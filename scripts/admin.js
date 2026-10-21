@@ -26,6 +26,18 @@ const STATUS = {
   published: 'Yayında', cancelled: 'İptal', completed: 'Tamamlandı', archived: 'Arşiv', active: 'Aktif', inactive: 'Pasif', ended: 'Sona erdi', expired: 'Süresi doldu',
   confirmed: 'Onaylı', pending_payment: 'Ödeme bekliyor', checked_in: 'Giriş yaptı', no_show: 'Gelmedi', suspended: 'Askıda', revoked: 'Geri alındı',
 };
+// What a reference column means when it is not simply "the" link (e.g. bookings.cancelled_by_user_id → who cancelled).
+const REF_ROLES = {
+  id_user: 'kişi', actor_user_id: 'işlemi yapan', approved_by_user_id: 'onaylayan', assigned_by_user_id: 'atayan', booked_by_user_id: 'ayırtan',
+  cancelled_by_user_id: 'iptal eden', claimed_by_user_id: 'kullanan', created_by_user_id: 'oluşturan', granted_by_user_id: 'veren',
+  invited_by_user_id: 'davet eden', invited_user_id: 'davet edilen', issued_by_user_id: 'veren', posted_by_user_id: 'kesinleştiren',
+  referrer_user_id: 'yönlendiren', reversed_by_user_id: 'geri alan', reviewed_by_user_id: 'inceleyen', revoked_by_user_id: 'geri alan',
+  updated_by_user_id: 'son düzenleyen', verified_by_user_id: 'doğrulayan',
+};
+/** Role of a reference column, or '' when it is the plain link named after the target's key (bookings.id_event → events). */
+const refRole = (column, targetPk) => column === targetPk && column !== 'id_user' ? '' : REF_ROLES[column] ?? column.replace(/^id_/, '').replace(/_id$/, '').replace(/_/g, ' ');
+const AUDIT_REFS = ['created_by_user_id', 'updated_by_user_id'];
+
 const EVENT_TYPES = { workspace: 'Çalışma alanı', meetup: 'Buluşma', workshop: 'Atölye', talk: 'Konuşma', class: 'Ders', social: 'Sosyal' };
 const OVERVIEW = [
   ['open_applications', 'Açık üyelik başvurusu', '#basvurular'], ['events_awaiting_publish', 'Yayın bekleyen etkinlik', '#etkinlikler/onay'],
@@ -217,9 +229,14 @@ async function dataTable(name, params) {
 }
 
 function relationMap(meta) {
-  const out = meta.columns.filter(c => c.ref && !['created_by_user_id', 'updated_by_user_id'].includes(c.name));
-  if (!out.length && !meta.incoming.length) return '';
-  return `<section class="admin-section admin-relations"><h2 class="admin-h2">İlişkiler</h2><div class="admin-relation-grid"><div><span class="section-label">BU TABLO BAĞLANIR</span><ul>${out.map(c => `<li><code>${esc(c.name)}</code> → <a href="#veri/${c.ref.table}">${esc(label(c.ref.table))}</a></li>`).join('') || '<li class="admin-muted">—</li>'}</ul></div><div><span class="section-label">BU TABLOYA BAĞLANANLAR</span><ul>${meta.incoming.map(r => `<li><a href="#veri/${r.table}">${esc(label(r.table))}</a> <code>${esc(r.column)}</code></li>`).join('') || '<li class="admin-muted">—</li>'}</ul></div></div></section>`;
+  const out = meta.columns.filter(c => c.ref && !AUDIT_REFS.includes(c.name));
+  const incoming = new Map();
+  for (const r of meta.incoming) incoming.set(r.table, [...incoming.get(r.table) ?? [], refRole(r.column, meta.pk)]);
+  if (!out.length && !incoming.size) return '';
+  const roles = list => list.filter(Boolean).length ? ` <span class="admin-muted">${list.filter(Boolean).map(esc).join(' · ')}</span>` : '';
+  const outList = out.length ? `<div><span class="section-label">${esc(label(meta.name).toLocaleUpperCase('tr'))} ŞUNLARA BAĞLI</span><ul>${out.map(c => `<li><a href="#veri/${c.ref.table}">${esc(label(c.ref.table))}</a>${roles([refRole(c.name, tableOf(c.ref.table)?.pk)])}</li>`).join('')}</ul></div>` : '';
+  const inList = incoming.size ? `<div><span class="section-label">BUNLAR ${esc(label(meta.name).toLocaleUpperCase('tr'))} TABLOSUNA BAĞLI</span><ul>${[...incoming].map(([t, list]) => `<li><a href="#veri/${t}">${esc(label(t))}</a>${roles(list)}</li>`).join('')}</ul></div>` : '';
+  return `<section class="admin-section admin-relations"><h2 class="admin-h2">İlişkiler</h2><p class="admin-muted admin-relations-help">Bir kayda girdiğinde, bu tablolardaki ona bağlı kayıtları da görürsün.</p><div class="admin-relation-grid${outList && inList ? '' : ' admin-relation-single'}">${outList}${inList}</div></section>`;
 }
 
 async function record(name, id) {
@@ -233,9 +250,9 @@ async function record(name, id) {
   return heading(esc(label(name)).toLocaleUpperCase('tr'), esc(title), `<code>${esc(name)}</code> · <code>${esc(id)}</code>`)
     + (name === 'events' ? `<div class="admin-actions admin-actions-top"><a class="shell-secondary" href="#etkinlik/${esc(id)}">Katılımcılar ve işlemler ↗</a></div>` : '')
     + (name === 'users' ? await rolePanel(id, data) + resetPanel(id) : '')
-    + `<section class="admin-section"><dl class="admin-fields">${meta.columns.map(c => `<div><dt><code>${esc(c.name)}</code>${c.ref ? ` <small>→ ${esc(label(c.ref.table))}</small>` : ''}</dt><dd>${cell(name, c, data.row[c.name], data.labels, { full: true })}</dd></div>`).join('')}</dl></section>`
-    + related.map(r => { const src = tableOf(r.table); return `<section class="admin-section"><div class="member-section-top"><h2 class="admin-h2">${esc(label(r.table))} <small>· ${esc(r.column)} (${r.total})</small></h2>${r.total > r.items.length ? `<a class="text-link" href="#veri/${r.table}?${encodeURIComponent(r.column)}=${encodeURIComponent(id)}">Tümünü gör ↗</a>` : ''}</div>${rowsTable(r.table, r.items, r.labels, summaryColumns(src, 5))}</section>`; }).join('')
-    + (emptyRelated.length ? `<p class="admin-muted admin-empty-rel">Bağlı kayıt yok: ${emptyRelated.map(r => `${esc(label(r.table))} (<code>${esc(r.column)}</code>)`).join(', ')}</p>` : '');
+    + `<section class="admin-section"><dl class="admin-fields">${meta.columns.map(c => `<div><dt><code>${esc(c.name)}</code>${c.ref ? ` <small>→ ${esc(label(c.ref.table))}${refRole(c.name, tableOf(c.ref.table)?.pk) ? ` (${esc(refRole(c.name, tableOf(c.ref.table)?.pk))})` : ''}</small>` : ''}</dt><dd>${cell(name, c, data.row[c.name], data.labels, { full: true })}</dd></div>`).join('')}</dl></section>`
+    + related.map(r => { const src = tableOf(r.table); return `<section class="admin-section"><div class="member-section-top"><h2 class="admin-h2">${esc(label(r.table))} <small>${refRole(r.column, meta.pk) ? `· ${esc(refRole(r.column, meta.pk))} olarak ` : ''}(${r.total})</small></h2>${r.total > r.items.length ? `<a class="text-link" href="#veri/${r.table}?${encodeURIComponent(r.column)}=${encodeURIComponent(id)}">Tümünü gör ↗</a>` : ''}</div>${rowsTable(r.table, r.items, r.labels, summaryColumns(src, 5))}</section>`; }).join('')
+    + (emptyRelated.length ? `<p class="admin-muted admin-empty-rel">Bağlı kaydı olmayanlar: ${[...new Set(emptyRelated.map(r => r.table))].map(t => esc(label(t))).join(', ')}</p>` : '');
 }
 
 function resetPanel(userId) {

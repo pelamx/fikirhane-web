@@ -133,3 +133,8 @@ body[data-shell=admin] .member-menu{display:none}
 #confirm-done .shell-primary{width:auto;margin-top:14px}
 #request-sent .text-link,#request-again{display:inline-block;margin-top:12px}
 .admin-reset-link input{flex:1;min-width:200px;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.admin-relations-help{margin:-8px 0 16px}
+.admin-relation-single{grid-template-columns:1fr}
+.admin-relations li{line-height:1.6}
+.admin-relations ul{padding:0}
+.admin-relation-single ul{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));column-gap:24px}
