@@ -2,6 +2,7 @@
 import { initTheme, escapeHTML as esc } from './shared.js';
 import { api, apiAvailable } from './api.js';
 import { siteUrl } from './session.js';
+import { columnLabel, valueLabel } from './admin-labels.js';
 initTheme();
 
 const content = document.querySelector('#admin-content');
@@ -35,7 +36,7 @@ const REF_ROLES = {
   updated_by_user_id: 'son düzenleyen', verified_by_user_id: 'doğrulayan',
 };
 /** Role of a reference column, or '' when it is the plain link named after the target's key (bookings.id_event → events). */
-const refRole = (column, targetPk) => column === targetPk && column !== 'id_user' ? '' : REF_ROLES[column] ?? column.replace(/^id_/, '').replace(/_id$/, '').replace(/_/g, ' ');
+const refRole = (column, targetPk) => column === targetPk && column !== 'id_user' ? '' : REF_ROLES[column] ?? columnLabel(column).toLocaleLowerCase('tr');
 const AUDIT_REFS = ['created_by_user_id', 'updated_by_user_id'];
 
 const EVENT_TYPES = { workspace: 'Çalışma alanı', meetup: 'Buluşma', workshop: 'Atölye', talk: 'Konuşma', class: 'Ders', social: 'Sosyal' };
@@ -56,7 +57,7 @@ const dateTime = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul',
 const dateOnly = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' });
 const when = v => v ? dateTime.format(new Date(v)) : '—';
 const money = (amount, currency) => amount == null ? '—' : Number(amount) === 0 ? 'Ücretsiz' : new Intl.NumberFormat('tr-TR', { style: 'currency', currency: currency || 'TRY', maximumFractionDigits: 2 }).format(Number(amount));
-const badge = s => `<span class="admin-status" data-status="${esc(s)}">${esc(STATUS[s] ?? s)}</span>`;
+const badge = (s, column = 'status') => `<span class="admin-status" data-status="${esc(s)}">${esc(STATUS[s] ?? valueLabel(column, s) ?? s)}</span>`;
 
 function route() {
   const [path, search = ''] = location.hash.slice(1).split('?');
@@ -91,7 +92,9 @@ function cell(table, col, value, labels, { full = false } = {}) {
   }
   if (col.name === tableOf(table)?.pk) return `<code>${esc(String(value).slice(0, 8))}</code>`;
   if (typeof value === 'boolean') return value ? 'Evet' : 'Hayır';
-  if (col.name === 'status' || col.name.endsWith('_status')) return badge(String(value));
+  if (col.name === 'status' || col.name.endsWith('_status')) return badge(String(value), col.name);
+  const coded = valueLabel(col.name, value);
+  if (coded) return `<span title="${esc(value)}">${esc(coded)}</span>`;
   if (col.type.startsWith('timestamp')) return esc(when(value));
   if (col.type === 'date') return esc(dateOnly.format(new Date(value)));
   if (typeof value === 'object') { const json = JSON.stringify(value); return `<code>${esc(full ? json : json.slice(0, 80))}</code>`; }
@@ -109,7 +112,7 @@ function summaryColumns(meta, max = 6) {
 
 function rowsTable(table, items, labels, columns) {
   const meta = tableOf(table);
-  return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr>${columns.map(c => `<th scope="col">${esc(c.name)}</th>`).join('')}<th scope="col"><span class="visually-hidden">Kayıt</span></th></tr></thead><tbody>${items.map(r => `<tr>${columns.map(c => `<td>${cell(table, c, r[c.name], labels)}</td>`).join('')}<td><a class="admin-open" href="#kayit/${esc(table)}/${esc(r[meta.pk])}" aria-label="Kaydı aç">↗</a></td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr>${columns.map(c => `<th scope="col" title="${esc(c.name)}">${esc(columnLabel(c.name, c.name === meta.pk))}</th>`).join('')}<th scope="col"><span class="visually-hidden">Kayıt</span></th></tr></thead><tbody>${items.map(r => `<tr>${columns.map(c => `<td>${cell(table, c, r[c.name], labels)}</td>`).join('')}<td><a class="admin-open" href="#kayit/${esc(table)}/${esc(r[meta.pk])}" aria-label="Kaydı aç">↗</a></td></tr>`).join('')}</tbody></table></div>`;
 }
 
 // ---------- views ----------
@@ -177,7 +180,7 @@ async function eventDetail(id) {
     + (options?.items.length ? `<section class="admin-section"><h2 class="admin-h2">Seçenekler</h2>${rowsTable('event_options', options.items, options.labels, summaryColumns(tableOf('event_options')))}</section>` : '')
     + `<section class="admin-section"><h2 class="admin-h2">Katılımcılar${people ? ` <small>(${people.items.length})</small>` : ''}</h2>`
     + (!people ? '<p class="admin-muted">Bu etkinliğin katılımcılarını görme yetkin yok.</p>'
-      : people.items.length ? `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th scope="col">Katılımcı</th><th scope="col">Yer</th><th scope="col">Durum</th><th scope="col">Ödeme</th><th scope="col">Tutar</th><th scope="col">Giriş</th></tr></thead><tbody>${people.items.map(p => `<tr><td>${p.first_name ? `${esc(p.first_name)} ${esc(p.last_name)}` : '<span class="admin-muted">Misafir</span>'}</td><td>${esc(p.option_code)}${p.seat_code ? ` · ${esc(p.seat_code)}` : ''}</td><td>${badge(p.booking_status)}</td><td>${esc(p.payment_status)}</td><td>${esc(money(p.final_price, e?.currency_code))}</td><td>${p.checkin_at ? esc(when(p.checkin_at)) : checkin && p.booking_status === 'confirmed' ? `<button class="shell-secondary" data-checkin="${p.id_booking}">Giriş yaptı</button>` : '—'}</td></tr>`).join('')}</tbody></table></div>`
+      : people.items.length ? `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th scope="col">Katılımcı</th><th scope="col">Yer</th><th scope="col">Durum</th><th scope="col">Ödeme</th><th scope="col">Tutar</th><th scope="col">Giriş</th></tr></thead><tbody>${people.items.map(p => `<tr><td>${p.first_name ? `${esc(p.first_name)} ${esc(p.last_name)}` : '<span class="admin-muted">Misafir</span>'}</td><td>${esc(p.option_code)}${p.seat_code ? ` · ${esc(p.seat_code)}` : ''}</td><td>${badge(p.booking_status)}</td><td>${esc(valueLabel('payment_status', p.payment_status) ?? p.payment_status)}</td><td>${esc(money(p.final_price, e?.currency_code))}</td><td>${p.checkin_at ? esc(when(p.checkin_at)) : checkin && p.booking_status === 'confirmed' ? `<button class="shell-secondary" data-checkin="${p.id_booking}">Giriş yaptı</button>` : '—'}</td></tr>`).join('')}</tbody></table></div>`
       : '<p class="admin-muted">Henüz rezervasyon yok.</p>') + '</section>';
 }
 
@@ -205,7 +208,7 @@ async function newEvent() {
 function dataIndex() {
   const groups = Object.entries(GROUPS).map(([g, name]) => [name, tables.filter(t => t.group === g)]).filter(([, list]) => list.length);
   return heading('VERİ', 'Kayıtlar ve <em>ilişkiler.</em>', 'Tablo dokümanlarındaki her tablo, alanları ve bağlantılarıyla. Bir kayda girince ona bağlı bütün kayıtları görürsün. Bu görünüm salt okunurdur.')
-    + groups.map(([name, list]) => `<section class="admin-section"><h2 class="admin-h2">${esc(name)}</h2><div class="admin-tables">${list.map(t => `<a href="#veri/${t.name}" class="admin-table-card"><strong>${esc(label(t.name))}</strong><code>${esc(t.name)}</code><small>${t.columns.length} alan · ${t.columns.filter(c => c.ref).length} bağlantı · ${t.incoming.length} ters ilişki</small></a>`).join('')}</div></section>`).join('');
+    + groups.map(([name, list]) => `<section class="admin-section"><h2 class="admin-h2">${esc(name)}</h2><div class="admin-tables">${list.map(t => `<a href="#veri/${t.name}" class="admin-table-card"><strong>${esc(label(t.name))}</strong><code>${esc(t.name)}</code><small>${t.columns.length} alan · ${t.columns.filter(c => c.ref).length} bağlantı · ${t.incoming.length} bağlanan tablo</small></a>`).join('')}</div></section>`).join('');
 }
 
 async function dataTable(name, params) {
@@ -218,11 +221,11 @@ async function dataTable(name, params) {
   const all = params.get('tum') === '1';
   const columns = all ? meta.columns : summaryColumns(meta);
   const link = changes => { const p = new URLSearchParams(params); for (const [k, v] of Object.entries(changes)) v == null ? p.delete(k) : p.set(k, v); const s = p.toString(); return `#veri/${name}${s ? '?' + s : ''}`; };
-  const filterLabel = (k, v) => { const col = meta.columns.find(c => c.name === k); const ref = col?.ref ? data.labels?.[col.ref.table]?.[v] : null; return `${esc(k)} = ${esc(ref ?? (v === '' ? 'boş' : v.length > 12 ? v.slice(0, 8) + '…' : v))}`; };
+  const filterLabel = (k, v) => { const col = meta.columns.find(c => c.name === k); const ref = col?.ref ? data.labels?.[col.ref.table]?.[v] : null; return `${esc(columnLabel(k, k === meta.pk))}: ${esc(ref ?? valueLabel(k, v) ?? STATUS[v] ?? (v === '' ? 'boş' : v.length > 12 ? v.slice(0, 8) + '…' : v))}`; };
   const pages = Math.ceil(data.total / limit);
   return heading(esc(GROUPS[meta.group] ?? '').toLocaleUpperCase('tr'), esc(label(name)), `<code>${esc(name)}</code> · ${data.total} kayıt`)
     + `<div class="admin-toolbar"><form id="data-search" class="admin-search" role="search"><label class="visually-hidden" for="data-q">Ara</label><input id="data-q" name="q" value="${esc(params.get('q') ?? '')}" placeholder="Metin alanlarında ara"><button class="shell-secondary" type="submit">Ara</button></form><a class="admin-chip" aria-pressed="${all}" href="${link({ tum: all ? null : '1', sayfa: null })}">${all ? 'Özet sütunlar' : 'Tüm sütunlar'}</a><a class="text-link" href="#veri">Tablolar ↗</a></div>`
-    + (filters.length ? `<div class="admin-filters">${filters.map(([k, v]) => `<a class="admin-chip" aria-pressed="true" href="${link({ [k]: null, sayfa: null })}" aria-label="Filtreyi kaldır: ${esc(k)}">${filterLabel(k, v)} ✕</a>`).join('')}</div>` : '')
+    + (filters.length ? `<div class="admin-filters">${filters.map(([k, v]) => `<a class="admin-chip" aria-pressed="true" href="${link({ [k]: null, sayfa: null })}" aria-label="Filtreyi kaldır: ${esc(columnLabel(k))}">${filterLabel(k, v)} ✕</a>`).join('')}</div>` : '')
     + (data.items.length ? rowsTable(name, data.items, data.labels, columns) : empty('Kayıt bulunamadı.'))
     + (pages > 1 ? `<nav class="admin-pager" aria-label="Sayfalar">${page > 0 ? `<a class="shell-secondary" href="${link({ sayfa: page - 1 || null })}">← Önceki</a>` : ''}<span>${page + 1} / ${pages}</span>${page + 1 < pages ? `<a class="shell-secondary" href="${link({ sayfa: page + 1 })}">Sonraki →</a>` : ''}</nav>` : '')
     + relationMap(meta);
@@ -250,7 +253,7 @@ async function record(name, id) {
   return heading(esc(label(name)).toLocaleUpperCase('tr'), esc(title), `<code>${esc(name)}</code> · <code>${esc(id)}</code>`)
     + (name === 'events' ? `<div class="admin-actions admin-actions-top"><a class="shell-secondary" href="#etkinlik/${esc(id)}">Katılımcılar ve işlemler ↗</a></div>` : '')
     + (name === 'users' ? await rolePanel(id, data) + resetPanel(id) : '')
-    + `<section class="admin-section"><dl class="admin-fields">${meta.columns.map(c => `<div><dt><code>${esc(c.name)}</code>${c.ref ? ` <small>→ ${esc(label(c.ref.table))}${refRole(c.name, tableOf(c.ref.table)?.pk) ? ` (${esc(refRole(c.name, tableOf(c.ref.table)?.pk))})` : ''}</small>` : ''}</dt><dd>${cell(name, c, data.row[c.name], data.labels, { full: true })}</dd></div>`).join('')}</dl></section>`
+    + `<section class="admin-section"><dl class="admin-fields">${meta.columns.map(c => `<div><dt><b>${esc(columnLabel(c.name, c.name === meta.pk))}</b> <code>${esc(c.name)}</code>${c.ref ? ` <small>→ ${esc(label(c.ref.table))}${refRole(c.name, tableOf(c.ref.table)?.pk) ? ` (${esc(refRole(c.name, tableOf(c.ref.table)?.pk))})` : ''}</small>` : ''}</dt><dd>${cell(name, c, data.row[c.name], data.labels, { full: true })}</dd></div>`).join('')}</dl></section>`
     + related.map(r => { const src = tableOf(r.table); return `<section class="admin-section"><div class="member-section-top"><h2 class="admin-h2">${esc(label(r.table))} <small>${refRole(r.column, meta.pk) ? `· ${esc(refRole(r.column, meta.pk))} olarak ` : ''}(${r.total})</small></h2>${r.total > r.items.length ? `<a class="text-link" href="#veri/${r.table}?${encodeURIComponent(r.column)}=${encodeURIComponent(id)}">Tümünü gör ↗</a>` : ''}</div>${rowsTable(r.table, r.items, r.labels, summaryColumns(src, 5))}</section>`; }).join('')
     + (emptyRelated.length ? `<p class="admin-muted admin-empty-rel">Bağlı kaydı olmayanlar: ${[...new Set(emptyRelated.map(r => r.table))].map(t => esc(label(t))).join(', ')}</p>` : '');
 }

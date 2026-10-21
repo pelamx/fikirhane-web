@@ -138,3 +138,15 @@ body[data-shell=admin] .member-menu{display:none}
 .admin-relations li{line-height:1.6}
 .admin-relations ul{padding:0}
 .admin-relation-single ul{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));column-gap:24px}
+.admin-table th{font:11px 'DM Sans',sans-serif;color:var(--muted);letter-spacing:.2px}
+.admin-fields dt b{font-weight:500;font-size:12px;margin-right:4px}
+.admin-fields dt code{font-size:9px}
+.admin-table td{overflow-wrap:break-word;word-break:normal}
+@media(max-width:650px){
+.admin-table{min-width:680px}
+.admin-stats{grid-template-columns:1fr 1fr}
+.admin-stats>a{padding:16px 12px!important;border-right:1px solid var(--line)!important}
+.admin-stats>a:nth-child(2n){border-right:0!important}
+.admin-stats strong{font-size:34px}
+.admin-new{width:100%!important}
+}
