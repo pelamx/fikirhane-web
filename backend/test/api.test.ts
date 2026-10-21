@@ -83,7 +83,11 @@ describe('security', () => {
   test('the site is served but backend files are not', async () => {
     const c = new Client(env);
     assert.equal((await c.get('/')).status, 200);
-    assert.equal((await c.get('/scripts/session.js')).status, 200);
+    const script = await c.get('/scripts/session.js');
+    assert.equal(script.status, 200);
+    assert.equal(script.headers.get('cache-control'), 'no-cache', 'code is revalidated so deploys need no hard refresh');
+    const again = await c.call('GET', '/scripts/session.js', undefined, { 'if-modified-since': script.headers.get('last-modified')! });
+    assert.equal(again.status, 304);
     for (const p of ['/%E0%A4%A', '/backend/package.json', '/backend/.env', '/.git/config', '/docs/backend-decisions.md', '/scripts/../backend/src/app.ts']) {
       assert.equal((await c.get(p)).status, 404, p);
     }

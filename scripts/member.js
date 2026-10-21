@@ -1,10 +1,10 @@
 import { initTheme, escapeHTML as esc } from './shared.js';
-import { ready, mode, getCatalog, getSession, saveProfile, toggleClub, toggleEvent, bookEvent, cancelBooking, applyForMembership, membershipStatus, signOut, clearPreview, siteUrl } from './session.js';
+import { ready, mode, getCatalog, getSession, saveProfile, toggleClub, toggleEvent, bookEvent, cancelBooking, signOut, clearPreview, siteUrl } from './session.js';
 initTheme();
 const content = document.querySelector('#member-content');
 const menu = document.querySelector('.member-menu');
 const sidebar = document.querySelector('.member-sidebar');
-let query = '', category = 'all', eventFilter = 'all', toastTimer, busy = false, membershipInfo = null;
+let query = '', category = 'all', eventFilter = 'all', toastTimer, busy = false;
 const navNames = { anasayfa: 'Ana sayfam', kesfet: 'Kulüpleri keşfet', kuluplerim: 'Kulüplerim', bulusmalar: 'Buluşmalar', profil: 'Profilim', kulup: 'Kulüp' };
 const live = () => mode() === 'api';
 const clubs = () => getCatalog().clubs;
@@ -83,21 +83,11 @@ function gatherings(session) {
     : ['İlgini çeken buluşmaları kişisel planına ekle. Gerçek katılım işlemini etkinliğin kendi sayfasında tamamla.', `Planım (${session.eventIds.length})`, '21–27 Ekim 2026 · Kaynak siteden alınan örnek program'];
   return heading('BULUŞMALAR', 'Bir sonraki <em>merhaba.</em>', intro) + `<div class="event-filter" role="group" aria-label="Buluşma görünümü"><button data-event-filter="all" aria-pressed="${eventFilter==='all'}">Tüm buluşmalar</button><button data-event-filter="mine" aria-pressed="${eventFilter==='mine'}">${mine}</button></div><p class="program-label">${label}</p>` + (shown.length ? shown.map(e=>eventCard(e,session)).join('') : empty('Takviminde boş bir sandalye var.', live() ? 'Bir buluşmada yerini ayırt; tarihi ve saati burada bir arada gör.' : 'Bir buluşmayı planına ekle; tarihi ve saati burada bir arada gör.', 'Tüm buluşmaları gör', '#bulusmalar/tumu'));
 }
-function membershipPanel(session) {
-  const m = session.membership;
-  const open = membershipInfo?.applications?.find(a => ['submitted', 'under_review', 'waitlisted'].includes(a.status));
-  const statusText = { submitted: 'Başvurun alındı; ekibimiz inceleyecek.', under_review: 'Başvurun inceleniyor.', waitlisted: 'Başvurun bekleme listesinde.' };
-  const body = m?.code
-    ? `<p><strong>${esc(m.name)}</strong>${m.end_date ? ` · ${esc(new Date(m.end_date).toLocaleDateString('tr-TR'))} tarihine kadar` : ''}</p><p>%${Number(m.discount_rate)} indirim · ${m.reservation_window_days} gün önceden rezervasyon${m.seat_selection_enabled ? ' · koltuk seçimi' : ''}</p>`
-    : open ? `<p>${statusText[open.status]}</p>`
-    : `<p>Şu an ziyaretçisin. Üyeler buluşmalarda indirim ve öncelikli rezervasyon hakkı kazanır.</p><form id="membership-form" class="profile-form"><label for="membership-motivation">Fikirhane’ye neden katılmak istiyorsun?</label><textarea id="membership-motivation" maxlength="2000" rows="3" required></textarea><button class="shell-primary" type="submit">Üyelik başvurusu yap <span>↗</span></button></form>`;
-  return `<section class="preview-settings membership-panel"><h2>Fikirhane üyeliği</h2>${body}</section>`;
-}
 function profile(session) {
   const badge = live() ? esc((session.membership?.code ? session.membership.name : 'Ziyaretçi').toLocaleUpperCase('tr')) : 'ÜYE ALANI ÖNİZLEMESİ';
   const foot = live() ? 'Profilin Fikirhane hesabında saklanır.' : 'Bu profil yalnızca senin tarayıcında görünür. Başka üyelerle paylaşılmaz.';
   const settings = live()
-    ? membershipPanel(session) + `<section class="preview-settings"><h2>Hesap</h2><p>${esc(session.profile.email ?? '')}</p><div><button class="shell-secondary" data-signout>Çıkış yap ↗</button></div></section>`
+    ? `<section class="preview-settings"><h2>Hesap</h2><p>${esc(session.profile.email ?? '')}</p><div><button class="shell-secondary" data-signout>Çıkış yap ↗</button></div></section>`
     : `<section class="preview-settings"><h2>Önizleme tercihleri</h2><p>Çıkış yaparsan seçimlerin korunur. Önizlemeyi silersen bu tarayıcıdaki profilin ve seçimlerin kaldırılır.</p><div><button class="shell-secondary" data-signout>Çıkış yap ↗</button><button class="text-danger" data-action="reset">Önizlemeyi sil</button></div></section>`;
   return heading('PROFİLİM', 'Biraz da <em>senden.</em>', 'Bir sonraki sohbet, ortak bir merakla başlayabilir.') + `<div class="profile-layout"><form id="profile-form" class="profile-form"><label for="profile-name">Adın</label><input id="profile-name" name="name" maxlength="50" required autocomplete="given-name" value="${esc(session.profile.name)}"><label for="profile-bio">Nelerle ilgileniyorsun?</label><textarea id="profile-bio" name="bio" maxlength="240" rows="4" placeholder="Kısaca kendinden ve merak ettiklerinden bahset.">${esc(session.profile.bio)}</textarea><p class="entry-footnote">${foot}</p><button class="shell-primary" type="submit">Değişiklikleri kaydet <span>↗</span></button></form><aside class="profile-summary"><div class="profile-avatar">${esc(session.profile.name[0].toLocaleUpperCase('tr'))}</div><h2>${esc(session.profile.name)}</h2><p>${session.clubIds.length} kulüp · ${session.eventIds.length} ${live() ? 'rezervasyon' : 'buluşma'}</p><span class="preview-badge">${badge}</span>${live() ? '' : '<a class="text-link" href="https://www.fikirhane.co/ng/uyelik" target="_blank" rel="noopener">Gerçek Fikirhane üyeliği ↗</a>'}</aside></div>${settings}`;
 }
@@ -118,7 +108,6 @@ function render() {
   if (view==='bulusmalar' && id==='tumu') eventFilter='all';
   content.innerHTML = view==='anasayfa' ? home(session) : view==='kesfet' ? discover() : view==='kuluplerim' ? myClubs(session) : view==='kulup' ? clubDetail(id,session) : view==='bulusmalar' ? gatherings(session) : profile(session);
   if (view==='kesfet') renderResults(session);
-  if (view==='profil' && live() && !membershipInfo) membershipStatus().then(info => { membershipInfo = info; if (route().view === 'profil') render(); }).catch(() => {});
 }
 async function exit() { try { await signOut(); location.assign(siteUrl('')); } catch { flash('Çıkış kaydedilemedi. Tarayıcı depolama iznini kontrol et.'); } }
 async function run(task, success) {
@@ -144,11 +133,6 @@ document.addEventListener('click', event => {
 content.addEventListener('input', event => { if(event.target.id==='club-search'){query=event.target.value;renderResults(getSession());} if(event.target.id==='profile-name')event.target.setCustomValidity(''); });
 content.addEventListener('submit', event => {
   event.preventDefault();
-  if (event.target.id === 'membership-form') {
-    const text = document.querySelector('#membership-motivation').value.trim();
-    run(async () => { await applyForMembership('MEMBER', text); membershipInfo = await membershipStatus(); }, 'Başvurun alındı.');
-    return;
-  }
   if (event.target.id!=='profile-form') return;
   const name=document.querySelector('#profile-name').value.trim();
   if(!name){document.querySelector('#profile-name').setCustomValidity('Adını yazabilir misin?');document.querySelector('#profile-name').reportValidity();return;}

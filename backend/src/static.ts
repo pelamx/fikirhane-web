@@ -25,10 +25,16 @@ export function staticSite(root: string) {
     try {
       const info = await stat(file);
       if (info.isDirectory()) return c.redirect(path + '/', 301);
-      const data = await readFile(file);
-      c.header('content-type', TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream');
-      c.header('cache-control', extname(file) === '.html' ? 'no-cache' : 'public, max-age=3600');
-      return c.body(data);
+      // Code and pages are revalidated on every load so a deploy shows up without a hard refresh; images can be cached.
+      const ext = extname(file).toLowerCase();
+      const revalidate = ext === '.html' || ext === '.js' || ext === '.css';
+      const lastModified = new Date(Math.floor(info.mtimeMs / 1000) * 1000);
+      c.header('cache-control', revalidate ? 'no-cache' : 'public, max-age=86400');
+      c.header('last-modified', lastModified.toUTCString());
+      const since = Date.parse(c.req.header('if-modified-since') ?? '');
+      if (!Number.isNaN(since) && lastModified.getTime() <= since) return c.body(null, 304);
+      c.header('content-type', TYPES[ext] ?? 'application/octet-stream');
+      return c.body(await readFile(file));
     } catch {
       return c.notFound();
     }
