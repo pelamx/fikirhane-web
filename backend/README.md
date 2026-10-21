@@ -28,7 +28,7 @@ The server migrates on start unless `MIGRATE_ON_START=false`, and runs the expir
 
 ```sh
 npm run typecheck
-npm test           # 29 tests against a real, throwaway PostgreSQL (embedded-postgres)
+npm test           # 34 tests against a real, throwaway PostgreSQL (embedded-postgres)
 ```
 
 They cover schema guards (no hard delete, append-only ledgers, document/allocation/stock rules, sponsor exclusivity), pricing,
@@ -68,6 +68,11 @@ Browsers authenticate with the httpOnly `fh_session` cookie; other clients can s
 | GET | `/clubs`, `/clubs/:code`, `/events`, `/events/:id`, `/interests`, `/skills`, `/membership-types` | public; prices are personalized when signed in |
 | PUT / DELETE | `/clubs/:code/membership` | join / leave as MEMBER |
 | POST | `/bookings` | `event_id, event_option_id?, seat_id?, table_id?, freepass_code?, join_waitlist?, need_text?, offer_text?` |
+| GET | `/admin/schema` | tables the caller may read, with columns, foreign keys and incoming relations; 403 for non-staff |
+| GET | `/admin/overview` | counts, only for the caller's permissions |
+| GET | `/admin/data/:table` | `q`, `limit`, `offset`, and `<column>=<value>` filters (empty value = null); foreign keys come with display labels |
+| GET | `/admin/data/:table/:id` | one record, its references, and the first rows of every table that points at it |
+| GET | `/admin/events` | `when=upcoming/past/all`, `status`; includes drafts, capacity, bookings |
 | GET | `/admin/membership-applications` | `membership.view` |
 | POST | `/admin/membership-applications/:id/decision` | `under_review / approved / waitlisted / declined` |
 | POST | `/admin/events` | `event.create`, or club lead → `submitted` |
@@ -76,5 +81,7 @@ Browsers authenticate with the httpOnly `fh_session` cookie; other clients can s
 | POST | `/admin/bookings/:id/checkin` | |
 | POST / DELETE | `/admin/users/:id/roles[/:role]` | `role.assign` / `role.revoke`, audited |
 
+The `/admin/data` endpoints are read-only. Each table opens with one of the permissions listed in `src/services/admin-data.ts`;
+`auth_identities` and `user_sessions` are never exposed, and guest emails/phones are masked without `user.view_contact`.
 Finance (documents, transactions, allocations), stock, campaigns, invitations and sponsorships are fully modelled and guarded
-in the database. Their API endpoints are the next phase.
+in the database and readable in the admin shell (`/admin/`). Their write endpoints are the next phase.

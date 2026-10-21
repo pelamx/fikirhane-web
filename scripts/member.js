@@ -112,6 +112,8 @@ function render() {
   document.querySelector('#header-name').textContent = session.profile.name;
   document.querySelector('#header-initial').textContent = session.profile.name[0].toLocaleUpperCase('tr');
   document.querySelector('#sidebar-club-count').textContent = session.clubIds.length;
+  const staff = live() && session.roles?.some(r => r !== 'USER');
+  if (staff && !document.querySelector('#admin-link')) document.querySelector('#member-nav').insertAdjacentHTML('beforeend', `<a href="${siteUrl('admin/')}" id="admin-link"><span>⚙</span>Yönetim paneli</a>`);
   document.querySelectorAll('[data-view]').forEach(link=> { const current = link.dataset.view === (view==='kulup' ? 'kesfet' : view); if(current)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current'); });
   if (view==='bulusmalar' && id==='tumu') eventFilter='all';
   content.innerHTML = view==='anasayfa' ? home(session) : view==='kesfet' ? discover() : view==='kuluplerim' ? myClubs(session) : view==='kulup' ? clubDetail(id,session) : view==='bulusmalar' ? gatherings(session) : profile(session);

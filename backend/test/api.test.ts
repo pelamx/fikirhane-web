@@ -296,6 +296,79 @@ describe('admin events', () => {
   });
 });
 
+describe('admin data', () => {
+  test('only back-office roles get the schema, overview and data; credentials are never exposed', async () => {
+    const user = await registered(env);
+    for (const path of ['/api/admin/schema', '/api/admin/overview', '/api/admin/data/users', '/api/admin/events']) {
+      assert.equal((await user.client.get(path)).status, 403, path);
+    }
+    const admin = await registered(env);
+    await grantRole(env.sql, admin.userId, 'FIKIRHANE_ADMIN');
+    const schema = await admin.client.get('/api/admin/schema');
+    assert.equal(schema.status, 200);
+    const names = schema.json.tables.map((t: { name: string }) => t.name);
+    assert.ok(names.includes('bookings') && names.includes('membership_applications'));
+    assert.ok(!names.includes('auth_identities') && !names.includes('user_sessions') && !names.includes('audit_log'));
+    assert.equal((await admin.client.get('/api/admin/data/auth_identities')).status, 404);
+    assert.equal((await admin.client.get('/api/admin/data/audit_log')).status, 403);
+    assert.equal((await admin.client.get('/api/admin/data/users;drop')).status, 400);
+    assert.equal((await admin.client.get('/api/admin/data/users?password=x')).status, 400);
+    const overview = await admin.client.get('/api/admin/overview');
+    assert.equal(typeof overview.json.open_applications, 'number');
+  });
+
+  test('relations follow foreign keys both ways, including composite keys', async () => {
+    const admin = await registered(env);
+    await grantRole(env.sql, admin.userId, 'FIKIRHANE_ADMIN');
+    const schema = (await admin.client.get('/api/admin/schema')).json.tables;
+    const bookings = schema.find((t: { name: string }) => t.name === 'bookings');
+    const col = (n: string) => bookings.columns.find((c: { name: string }) => c.name === n);
+    assert.deepEqual(col('id_user').ref, { table: 'users', column: 'id_user' });
+    assert.deepEqual(col('id_event').ref, { table: 'events', column: 'id_event' });
+    const events = schema.find((t: { name: string }) => t.name === 'events');
+    assert.ok(events.incoming.some((r: { table: string; column: string }) => r.table === 'bookings' && r.column === 'id_event'));
+
+    const member = await registered(env, { last_name: 'İlişkiTesti' });
+    await member.client.put('/api/clubs/ENGLISH/membership');
+    const found = await admin.client.get('/api/admin/data/users?q=İlişkiTesti');
+    assert.equal(found.json.total, 1);
+    const record = await admin.client.get(`/api/admin/data/users/${member.userId}`);
+    assert.equal(record.json.row.last_name, 'İlişkiTesti');
+    const clubs = record.json.related.find((r: { table: string; column: string }) => r.table === 'club_users' && r.column === 'id_user');
+    assert.equal(clubs.total, 1);
+    const clubId = clubs.items[0].id_club;
+    assert.equal(clubs.labels.clubs[clubId], 'İngilizce Konuşma Kulübü');
+    const filtered = await admin.client.get(`/api/admin/data/club_users?id_user=${member.userId}`);
+    assert.equal(filtered.json.total, 1);
+  });
+
+  test('guest contact details are masked without user.view_contact', async () => {
+    const { eventId, optionId } = await makeEvent(env.sql, { hoursFromNow: 300 });
+    await env.sql`insert into bookings (id_event, id_event_option, booking_status, booking_source, booking_unit, final_price, currency_code,
+        payment_status, guest_first_name, guest_email)
+      values (${eventId}, ${optionId}, 'waitlisted', 'staff', 'seat', 0, 'TRY', 'unpaid', 'Misafir', 'guest@example.com')`;
+    const marketing = await registered(env);
+    await grantRole(env.sql, marketing.userId, 'MARKETING');
+    const list = await marketing.client.get(`/api/admin/data/bookings?id_event=${eventId}`);
+    assert.equal(list.json.items[0].guest_email, '•••');
+    assert.equal((await marketing.client.get(`/api/admin/data/bookings?guest_email=guest@example.com`)).status, 403);
+    const admin = await registered(env);
+    await grantRole(env.sql, admin.userId, 'FIKIRHANE_ADMIN');
+    assert.equal((await admin.client.get(`/api/admin/data/bookings?id_event=${eventId}`)).json.items[0].guest_email, 'guest@example.com');
+  });
+
+  test('admin event list shows drafts with capacity and bookings', async () => {
+    const admin = await registered(env);
+    await grantRole(env.sql, admin.userId, 'FIKIRHANE_ADMIN');
+    const { eventId } = await makeEvent(env.sql, { hoursFromNow: 500, capacity: 7 });
+    await env.sql`update events set status = 'draft' where id_event = ${eventId}`;
+    const res = await admin.client.get('/api/admin/events?status=draft');
+    const row = res.json.items.find((e: { id_event: string }) => e.id_event === eventId);
+    assert.equal(row.capacity, 7);
+    assert.equal(row.booked, 0);
+  });
+});
+
 describe('jobs', () => {
   test('expire pending holds and finished memberships', async () => {
     const { eventId, optionId } = await makeEvent(env.sql, { hoursFromNow: 40 });

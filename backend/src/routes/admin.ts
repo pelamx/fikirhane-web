@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { forbidden, notFound } from '../errors.ts';
+import { badRequest, forbidden, notFound } from '../errors.ts';
 import { body, idParam, permissionsOf, query, requireUser, type Deps, type Env } from '../http.ts';
+import { getRecord, listRows, visibleSchema } from '../services/admin-data.ts';
 import { audit } from '../services/audit.ts';
 import { hasClubPermission, hasEventPermission, requirePermission } from '../services/authz.ts';
 import { checkIn } from '../services/bookings.ts';
@@ -38,12 +39,74 @@ const Decision = z.object({
   waitlist_until: z.iso.date().nullable().optional(),
 });
 const Reason = z.object({ reason: z.string().trim().min(3).max(500) });
+const identifier = (v: string) => { if (!/^[a-z_]{2,40}$/.test(v)) throw badRequest('invalid_name', 'Invalid table or column name.'); return v; };
+const Page = z.object({ q: z.string().trim().max(100).optional(), limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).max(1_000_000).default(0) });
+const EVENT_LIST_PERMS = ['event.create', 'event.publish', 'event.cancel', 'booking.view'];
 const RoleAssign = z.object({ role_code: code, expires_at: z.iso.datetime({ offset: true }).nullable().optional(), notes: z.string().max(500).nullable().optional() });
 
 /** Back-office endpoints. Every handler checks permission on the server (PERM-D10) and audits critical actions. */
 export function adminRoutes(deps: Deps) {
   const app = new Hono<Env>();
   const { sql, config } = deps;
+
+  // Navigation for the admin shell: which tables (with their relations) and actions this person may use.
+  app.get('/schema', async c => {
+    const perms = await permissionsOf(c, deps);
+    const tables = await visibleSchema(sql, perms);
+    if (!tables.length && !perms.has('membership.view') && !EVENT_LIST_PERMS.some(p => perms.has(p))) throw forbidden();
+    return c.json({ permissions: [...perms].sort(), tables });
+  });
+
+  app.get('/overview', async c => {
+    const perms = await permissionsOf(c, deps);
+    const count = async (q: Promise<{ n: number }[]>) => (await q)[0].n;
+    const out: Record<string, number> = {};
+    const jobs: Promise<void>[] = [];
+    const add = (key: string, perm: string, q: () => Promise<{ n: number }[]>) => { if (perms.has(perm)) jobs.push(count(q()).then(n => { out[key] = n; })); };
+    add('open_applications', 'membership.view', () => sql`select count(*)::int as n from membership_applications where status in ('submitted', 'under_review')`);
+    add('active_memberships', 'membership.view', () => sql`select count(*)::int as n from user_memberships where status = 'active'`);
+    add('events_awaiting_publish', 'event.publish', () => sql`select count(*)::int as n from events where status in ('submitted', 'approved') and end_datetime > now()`);
+    add('upcoming_events', 'booking.view', () => sql`select count(*)::int as n from events where status = 'published' and start_datetime between now() and now() + interval '7 days'`);
+    add('active_bookings', 'booking.view', () => sql`select count(*)::int as n from bookings b join events e using (id_event)
+      where b.booking_status in ('pending_payment', 'confirmed', 'checked_in') and e.end_datetime > now()`);
+    add('users', 'user.view_basic', () => sql`select count(*)::int as n from users where account_status = 'active'`);
+    await Promise.all(jobs);
+    if (!Object.keys(out).length) throw forbidden();
+    return c.json(out);
+  });
+
+  app.get('/data/:table', async c => {
+    const perms = await permissionsOf(c, deps);
+    const { q, limit, offset, ...rest } = c.req.query();
+    const page = Page.safeParse({ q, limit, offset });
+    if (!page.success) throw badRequest('validation_failed', 'Some query parameters are invalid.');
+    const filters = Object.fromEntries(Object.entries(rest).map(([k, v]) => [identifier(k), String(v).slice(0, 200)]));
+    return c.json(await listRows(sql, perms, identifier(c.req.param('table')), { ...page.data, q: page.data.q || undefined, filters }));
+  });
+
+  app.get('/data/:table/:id', async c => {
+    const perms = await permissionsOf(c, deps);
+    return c.json(await getRecord(sql, perms, identifier(c.req.param('table')), idParam(c, 'id')));
+  });
+
+  app.get('/events', async c => {
+    const perms = await permissionsOf(c, deps);
+    if (!EVENT_LIST_PERMS.some(p => perms.has(p))) throw forbidden();
+    const { status, when } = query(c, z.object({ status: z.string().regex(/^[a-z_]{2,20}$/).optional(), when: z.enum(['upcoming', 'past', 'all']).default('upcoming') }));
+    const rows = await sql`
+      select e.id_event, e.event_title, e.event_type, e.status, e.start_datetime, e.end_datetime, e.base_price, e.currency_code,
+             (select coalesce(sum(o.capacity), 0)::int from event_options o where o.id_event = e.id_event and o.status = 'active') as capacity,
+             (select count(*)::int from bookings b where b.id_event = e.id_event and b.booking_status in ('pending_payment', 'confirmed', 'checked_in')) as booked,
+             (select count(*)::int from bookings b where b.id_event = e.id_event and b.booking_status = 'waitlisted') as waitlisted,
+             (select string_agg(cl.club_name, ', ' order by ec.is_primary desc) from event_clubs ec join clubs cl using (id_club)
+               where ec.id_event = e.id_event and ec.status = 'active') as clubs
+      from events e
+      where ${status ? sql`e.status = ${status}` : sql`true`}
+        and ${when === 'upcoming' ? sql`e.end_datetime > now()` : when === 'past' ? sql`e.end_datetime <= now()` : sql`true`}
+      order by ${when === 'past' ? sql`e.start_datetime desc` : sql`e.start_datetime`} limit 300`;
+    return c.json({ items: rows });
+  });
 
   app.get('/membership-applications', async c => {
     requirePermission(await permissionsOf(c, deps), 'membership.view');

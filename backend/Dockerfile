@@ -13,6 +13,7 @@ COPY scripts scripts
 COPY assets assets
 COPY member member
 COPY uyelik uyelik
+COPY admin admin
 ENV NODE_ENV=production PORT=8080 SITE_DIR=..
 WORKDIR /app/backend
 USER node
