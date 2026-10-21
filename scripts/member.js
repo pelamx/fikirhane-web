@@ -31,12 +31,12 @@ function bookingControls(event) {
     const label = b.booking_status === 'waitlisted' ? 'Bekleme listesindesin' : 'Yerin ayrıldı';
     return `<p class="booking-state">✓ ${label}${option ? ' · ' + esc(option.option_name ?? option.location_name) : ''}</p><button class="shell-secondary" data-action="cancel-booking" data-id="${esc(b.id_booking)}">Rezervasyonu iptal et</button>`;
   }
-  return event.options.map(o => {
-    const full = o.available === 0;
-    const price = o.price ? money(o.price.finalPrice, o.price.currency) : '';
-    const was = o.price && o.price.discountAmount !== '0.00' ? ` <s>${money(o.price.listAmount, o.price.currency)}</s>` : '';
-    return `<button class="shell-secondary option-button" data-action="book" data-id="${esc(event.id)}" data-option="${esc(o.id_event_option)}" ${full ? 'disabled' : ''}><span>${esc(o.option_name ?? o.location_name)}</span><small>${price}${was} · ${full ? 'Dolu' : o.available + ' yer'}</small></button>`;
-  }).join('');
+  // Booking happens in the reservation flow (session → seat → details → confirm); here we show price and room availability.
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(event.start));
+  const free = event.options.reduce((n, o) => n + o.available, 0);
+  const prices = event.options.map(o => o.price).filter(Boolean).sort((a, b) => Number(a.finalPrice) - Number(b.finalPrice));
+  const price = prices[0] ? money(prices[0].finalPrice, prices[0].currency) : '';
+  return `<p class="booking-state">${price}${price ? ' · ' : ''}${free ? `${free} yer boş` : 'Dolu · bekleme listesi'}</p><a class="shell-primary option-button" href="${siteUrl(`rezervasyon/?tarih=${day}&seans=${encodeURIComponent(event.id)}&adim=koltuk`)}">Yer ayırt <span>↗</span></a>`;
 }
 function eventCard(event, session) {
   const club = clubs().find(c => c.id === event.clubId);

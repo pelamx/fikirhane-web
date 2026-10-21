@@ -113,11 +113,27 @@ export function catalogRoutes(deps: Deps) {
     }));
   }
 
+  /** What the caller may do when booking: shown up front so the reservation page can explain limits before submitting. */
+  async function policy(userId: string | null) {
+    const rights = userId ? await membershipRights(sql, userId, deps.config) : null;
+    return {
+      signed_in: !!userId,
+      membership: rights?.code ? rights.name : null,
+      seat_selection: !!rights?.seatSelectionEnabled,
+      reservation_window_days: rights?.reservationWindowDays ?? deps.config.visitorReservationWindowDays,
+      max_active_bookings: rights?.maxActiveBookings ?? deps.config.visitorMaxActiveBookings,
+      cancellation_lock_hours: deps.config.cancellationLockHours,
+      payment_mode: deps.config.paymentMode,
+    };
+  }
+
   app.get('/events', async c => {
     const q = query(c, EventsQuery);
     const from = q.from ? new Date(q.from) : new Date();
     const to = q.to ? new Date(q.to) : new Date(from.getTime() + 60 * 86_400_000);
-    return c.json({ items: await events(c.get('userId'), { from, to, club: q.club }) });
+    const userId = c.get('userId');
+    const [items, rules] = await Promise.all([events(userId, { from, to, club: q.club }), policy(userId)]);
+    return c.json({ items, policy: rules });
   });
 
   app.get('/events/:id', async c => {
@@ -127,14 +143,22 @@ export function catalogRoutes(deps: Deps) {
     if (!event) throw notFound('Event');
     // Seat map for seat-based options: positions plus whether each seat is free (no identities of other participants).
     const seatMaps = await sql`
-      select o.id_event_option, s.id_seat, s.seat_code, s.seat_name, s.position_x, s.position_y, s.rotation, t.table_code,
+      select o.id_event_option, s.id_seat, s.seat_code, s.seat_name, s.position_x, s.position_y, s.rotation, t.table_code, s.id_table,
              not exists (select 1 from bookings b where b.id_event_option = o.id_event_option and b.id_seat = s.id_seat
                          and b.booking_status in ${sql(CAPACITY_STATUSES)}) as free
       from event_options o join seats s on s.id_space_setup = o.id_space_setup and s.status = 'active' and s.reservable
       left join tables t on t.id_table = s.id_table
       where o.id_event = ${id.data} and o.status = 'active' and o.booking_unit = 'seat'
       order by s.sort_order`;
-    return c.json({ event: { ...event, seats: seatMaps } });
+    // Floor plan per option: the setup's plan image and its tables, drawn under the seats.
+    const plans = await sql`
+      select o.id_event_option, ss.setup_name, ss.map_image, ss.map_aspect_ratio, ss.capacity,
+             coalesce((select json_agg(json_build_object('id_table', t.id_table, 'table_code', t.table_code, 'table_name', t.table_name,
+                 'position_x', t.position_x, 'position_y', t.position_y, 'width', t.width, 'height', t.height, 'shape', t.shape) order by t.sort_order)
+               from tables t where t.id_space_setup = ss.id_space_setup and t.status = 'active'), '[]') as tables
+      from event_options o join space_setups ss using (id_space_setup)
+      where o.id_event = ${id.data} and o.status = 'active'`;
+    return c.json({ event: { ...event, seats: seatMaps, plans }, policy: await policy(c.get('userId')) });
   });
 
   app.post('/bookings', async c => {

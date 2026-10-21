@@ -125,6 +125,25 @@ describe('clubs and events', () => {
   });
 });
 
+describe('reservation page data', () => {
+  test('event detail carries the floor plan, seat positions and what the caller may do', async () => {
+    const { eventId } = await makeEvent(env.sql, { hoursFromNow: 72 });
+    const anon = new Client(env);
+    const res = await anon.get(`/api/events/${eventId}`);
+    const [plan] = res.json.event.plans;
+    assert.equal(plan.map_image, 'assets/plans/atolye.png');
+    assert.equal(plan.tables.length, 3);
+    const seats = res.json.event.seats;
+    assert.equal(seats.length, 12);
+    assert.ok(seats.every((x: { position_x: string; free: boolean }) => Number(x.position_x) > 0 && x.free));
+    assert.equal(res.json.policy.signed_in, false);
+    assert.equal(res.json.policy.seat_selection, false);
+    const premium = await registered(env);
+    await giveMembership(env.sql, premium.userId, 'PREMIUM');
+    assert.equal((await premium.client.get(`/api/events/${eventId}`)).json.policy.seat_selection, true);
+  });
+});
+
 describe('bookings', () => {
   test('member booking snapshots price, assigns a seat, blocks duplicates; cancel returns capacity', async () => {
     const { eventId } = await makeEvent(env.sql, { hoursFromNow: 72 });

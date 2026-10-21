@@ -59,7 +59,7 @@ function mapEvent(e, clubList) {
     name: e.event_title, description: e.event_description, day: dayFmt.format(start), month: monthFmt.format(start).toLocaleUpperCase('tr'),
     date: date.replace(/^(\S+) (\S+) (\S+) (\S+)$/, '$1 $2 $3, $4').replace(/^(\d+ \S+ \d+) (\S+)$/, '$1, $2'),
     time: `${time(start)} — ${time(end)}`, location: [...new Set(e.options.map(o => o.location_name))].join(' / '),
-    sourceUrl: null, options: e.options, booking: e.my_booking,
+    sourceUrl: null, options: e.options, booking: e.my_booking, start: e.start_datetime,
   };
 }
 
@@ -153,7 +153,7 @@ export function resumePreview() { if (!state) return null; return persistPreview
 export function clearPreview() { localStorage.removeItem(KEY); state = null; notify(); }
 
 // Accept only internal, known views and catalog IDs; never redirect to a user-supplied URL.
-export function destination(params = new URLSearchParams(location.search)) { const club = params.get('club'); if (catalog.clubs.some(c => c.id === club)) return 'member/#kulup/' + club; if (params.get('event') && catalog.events.some(e => e.id === params.get('event'))) return 'member/#bulusmalar'; const view = params.get('view'); if (view === 'yonetim') return 'admin/'; return 'member/#' + (['anasayfa','kesfet','kuluplerim','bulusmalar','profil'].includes(view) ? view : 'anasayfa'); }
+export function destination(params = new URLSearchParams(location.search)) { const club = params.get('club'); if (catalog.clubs.some(c => c.id === club)) return 'member/#kulup/' + club; if (params.get('event') && catalog.events.some(e => e.id === params.get('event'))) return 'member/#bulusmalar'; const next = params.get('next'); if (next && /^rezervasyon\/(\?[\w=&%.\-]*)?$/.test(next)) return next; const view = params.get('view'); if (view === 'yonetim') return 'admin/'; return 'member/#' + (['anasayfa','kesfet','kuluplerim','bulusmalar','profil'].includes(view) ? view : 'anasayfa'); }
 // Server-side changes (approvals, admin cancellations, other tabs) show up when the user returns to the page.
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && currentMode === 'api') refresh().then(notify).catch(() => {}); });
 window.addEventListener('storage', event => { if (currentMode === 'preview' && (event.key === KEY || event.key === null)) { state = readPreview(); notify(); } });
