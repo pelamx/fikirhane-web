@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
+import { createApp } from '../src/app.ts';
 import { runJobs } from '../src/services/jobs.ts';
 import { Client, giveMembership, grantRole, makeEvent, ORIGIN, registered, setup, type TestEnv } from './helpers.ts';
 
@@ -61,6 +62,16 @@ describe('security', () => {
     const pages = await client.call('PATCH', '/api/me', { bio: 'x' }, { origin: 'https://pelamx.github.io' });
     assert.equal(pages.status, 200);
     assert.equal(pages.headers.get('access-control-allow-origin'), 'https://pelamx.github.io');
+  });
+
+  test('behind a TLS-terminating proxy, same-origin https writes are accepted only when the proxy is trusted', async () => {
+    const proxied = { origin: 'https://localhost', 'x-forwarded-proto': 'https' };
+    const body = { email: 'nobody@example.com', password: 'wrong-password-1' };
+    const direct = await new Client(env).call('POST', '/api/auth/login', body, proxied);
+    assert.equal(direct.json.error.code, 'bad_origin');
+    const trusted = { ...env, app: createApp({ sql: env.sql, config: { ...env.config, trustProxy: true } }) };
+    const res = await new Client(trusted).call('POST', '/api/auth/login', body, proxied);
+    assert.equal(res.json.error.code, 'invalid_credentials');
   });
 
   test('admin endpoints require permissions', async () => {

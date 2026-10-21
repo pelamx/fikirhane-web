@@ -12,6 +12,14 @@ import { staticSite } from './static.ts';
 
 const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+/** The public origin of this server. Behind a TLS-terminating proxy the request arrives as http, so trust its forwarded headers. */
+function selfOrigin(url: string, proto: string | undefined, host: string | undefined, trustProxy: boolean): string {
+  const u = new URL(url);
+  if (!trustProxy) return u.origin;
+  const scheme = proto?.split(',')[0]?.trim();
+  return `${scheme === 'https' || scheme === 'http' ? scheme : u.protocol.slice(0, -1)}://${host?.split(',')[0]?.trim() || u.host}`;
+}
+
 export function createApp(deps: Deps) {
   const app = new Hono<Env>();
   const allowed = new Set(deps.config.corsOrigins);
@@ -38,7 +46,7 @@ export function createApp(deps: Deps) {
     // CSRF: cookie-authenticated writes must come from this origin or an allowed one.
     if (UNSAFE.has(c.req.method) && viaCookie) {
       const origin = c.req.header('origin');
-      const self = new URL(c.req.url).origin;
+      const self = selfOrigin(c.req.url, c.req.header('x-forwarded-proto'), c.req.header('x-forwarded-host'), deps.config.trustProxy);
       if (origin && origin !== self && !allowed.has(origin)) throw new ApiError(403, 'bad_origin', 'Request origin is not allowed.');
     }
     const token = sessionToken(c);

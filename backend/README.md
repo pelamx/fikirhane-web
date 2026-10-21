@@ -48,7 +48,7 @@ docker run -p 8080:8080 -e DATABASE_URL=... -e CORS_ORIGINS=https://pelamx.githu
 - Same origin (recommended): point the domain at the container. The site and API are served together with `COOKIE_SAMESITE=Lax`.
 - Keeping the GitHub Pages frontend: set `PAGES_API_URL` in `scripts/config.js` to `https://<api-host>/api`, and run the API with
   `CORS_ORIGINS=https://pelamx.github.io COOKIE_SAMESITE=None COOKIE_SECURE=true`. Until then, Pages keeps running the browser-only preview.
-- Behind a reverse proxy, set `TRUST_PROXY=true` so rate limiting sees real client IPs.
+- Behind a reverse proxy, set `TRUST_PROXY=true` so rate limiting sees real client IPs and same-origin HTTPS requests pass the origin check.
 
 ## API
 
