@@ -369,6 +369,79 @@ describe('admin data', () => {
   });
 });
 
+describe('password reset', () => {
+  const withMail = () => {
+    const sent: { to: string; text: string }[] = [];
+    const app = createApp({ sql: env.sql, config: env.config, mailer: async m => { sent.push(m); } });
+    return { sent, env: { ...env, app } };
+  };
+  const waitFor = async <T>(fn: () => T | undefined): Promise<T> => {
+    for (let i = 0; i < 100; i++) { const v = fn(); if (v !== undefined) return v; await new Promise(r => setTimeout(r, 20)); }
+    throw new Error('timed out');
+  };
+  const tokenIn = (text: string) => /#t=([A-Za-z0-9_-]+)/.exec(text)?.[1];
+
+  test('email link sets a new password once, signs out old sessions, and unknown emails look the same', async () => {
+    const mail = withMail();
+    const { client, email } = await registered(env);
+    const anon = new Client(mail.env);
+    const unknown = await anon.post('/api/auth/password-reset/request', { email: 'nobody-here@example.com' });
+    const known = await anon.post('/api/auth/password-reset/request', { email: email.toUpperCase() });
+    assert.equal(unknown.status, 202);
+    assert.deepEqual(known.json, unknown.json);
+    const message = await waitFor(() => mail.sent.find(m => m.to === email));
+    assert.equal(mail.sent.length, 1);
+    const token = tokenIn(message.text)!;
+    assert.ok(token);
+
+    assert.equal((await anon.post('/api/auth/password-reset/confirm', { token, password: 'short' })).status, 400);
+    assert.equal((await anon.post('/api/auth/password-reset/confirm', { token, password: 'a-brand-new-secret' })).status, 204);
+    assert.equal((await client.get('/api/me')).status, 401, 'old session is revoked');
+    const reuse = await anon.post('/api/auth/password-reset/confirm', { token, password: 'another-new-secret' });
+    assert.equal(reuse.json.error.code, 'reset_token_invalid');
+    assert.equal((await new Client(env).post('/api/auth/login', { email, password: 'correct-horse-1' })).status, 401);
+    assert.equal((await new Client(env).post('/api/auth/login', { email, password: 'a-brand-new-secret' })).status, 200);
+  });
+
+  test('only the newest link works, and expired links are refused', async () => {
+    const mail = withMail();
+    const { email, userId } = await registered(env);
+    const anon = new Client(mail.env);
+    await anon.post('/api/auth/password-reset/request', { email });
+    const first = tokenIn((await waitFor(() => mail.sent[0])).text)!;
+    await anon.post('/api/auth/password-reset/request', { email });
+    const second = tokenIn((await waitFor(() => mail.sent[1])).text)!;
+    assert.equal((await anon.post('/api/auth/password-reset/confirm', { token: first, password: 'first-link-secret' })).json.error.code, 'reset_token_invalid');
+    await env.sql`update password_reset_tokens set created_at = now() - interval '2 hours', expires_at = now() - interval '1 hour' where id_user = ${userId} and used_at is null`;
+    assert.equal((await anon.post('/api/auth/password-reset/confirm', { token: second, password: 'second-link-secret' })).json.error.code, 'reset_token_invalid');
+  });
+
+  test('without a mail channel nothing is sent and the page can say so', async () => {
+    const app = createApp({ sql: env.sql, config: env.config, mailer: null });
+    const anon = new Client({ ...env, app });
+    assert.deepEqual((await anon.get('/api/auth/password-reset')).json, { email_enabled: false });
+    assert.equal((await anon.post('/api/auth/password-reset/request', { email: 'x@example.com' })).status, 202);
+  });
+
+  test('staff can hand out a one-time link, but never for another staff account', async () => {
+    const admin = await registered(env);
+    await grantRole(env.sql, admin.userId, 'FIKIRHANE_ADMIN');
+    const member = await registered(env);
+    const plain = await registered(env);
+    assert.equal((await plain.client.post(`/api/admin/users/${member.userId}/password-reset-link`)).status, 403);
+    const link = await admin.client.post(`/api/admin/users/${member.userId}/password-reset-link`);
+    assert.equal(link.status, 201);
+    const token = tokenIn(link.json.url)!;
+    assert.equal((await new Client(env).post('/api/auth/password-reset/confirm', { token, password: 'handed-over-secret' })).status, 204);
+    assert.equal((await new Client(env).post('/api/auth/login', { email: member.email, password: 'handed-over-secret' })).status, 200);
+    const other = await registered(env);
+    await grantRole(env.sql, other.userId, 'ACCOUNTING');
+    assert.equal((await admin.client.post(`/api/admin/users/${other.userId}/password-reset-link`)).json.error.code, 'staff_account');
+    const [entry] = await env.sql`select actor_user_id from audit_log where action = 'user.password_reset_link' and entity_id = ${member.userId}`;
+    assert.equal(entry.actor_user_id, admin.userId);
+  });
+});
+
 describe('jobs', () => {
   test('expire pending holds and finished memberships', async () => {
     const { eventId, optionId } = await makeEvent(env.sql, { hoursFromNow: 40 });

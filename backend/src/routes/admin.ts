@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { badRequest, forbidden, notFound } from '../errors.ts';
-import { body, idParam, permissionsOf, query, requireUser, type Deps, type Env } from '../http.ts';
+import { ApiError, badRequest, forbidden, notFound } from '../errors.ts';
+import { body, idParam, linkBase, permissionsOf, query, requireUser, selfOrigin, type Deps, type Env } from '../http.ts';
 import { getRecord, listRows, visibleSchema } from '../services/admin-data.ts';
 import { audit } from '../services/audit.ts';
+import { createResetToken, resetUrl } from '../services/password-reset.ts';
 import { hasClubPermission, hasEventPermission, requirePermission } from '../services/authz.ts';
 import { checkIn } from '../services/bookings.ts';
 import { cancelEvent, createEvent, publishEvent } from '../services/events.ts';
@@ -191,6 +192,30 @@ export function adminRoutes(deps: Deps) {
     const perms = await permissionsOf(c, deps);
     if (!perms.has('booking.checkin') && !await hasEventPermission(sql, userId, b.id_event, 'event_attendance.manage', perms)) throw forbidden();
     return c.json({ booking: await checkIn(sql, userId, bookingId) });
+  });
+
+  // A one-time link staff can hand over (e.g. by WhatsApp) when email is not available. Accounts that hold any staff role
+  // are excluded so this cannot be used to take over another administrator.
+  app.post('/users/:id/password-reset-link', async c => {
+    const actor = requireUser(c);
+    requirePermission(await permissionsOf(c, deps), 'user.reset_password');
+    const target = idParam(c, 'id');
+    const result = await sql.begin(async tx => {
+      const [user] = await tx<{ account_status: string; staff: boolean; has_password: boolean }[]>`
+        select u.account_status,
+               exists (select 1 from user_roles ur join roles r using (id_role) where ur.id_user = u.id_user and ur.status = 'active'
+                       and (ur.expires_at is null or ur.expires_at > now()) and r.role_code <> 'USER') as staff,
+               exists (select 1 from auth_identities a where a.id_user = u.id_user and a.provider = 'password' and a.status = 'active') as has_password
+        from users u where u.id_user = ${target}`;
+      if (!user || !user.has_password) throw notFound('Account');
+      if (user.staff) throw new ApiError(403, 'staff_account', 'Staff accounts reset their password by email or the reset-password script.');
+      if (user.account_status !== 'active') throw new ApiError(409, 'account_inactive', 'This account is not active.');
+      const created = await createResetToken(tx, target, { channel: 'admin_link', minutes: 24 * 60, createdBy: actor });
+      await audit(tx, { actorUserId: actor, action: 'user.password_reset_link', entityType: 'user', entityId: target, source: 'admin_web' });
+      return created;
+    });
+    const base = linkBase(c, deps) ?? selfOrigin(c, config.trustProxy);
+    return c.json({ url: resetUrl(base, result.token), expires_at: result.expiresAt }, 201);
   });
 
   app.post('/users/:id/roles', async c => {

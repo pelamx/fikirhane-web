@@ -3,8 +3,10 @@ import { getConnInfo } from '@hono/node-server/conninfo';
 import { deleteCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { ApiError, unauthorized } from '../errors.ts';
-import { body, sessionToken, SESSION_COOKIE, type Deps, type Env, type Ctx } from '../http.ts';
+import { body, linkBase, sessionToken, SESSION_COOKIE, type Deps, type Env, type Ctx } from '../http.ts';
 import { createSession, dummyPasswordHash, normalizeEmail, RateLimiter, revokeSession, verifyPassword } from '../services/auth.ts';
+import { mailerFromConfig } from '../services/mail.ts';
+import { consumeResetToken, createResetToken, resetEmail, resetUrl } from '../services/password-reset.ts';
 import { registerUser } from '../services/users.ts';
 
 const name = z.string().trim().min(1).max(50);
@@ -29,12 +31,17 @@ const Register = z.object({
     utm_term: z.string().max(100).optional(),
   }).optional(),
 });
+const ResetRequest = z.object({ email: z.email().max(254) });
+const ResetConfirm = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{20,100}$/), password });
 const Login = z.object({ email: z.email().max(254), password: z.string().min(1).max(200) });
 
 export function authRoutes(deps: Deps) {
   const app = new Hono<Env>();
   const attempts = new RateLimiter(deps.config.loginAttemptsPer15Min, 15 * 60_000);
   const signups = new RateLimiter(deps.config.signupsPerHour, 60 * 60_000);
+  const resetRequests = new RateLimiter(deps.config.passwordResetRequestsPerHour, 60 * 60_000);
+  const resetConfirms = new RateLimiter(deps.config.loginAttemptsPer15Min, 15 * 60_000);
+  const mailer = deps.mailer !== undefined ? deps.mailer : mailerFromConfig(deps.config);
   // Forwarded headers are only trusted behind a known reverse proxy (TRUST_PROXY=true); otherwise they are spoofable.
   const ip = (c: Ctx) => {
     if (deps.config.trustProxy) return c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
@@ -77,6 +84,40 @@ export function authRoutes(deps: Deps) {
     await deps.sql`update auth_identities set last_login_at = now() where provider = 'password' and provider_subject = ${email}`;
     const token = await startSession(c, identity.id_user);
     return c.json({ user_id: identity.id_user, token });
+  });
+
+  // Forgot password. The answer is the same whether or not the email has an account, and the email is sent after the
+  // response, so neither content nor timing reveals who is registered.
+  app.get('/password-reset', c => c.json({ email_enabled: mailer !== null }));
+
+  app.post('/password-reset/request', async c => {
+    const { email: raw } = await body(c, ResetRequest);
+    const email = normalizeEmail(raw);
+    if (!resetRequests.allow(`ip|${ip(c)}`) || !resetRequests.allow(`email|${email}`)) {
+      throw new ApiError(429, 'rate_limited', 'Too many attempts. Try again later.');
+    }
+    const base = linkBase(c, deps);
+    if (mailer && base) {
+      const send = mailer;
+      void (async () => {
+        const [user] = await deps.sql<{ id_user: string; first_name: string }[]>`
+          select u.id_user, u.first_name from auth_identities a join users u using (id_user)
+          where a.provider = 'password' and a.provider_subject = ${email} and a.status = 'active' and u.account_status = 'active'`;
+        if (!user) return;
+        const { token } = await createResetToken(deps.sql, user.id_user, { channel: 'email', minutes: deps.config.passwordResetMinutes });
+        await send({ to: email, ...resetEmail(user.first_name, resetUrl(base, token), deps.config.passwordResetMinutes) });
+      })().catch(err => console.error('[password-reset] could not send:', err instanceof Error ? err.message : err));
+    } else if (mailer && !base) {
+      console.error('[password-reset] PUBLIC_SITE_URL is not set; no reset link can be emailed.');
+    }
+    return c.json({ ok: true }, 202);
+  });
+
+  app.post('/password-reset/confirm', async c => {
+    if (!resetConfirms.allow(ip(c))) throw new ApiError(429, 'rate_limited', 'Too many attempts. Try again in a few minutes.');
+    const input = await body(c, ResetConfirm);
+    await consumeResetToken(deps.sql, input.token, input.password);
+    return c.body(null, 204);
   });
 
   app.post('/logout', async c => {

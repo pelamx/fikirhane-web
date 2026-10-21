@@ -11,6 +11,7 @@
 
 - `/`: public introduction/discovery.
 - `/uyelik/`: account sign-up / login in API mode; in preview mode the labeled prototype onboarding (no password or email collected).
+- `/uyelik/sifre/`: forgot password; `#t=<token>` sets a new password from an emailed or staff-created link.
 - `/member/#anasayfa`: personal home.
 - `/member/#kesfet`: all clubs, search/category filter.
 - `/member/#kulup/work` (also language, writing): club details.

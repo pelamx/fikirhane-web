@@ -129,3 +129,7 @@ body[data-shell=admin] .member-menu{display:none}
 @media(max-width:900px){#admin-main{padding-inline:24px}}
 @media(max-width:650px){#admin-main{padding:18px 20px 30px}}
 .admin-switch{width:auto!important;margin:22px 14px 0 0}
+.forgot-link{display:inline-block;margin-top:14px;font-size:11px}
+#confirm-done .shell-primary{width:auto;margin-top:14px}
+#request-sent .text-link,#request-again{display:inline-block;margin-top:12px}
+.admin-reset-link input{flex:1;min-width:200px;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}

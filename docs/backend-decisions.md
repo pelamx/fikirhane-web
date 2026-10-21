@@ -39,6 +39,7 @@ choice made to get to one consistent schema. Items marked **Confirm** are assump
 | Table | Status |
 |---|---|
 | `user_emails`, `auth_identities`, `user_sessions` | **Created** (needed for login). Password identities only (scrypt); Google/Apple are reserved values. |
+| `password_reset_tokens` | **Created** for forgot password (`0101_password_reset.sql`), with a new sensitive permission `user.reset_password` for FIKIRHANE_ADMIN and TECH_ADMIN. Only token hashes are stored. |
 | `needs`, `offers` | **Created** minimally (free text + status), because `bookings` references them. |
 | `stock_counts`, `stock_count_items` | **Created** minimally, because `stock_movements` references them. |
 | `PRICING_RULES`, `EVENT_QUOTAS`, `EVENT_INTERESTS`, `EVENT_SKILLS`, `CLUB_INTERESTS`, `FINANCIAL_CENTER_USERS`, `USER_PHONES`, `USER_ADDRESSES`, `ORGANIZATION_EMAILS/PHONES/ADDRESSES`, `SERIES_ENROLLMENTS` | **Deferred.** Nothing in V1 requires them. V1 pricing is base price + option adjustment − membership discount, which is the docs' own V1 model. |

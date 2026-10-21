@@ -21,7 +21,10 @@ ADMIN_PASSWORD='<at least 10 chars>' DATABASE_URL=postgres://postgres:postgres@1
   npm run create-admin -- you@example.com Ad Soyad            # default role FIKIRHANE_ADMIN; pass other role codes to add more
 ```
 
-Forgotten password (there is no self-service reset yet); this also signs the account out everywhere:
+Forgot password: `/uyelik/sifre/` emails a one-time link (60 minutes) through [Resend](https://resend.com) when
+`RESEND_API_KEY` and `MAIL_FROM` are set; in development the email is printed to the server log instead. Staff with
+`user.reset_password` can also create a 24-hour link on a user's page in the admin panel and hand it over themselves
+(never for accounts that hold a staff role). From a terminal, this sets a password directly and signs the account out everywhere:
 
 ```sh
 NEW_PASSWORD='<at least 10 chars>' DATABASE_URL=... npm run reset-password -- you@example.com
@@ -34,7 +37,7 @@ The server migrates on start unless `MIGRATE_ON_START=false`, and runs the expir
 
 ```sh
 npm run typecheck
-npm test           # 34 tests against a real, throwaway PostgreSQL (embedded-postgres)
+npm test           # 38 tests against a real, throwaway PostgreSQL (embedded-postgres)
 ```
 
 They cover schema guards (no hard delete, append-only ledgers, document/allocation/stock rules, sponsor exclusivity), pricing,
@@ -66,6 +69,9 @@ Browsers authenticate with the httpOnly `fh_session` cookie; other clients can s
 | GET | `/health` | |
 | POST | `/auth/register` | `first_name, last_name, email, password, club_codes?, interest_codes?, acquisition?` → USER role only |
 | POST | `/auth/login`, `/auth/logout` | rate limited |
+| GET | `/auth/password-reset` | `{ email_enabled }` |
+| POST | `/auth/password-reset/request` | `email` → always 202, same answer for unknown emails; rate limited |
+| POST | `/auth/password-reset/confirm` | `token, password` → signs out every session of the account |
 | GET / PATCH | `/me` | profile, membership rights, roles, permissions, clubs, active bookings |
 | GET / PUT | `/me/interests`, `/me/skills` | replace the active set (max 10 / 12) |
 | GET | `/me/bookings`, `/me/freepasses`, `/me/membership` | |
@@ -85,6 +91,7 @@ Browsers authenticate with the httpOnly `fh_session` cookie; other clients can s
 | POST | `/admin/events/:id/publish`, `/admin/events/:id/cancel` | publish checks pricing, options, seats, location conflicts; cancel cascades |
 | GET | `/admin/events/:id/participants` | global or event/club-scoped permission |
 | POST | `/admin/bookings/:id/checkin` | |
+| POST | `/admin/users/:id/password-reset-link` | `user.reset_password`; refused for staff accounts; audited |
 | POST / DELETE | `/admin/users/:id/roles[/:role]` | `role.assign` / `role.revoke`, audited |
 
 The `/admin/data` endpoints are read-only. Each table opens with one of the permissions listed in `src/services/admin-data.ts`;

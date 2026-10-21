@@ -32,6 +32,12 @@ export interface Config {
   trustProxy: boolean;
   loginAttemptsPer15Min: number;
   signupsPerHour: number;
+  /** Public address of the site, used in emailed links. Render sets RENDER_EXTERNAL_URL automatically. */
+  publicSiteUrl: string | null;
+  resendApiKey: string | null;
+  mailFrom: string;
+  passwordResetMinutes: number;
+  passwordResetRequestsPerHour: number;
 }
 
 export function loadConfig(overrides: Partial<Config> = {}): Config {
@@ -58,6 +64,11 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     trustProxy: process.env.TRUST_PROXY === 'true',
     loginAttemptsPer15Min: int('LOGIN_ATTEMPTS_PER_15_MIN', 10),
     signupsPerHour: int('SIGNUPS_PER_HOUR', 5),
+    publicSiteUrl: (process.env.PUBLIC_SITE_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '') || null,
+    resendApiKey: process.env.RESEND_API_KEY || null,
+    mailFrom: process.env.MAIL_FROM || 'Fikirhane <onboarding@resend.dev>',
+    passwordResetMinutes: int('PASSWORD_RESET_MINUTES', 60),
+    passwordResetRequestsPerHour: int('PASSWORD_RESET_REQUESTS_PER_HOUR', 5),
     ...overrides,
   };
   if (config.cookieSameSite === 'None' && !config.cookieSecure) throw new Error('COOKIE_SAMESITE=None requires COOKIE_SECURE=true');

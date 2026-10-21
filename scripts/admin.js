@@ -35,6 +35,7 @@ const OVERVIEW = [
 const EVENT_PERMS = ['event.create', 'event.publish', 'event.cancel', 'booking.view'];
 
 let me = null, perms = new Set(), tables = [], toastTimer, busy = false, renderId = 0;
+const resetLinks = {};
 const can = p => perms.has(p);
 const tableOf = name => tables.find(t => t.name === name);
 const label = name => TABLE_LABELS[name] ?? name;
@@ -231,10 +232,18 @@ async function record(name, id) {
   const emptyRelated = data.related.filter(r => r.total === 0);
   return heading(esc(label(name)).toLocaleUpperCase('tr'), esc(title), `<code>${esc(name)}</code> · <code>${esc(id)}</code>`)
     + (name === 'events' ? `<div class="admin-actions admin-actions-top"><a class="shell-secondary" href="#etkinlik/${esc(id)}">Katılımcılar ve işlemler ↗</a></div>` : '')
-    + (name === 'users' ? await rolePanel(id, data) : '')
+    + (name === 'users' ? await rolePanel(id, data) + resetPanel(id) : '')
     + `<section class="admin-section"><dl class="admin-fields">${meta.columns.map(c => `<div><dt><code>${esc(c.name)}</code>${c.ref ? ` <small>→ ${esc(label(c.ref.table))}</small>` : ''}</dt><dd>${cell(name, c, data.row[c.name], data.labels, { full: true })}</dd></div>`).join('')}</dl></section>`
     + related.map(r => { const src = tableOf(r.table); return `<section class="admin-section"><div class="member-section-top"><h2 class="admin-h2">${esc(label(r.table))} <small>· ${esc(r.column)} (${r.total})</small></h2>${r.total > r.items.length ? `<a class="text-link" href="#veri/${r.table}?${encodeURIComponent(r.column)}=${encodeURIComponent(id)}">Tümünü gör ↗</a>` : ''}</div>${rowsTable(r.table, r.items, r.labels, summaryColumns(src, 5))}</section>`; }).join('')
     + (emptyRelated.length ? `<p class="admin-muted admin-empty-rel">Bağlı kayıt yok: ${emptyRelated.map(r => `${esc(label(r.table))} (<code>${esc(r.column)}</code>)`).join(', ')}</p>` : '');
+}
+
+function resetPanel(userId) {
+  if (!can('user.reset_password')) return '';
+  const link = resetLinks[userId];
+  return `<section class="admin-section admin-card"><h2 class="admin-h2">Şifre sıfırlama</h2><p class="admin-muted">E-posta ulaşmıyorsa tek kullanımlık bir bağlantı oluşturup kişiye kendin iletebilirsin. Bağlantı 24 saat geçerli; yeni bağlantı eskisini geçersiz kılar. Yönetici hesapları için oluşturulamaz.</p>`
+    + (link ? `<div class="admin-search admin-reset-link"><label class="visually-hidden" for="reset-link">Sıfırlama bağlantısı</label><input id="reset-link" readonly value="${esc(link.url)}"><button class="shell-secondary" data-copy="#reset-link">Kopyala</button></div><p class="admin-muted">Son geçerlilik: ${esc(when(link.expires_at))}. Bu bağlantıyı yalnızca hesabın sahibine ilet.</p>`
+      : `<div class="admin-actions"><button class="shell-secondary" data-reset-link="${esc(userId)}">Sıfırlama bağlantısı oluştur</button></div>`) + '</section>';
 }
 
 async function rolePanel(userId, data) {
@@ -312,6 +321,15 @@ document.addEventListener('click', async event => {
     if (reason === null) return;
     if (reason.length < 3) { flash('İptal gerekçesi en az 3 karakter olmalı.'); return; }
     run(async () => { const r = await api(`/admin/events/${t.dataset.cancelEvent}/cancel`, { method: 'POST', body: { reason } }); if (r?.cancelledBookings) flash(`Etkinlik iptal edildi, ${r.cancelledBookings} rezervasyon da iptal edildi.`); }, 'Etkinlik iptal edildi.');
+  }
+  if (t.dataset.resetLink) {
+    if (await ask({ title: 'Sıfırlama bağlantısı oluştur', copy: 'Bu kişinin önceki sıfırlama bağlantıları geçersiz olur. Bağlantıyı yalnızca hesabın sahibine ilet.', ok: 'Oluştur' }) === null) return;
+    const userId = t.dataset.resetLink;
+    run(async () => { resetLinks[userId] = await api(`/admin/users/${userId}/password-reset-link`, { method: 'POST', body: {} }); }, 'Bağlantı oluşturuldu.');
+  }
+  if (t.dataset.copy) {
+    const input = content.querySelector(t.dataset.copy);
+    try { await navigator.clipboard.writeText(input.value); flash('Kopyalandı.'); } catch { input.select(); flash('Seçildi; Ctrl+C ile kopyala.'); }
   }
   if (t.dataset.checkin) run(() => api(`/admin/bookings/${t.dataset.checkin}/checkin`, { method: 'POST', body: {} }), 'Giriş kaydedildi.');
   if (t.dataset.revoke) {

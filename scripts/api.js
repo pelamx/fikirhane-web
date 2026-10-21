@@ -25,6 +25,8 @@ const MESSAGES = {
   application_open: 'Açık bir üyelik başvurun zaten var.',
   already_member: 'Bu üyeliğe zaten sahipsin.',
   motivation_required: 'Kısaca neden katılmak istediğini yazar mısın?',
+  reset_token_invalid: 'Bu bağlantı geçersiz ya da süresi dolmuş. Yeni bir bağlantı isteyebilirsin.',
+  staff_account: 'Yönetici hesapları için sıfırlama bağlantısı oluşturulamaz; e-postayla şifre yenileme kullanılmalı.',
   management_role: 'Kulüpteki görevini devretmeden ayrılamazsın. Fikirhane ekibine yaz.',
 };
 

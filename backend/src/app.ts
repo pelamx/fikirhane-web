@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { ApiError, fromPgError } from './errors.ts';
-import { sessionToken, type Deps, type Env } from './http.ts';
+import { selfOrigin, sessionToken, type Deps, type Env } from './http.ts';
 import { adminRoutes } from './routes/admin.ts';
 import { authRoutes } from './routes/auth.ts';
 import { catalogRoutes } from './routes/catalog.ts';
@@ -11,14 +11,6 @@ import { resolveSession } from './services/auth.ts';
 import { staticSite } from './static.ts';
 
 const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-
-/** The public origin of this server. Behind a TLS-terminating proxy the request arrives as http, so trust its forwarded headers. */
-function selfOrigin(url: string, proto: string | undefined, host: string | undefined, trustProxy: boolean): string {
-  const u = new URL(url);
-  if (!trustProxy) return u.origin;
-  const scheme = proto?.split(',')[0]?.trim();
-  return `${scheme === 'https' || scheme === 'http' ? scheme : u.protocol.slice(0, -1)}://${host?.split(',')[0]?.trim() || u.host}`;
-}
 
 export function createApp(deps: Deps) {
   const app = new Hono<Env>();
@@ -46,7 +38,7 @@ export function createApp(deps: Deps) {
     // CSRF: cookie-authenticated writes must come from this origin or an allowed one.
     if (UNSAFE.has(c.req.method) && viaCookie) {
       const origin = c.req.header('origin');
-      const self = selfOrigin(c.req.url, c.req.header('x-forwarded-proto'), c.req.header('x-forwarded-host'), deps.config.trustProxy);
+      const self = selfOrigin(c, deps.config.trustProxy);
       if (origin && origin !== self && !allowed.has(origin)) throw new ApiError(403, 'bad_origin', 'Request origin is not allowed.');
     }
     const token = sessionToken(c);
