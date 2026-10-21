@@ -149,7 +149,7 @@ async function loadCatalog(sql: Sql): Promise<Catalog> {
   }
   const tables = new Map<string, CatalogTable>();
   for (const name of names) {
-    const own = cols.filter(c => c.table_name === name);
+    const own = cols.filter(c => c.table_name === name && c.column_name !== 'checkin_token');
     const pk = pkOf.get(name);
     if (!own.length || !pk) continue;
     const contact = new Set(TABLES[name].contact ?? []);

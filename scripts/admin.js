@@ -18,7 +18,8 @@ const MODULES = [
   { key: 'kulupler', icon: '◎', title: 'Kulüpler', copy: 'Kalıcı topluluklar, üyeleri ve kulüp içi roller.',
     tables: ['clubs', 'club_users', 'club_member_roles'] },
   { key: 'etkinlikler', icon: '▦', title: 'Etkinlikler', copy: 'Program, etkinlik seçenekleri, görevliler ve rezervasyonlar.',
-    views: [{ tab: 'program', label: 'Program', href: '#etkinlikler', show: () => EVENT_PERMS.some(can) }],
+    views: [{ tab: 'program', label: 'Program', href: '#etkinlikler', show: () => EVENT_PERMS.some(can) },
+      { tab: 'kontrol', label: 'Giriş kontrol', href: '#kontrol', show: () => can('booking.checkin') || can('event_attendance.manage') }],
     tables: ['events', 'event_series', 'event_options', 'event_clubs', 'event_organizations', 'event_users', 'bookings'] },
   { key: 'mekan', icon: '⌗', title: 'Mekânlar', copy: 'Alanlar, yerleşim düzenleri, masalar ve koltuklar.',
     tables: ['locations', 'space_setups', 'tables', 'seats'] },
@@ -43,6 +44,7 @@ const visibleModules = () => MODULES.filter(m => moduleTabs(m).length);
 /** Which area and tab a route belongs to, for the menu and the tab bar. */
 function placeOf(view, a) {
   if (view === 'basvurular') return ['uyeler', 'basvurular'];
+  if (view === 'kontrol') return ['etkinlikler', 'kontrol'];
   if (['etkinlikler', 'etkinlik', 'yeni-etkinlik'].includes(view)) return ['etkinlikler', 'program'];
   if (view === 'veri' && !a) return ['sistem', 'harita'];
   if (['veri', 'kayit', 'yeni', 'duzenle'].includes(view) && a) return [moduleOfTable(a)?.key ?? 'sistem', a];
@@ -436,6 +438,31 @@ function showFieldErrors(form, details) {
   return !!first;
 }
 
+// ---------- door check (QR) ----------
+
+const loginUrl = () => siteUrl(`uyelik/?giris&view=yonetim&next=${encodeURIComponent('admin/' + location.hash)}`);
+const tokenFrom = text => /(?:k=)?([0-9a-f]{64})/i.exec(String(text ?? ''))?.[1]?.toLowerCase() ?? null;
+
+async function doorCheck(params) {
+  const k = tokenFrom(params.get('k'));
+  const form = `<form id="pass-form" class="admin-search admin-pass-form"><label class="visually-hidden" for="pass-input">QR bağlantısı ya da kod</label><input id="pass-input" name="code" placeholder="QR bağlantısını ya da kodu yapıştır" autocomplete="off"><button class="shell-secondary" type="submit">Kontrol et</button></form>`;
+  const intro = heading('GİRİŞ KONTROL', 'Kapıda <em>QR kontrol.</em>', 'Katılımcının QR kodunu telefonunun kamerasıyla okut; açılan sayfada rezervasyonun bu seans için geçerli olup olmadığını görürsün. QR yalnızca kendi tarihindeki seans aralığında (başlangıçtan 15 dakika önce açılır) giriş verir.');
+  if (!k) return intro + form;
+  let data;
+  try { data = await api(`/admin/pass?k=${k}`); }
+  catch (err) { return intro + `<div class="admin-pass admin-pass-bad"><strong>${err?.status === 404 ? 'Geçersiz QR kodu.' : esc(err?.message ?? 'Kontrol edilemedi.')}</strong></div>` + form; }
+  const { pass, verdict } = data;
+  const tone = verdict.ok ? 'ok' : verdict.code === 'already_checked_in' ? 'done' : 'bad';
+  const date = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' }).format(new Date(`${pass.date}T12:00:00+03:00`));
+  return intro + `<div class="admin-pass admin-pass-${tone}"><span class="admin-pass-mark" aria-hidden="true">${tone === 'ok' ? '✓' : tone === 'done' ? '✓' : '✕'}</span>
+    <div><strong>${esc(verdict.message)}</strong>
+    <dl><div><dt>Etkinlik</dt><dd>${esc(pass.event_title)}</dd></div><div><dt>Tarih</dt><dd>${esc(date)}</dd></div><div><dt>Seans</dt><dd>${esc(pass.session)}</dd></div>
+    <div><dt>Yer</dt><dd>${esc(pass.location)}${pass.seat ? ` · ${esc(pass.seat)}` : ''}</dd></div><div><dt>Kişi</dt><dd>${esc(pass.holder || '—')}</dd></div>
+    <div><dt>Durum</dt><dd>${badge(pass.status, 'booking_status')}</dd></div></dl>
+    ${verdict.ok ? `<button class="shell-primary admin-pass-go" data-pass-checkin="${k}">Girişi onayla <span>→</span></button>` : ''}
+    <p class="admin-muted"><a class="text-link" href="#kayit/bookings/${esc(pass.id_booking)}">Rezervasyon kaydı ↗</a> · <a class="text-link" href="#etkinlik/${esc(pass.id_event)}">Etkinliğin katılımcıları ↗</a></p></div></div>` + form;
+}
+
 function resetPanel(userId) {
   if (!can('user.reset_password')) return '';
   const link = resetLinks[userId];
@@ -476,6 +503,7 @@ async function render() {
       : view === 'yeni-etkinlik' ? await newEvent()
       : view === 'veri' && a ? await dataTable(a, params)
       : view === 'veri' ? dataIndex()
+      : view === 'kontrol' ? await doorCheck(params)
       : view === 'kayit' && a && b ? await record(a, b)
       : view === 'yeni' && a ? await formView(a, null, params)
       : view === 'duzenle' && a && b ? await formView(a, b, params)
@@ -485,7 +513,7 @@ async function render() {
     document.title = `${content.querySelector('h1')?.textContent ?? 'Yönetim'} · Fikirhane yönetim`;
   } catch (err) {
     if (id !== renderId) return;
-    if (err?.status === 401) { location.replace(siteUrl('uyelik/?view=yonetim&giris')); return; }
+    if (err?.status === 401) { location.replace(loginUrl()); return; }
     content.innerHTML = empty(err?.status === 403 ? 'Bu bölüm için yetkin yok.' : err?.status === 404 ? 'Kayıt bulunamadı.' : 'Bu sayfa yüklenemedi.', esc(err?.message ?? ''));
   } finally { if (id === renderId) content.removeAttribute('aria-busy'); }
 }
@@ -493,7 +521,7 @@ async function render() {
 async function run(task, success) {
   if (busy) return; busy = true;
   try { await task(); if (success) flash(success); await render(); }
-  catch (err) { if (err?.status === 401) { location.replace(siteUrl('uyelik/?view=yonetim&giris')); return; } flash(err?.message || 'İşlem tamamlanamadı.'); }
+  catch (err) { if (err?.status === 401) { location.replace(loginUrl()); return; } flash(err?.message || 'İşlem tamamlanamadı.'); }
   finally { busy = false; }
 }
 
@@ -506,7 +534,7 @@ const DECISIONS = {
 
 document.addEventListener('click', async event => {
   const t = event.target.closest('button'); if (!t) return;
-  if (t.hasAttribute('data-switch-account')) { await api('/auth/logout', { method: 'POST', body: {} }).catch(() => {}); location.assign(siteUrl('uyelik/?view=yonetim&giris')); return; }
+  if (t.hasAttribute('data-switch-account')) { await api('/auth/logout', { method: 'POST', body: {} }).catch(() => {}); location.assign(loginUrl()); return; }
   if (t.hasAttribute('data-signout')) { await api('/auth/logout', { method: 'POST', body: {} }).catch(() => {}); location.assign(siteUrl('')); return; }
   if (t.dataset.decide) {
     const d = DECISIONS[t.dataset.decide];
@@ -545,6 +573,7 @@ document.addEventListener('click', async event => {
     const table = t.dataset.table;
     run(async () => { await api(`/admin/data/${table}/${t.dataset.id}`, { method: 'DELETE' }); location.hash = `veri/${table}`; }, 'Kayıt silindi.');
   }
+  if (t.dataset.passCheckin) { run(() => api('/admin/pass/checkin', { method: 'POST', body: { k: t.dataset.passCheckin } }), 'Giriş onaylandı.'); return; }
   if (t.dataset.checkin) run(() => api(`/admin/bookings/${t.dataset.checkin}/checkin`, { method: 'POST', body: {} }), 'Giriş kaydedildi.');
   if (t.dataset.revoke) {
     if (await ask({ title: 'Rolü geri al', copy: `${t.dataset.revoke} rolü bu kullanıcıdan geri alınacak.`, ok: 'Geri al' }) === null) return;
@@ -568,7 +597,7 @@ async function saveRecord(form) {
     flash(id ? 'Değişiklikler kaydedildi.' : 'Kayıt oluşturuldu.');
     location.hash = `kayit/${table}/${res.id}`;
   } catch (err) {
-    if (err?.status === 401) { location.replace(siteUrl('uyelik/?view=yonetim&giris')); return; }
+    if (err?.status === 401) { location.replace(loginUrl()); return; }
     showFieldErrors(form, err.details);
     error.textContent = err.message; error.hidden = false;
   } finally { busy = false; form.querySelector('[type=submit]') && (form.querySelector('[type=submit]').disabled = false); }
@@ -582,6 +611,7 @@ content.addEventListener('submit', event => {
     location.hash = `veri/${a}${params.size ? '?' + params : ''}`;
   }
   if (form.id === 'record-form') { saveRecord(form); return; }
+  if (form.id === 'pass-form') { const k = tokenFrom(new FormData(form).get('code')); if (!k) { flash('QR bağlantısında geçerli bir kod yok.'); return; } location.hash = `kontrol?k=${k}`; return; }
   if (form.id === 'role-form') {
     const code = new FormData(form).get('role_code');
     if (code) run(() => api(`/admin/users/${form.dataset.user}/roles`, { method: 'POST', body: { role_code: code } }), 'Rol verildi.');
@@ -616,7 +646,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu();
 async function start() {
   const loading = document.querySelector('#admin-loading p');
   if (!await apiAvailable()) { loading.innerHTML = 'Yönetim paneli yalnızca sunucuya bağlıyken çalışır. <a class="text-link" href="../">Keşif sayfasına dön ↗</a>'; return; }
-  try { me = await api('/me'); } catch (err) { if (err.status === 401) { location.replace(siteUrl('uyelik/?view=yonetim&giris')); return; } throw err; }
+  try { me = await api('/me'); } catch (err) { if (err.status === 401) { location.replace(loginUrl()); return; } throw err; }
   let schema;
   try { schema = await api('/admin/schema'); } catch (err) {
     if (err.status === 403) {

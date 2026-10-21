@@ -39,6 +39,7 @@ choice made to get to one consistent schema. Items marked **Confirm** are assump
 | Table | Status |
 |---|---|
 | `user_emails`, `auth_identities`, `user_sessions` | **Created** (needed for login). Password identities only (scrypt); Google/Apple are reserved values. |
+| `bookings.checkin_token` | **Added** (`0105_booking_pass.sql`): an unguessable token per booking for its QR entry pass. The QR also shows date and session; the server re-reads the booking, so a pass only opens its own session. |
 | `password_reset_tokens` | **Created** for forgot password (`0101_password_reset.sql`), with a new sensitive permission `user.reset_password` for FIKIRHANE_ADMIN and TECH_ADMIN. Only token hashes are stored. |
 | `needs`, `offers` | **Created** minimally (free text + status), because `bookings` references them. |
 | `stock_counts`, `stock_count_items` | **Created** minimally, because `stock_movements` references them. |

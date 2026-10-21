@@ -3,6 +3,7 @@
 import { initTheme, escapeHTML as esc } from './shared.js';
 import { api, apiAvailable } from './api.js';
 import { siteUrl } from './session.js';
+import { passCard } from './pass.js';
 initTheme();
 
 const TZ = 'Europe/Istanbul';
@@ -171,7 +172,8 @@ function doneStep(booking, e) {
   const place = [booking.location_name, booking.seat_code ? `Koltuk ${seatNo(booking.seat_code)}` : booking.table_name].filter(Boolean).join(' · ');
   return `<div class="booking-done"><span class="booking-done-mark" aria-hidden="true">${wait ? '…' : '✓'}</span><h1 class="booking-title">${wait ? 'Bekleme listesindesin.' : 'Yerin ayrıldı.'}</h1>
     <p class="booking-lead">${esc(e.event_title)} · ${esc(dayTitle(dayKey(new Date(e.start_datetime))))} · ${esc(range(e))}${place ? `<br><strong>${esc(place)}</strong>` : ''}</p>
-    <p>${wait ? 'Yer açıldığında rezervasyonun onaylanır.' : `Ödenecek tutar: <strong>${esc(money(booking.final_price, booking.currency_code))}</strong>. Görüşmek üzere!`}</p>
+    <p>${wait ? 'Yer açıldığında rezervasyonun onaylanır.' : `Ödenecek tutar: <strong>${esc(money(booking.final_price, booking.currency_code))}</strong>. Girişte aşağıdaki QR kodu göster; görüşmek üzere!`}</p>
+    <div id="pass-slot"></div>
     <div class="booking-login"><a class="shell-primary" href="${siteUrl('member/#bulusmalar')}">Rezervasyonlarım <span>↗</span></a><a class="shell-secondary" href="?">Yeni rezervasyon</a></div></div>`;
 }
 
@@ -254,6 +256,7 @@ async function submit() {
     stepper('onay'); bar.hidden = true;
     content.innerHTML = doneStep(booking, e);
     aside.innerHTML = '';
+    if (booking.booking_status === 'confirmed') passCard(booking.id_booking).then(html => { const slot = document.querySelector('#pass-slot'); if (slot) slot.innerHTML = html; }).catch(() => {});
   } catch (err) {
     if (err?.status === 401) { location.assign(siteUrl(`uyelik/?giris&next=${encodeURIComponent('rezervasyon/' + location.search)}`)); return; }
     if (err?.code === 'seat_taken') { cache.delete(e.id_event); flash('Bu koltuk az önce doldu; başka bir koltuk seç.'); go({ adim: 'koltuk', koltuk: null }); return; }

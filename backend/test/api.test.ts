@@ -464,6 +464,47 @@ describe('password reset', () => {
   });
 });
 
+describe('entry pass (QR)', () => {
+  test('a pass opens only its own session; it can be viewed and downloaded by its owner only', async () => {
+    const { eventId } = await makeEvent(env.sql, { hoursFromNow: 30 });
+    const member = await registered(env);
+    const booked = await member.client.post('/api/bookings', { event_id: eventId });
+    const id = booked.json.booking.id_booking;
+    const pass = await member.client.get(`/api/me/bookings/${id}/pass`);
+    assert.equal(pass.status, 200);
+    assert.match(pass.json.pass.session, /^\d\d:\d\d–\d\d:\d\d$/);
+    const svg = await member.client.call('GET', `/api/me/bookings/${id}/qr.svg`);
+    assert.match(String(svg.json), /<svg/);
+    const png = await env.app.request(`${ORIGIN}/api/me/bookings/${id}/qr.png`, { headers: { cookie: member.client.cookie } });
+    assert.equal(png.headers.get('content-type'), 'image/png');
+    assert.match(png.headers.get('content-disposition') ?? '', new RegExp(`attachment; filename="fikirhane-qr-${pass.json.pass.date}-\\d\\d\\.\\d\\d-\\d\\d\\.\\d\\d\\.png"`));
+    assert.equal((await (await registered(env)).client.get(`/api/me/bookings/${id}/pass`)).status, 404);
+
+    const [{ checkin_token: k }] = await env.sql`select checkin_token from bookings where id_booking = ${id}`;
+    const staff = await registered(env);
+    await grantRole(env.sql, staff.userId, 'FIKIRHANE_ADMIN');
+    assert.equal((await member.client.get(`/api/admin/pass?k=${k}`)).status, 403);
+    const early = await staff.client.get(`/api/admin/pass?k=${k}`);
+    assert.equal(early.json.verdict.code, 'pass_too_early');
+    assert.equal((await staff.client.post('/api/admin/pass/checkin', { k })).json.error.code, 'pass_too_early');
+
+    await env.sql`update events set start_datetime = now() - interval '10 minutes', end_datetime = now() + interval '2 hours' where id_event = ${eventId}`;
+    const now = await staff.client.post('/api/admin/pass/checkin', { k });
+    assert.equal(now.status, 200, JSON.stringify(now.json));
+    assert.equal(now.json.pass.status, 'checked_in');
+    assert.equal((await staff.client.post('/api/admin/pass/checkin', { k })).json.error.code, 'already_checked_in');
+
+    const late = await registered(env);
+    const { eventId: e2 } = await makeEvent(env.sql, { hoursFromNow: 30 });
+    const b2 = (await late.client.post('/api/bookings', { event_id: e2 })).json.booking.id_booking;
+    await env.sql`update events set start_datetime = now() - interval '3 hours', end_datetime = now() - interval '1 hour' where id_event = ${e2}`;
+    const [{ checkin_token: k2 }] = await env.sql`select checkin_token from bookings where id_booking = ${b2}`;
+    assert.equal((await staff.client.get(`/api/admin/pass?k=${k2}`)).json.verdict.code, 'pass_expired');
+    const browse = await staff.client.get(`/api/admin/data/bookings/${id}`);
+    assert.ok(!('checkin_token' in browse.json.row), 'the token never shows in the data browser');
+  });
+});
+
 describe('jobs', () => {
   test('expire pending holds and finished memberships', async () => {
     const { eventId, optionId } = await makeEvent(env.sql, { hoursFromNow: 40 });

@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { unprocessable } from '../errors.ts';
-import { body, idParam, requireUser, type Deps, type Env } from '../http.ts';
+import { body, idParam, linkBase, requireUser, selfOrigin, type Deps, type Env } from '../http.ts';
 import { audit } from '../services/audit.ts';
 import { globalPermissions, globalRoles } from '../services/authz.ts';
 import { cancelBooking } from '../services/bookings.ts';
+import { ownPass, passInfo, pngName, qrPng, qrSvg, qrText } from '../services/pass.ts';
 import { membershipRights, submitApplication, withdrawApplication } from '../services/membership.ts';
 import { MAX_ACTIVE_INTERESTS, MAX_ACTIVE_SKILLS, setInterests, setSkills } from '../services/users.ts';
 
@@ -104,6 +105,24 @@ export function meRoutes(deps: Deps) {
     const userId = requireUser(c);
     await setSkills(deps.sql, userId, (await body(c, Skills)).items);
     return c.body(null, 204);
+  });
+
+  // Entry pass: info, the QR as SVG for the page, and a PNG download named after the date and session.
+  app.get('/bookings/:id/pass', async c => {
+    const row = await ownPass(deps.sql, requireUser(c), idParam(c, 'id'));
+    return c.json({ pass: passInfo(row, deps.config) });
+  });
+  app.get('/bookings/:id/qr.svg', async c => {
+    const row = await ownPass(deps.sql, requireUser(c), idParam(c, 'id'));
+    c.header('content-type', 'image/svg+xml; charset=utf-8');
+    return c.body(await qrSvg(qrText(row, linkBase(c, deps) ?? selfOrigin(c, deps.config.trustProxy))));
+  });
+  app.get('/bookings/:id/qr.png', async c => {
+    const row = await ownPass(deps.sql, requireUser(c), idParam(c, 'id'));
+    const png = await qrPng(qrText(row, linkBase(c, deps) ?? selfOrigin(c, deps.config.trustProxy)));
+    c.header('content-type', 'image/png');
+    c.header('content-disposition', `attachment; filename="${pngName(row)}"`);
+    return c.body(new Uint8Array(png));
   });
 
   app.get('/bookings', async c => {

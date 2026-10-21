@@ -24,6 +24,7 @@
 - `/admin/#basvurular`: membership applications; approve, review, waitlist, decline.
 - `/admin/#etkinlikler`, `#etkinlik/<id>`, `#yeni-etkinlik`: events incl. drafts; create, publish, cancel, participants, check-in.
 - `/admin/#veri`, `#veri/<table>?<column>=<value>`, `#kayit/<table>/<id>`: every documented table with its relations. A record shows its outgoing references, every table that points at it, and the edit / lifecycle buttons its document allows.
+- `/admin/#kontrol?k=<token>&tarih&seans`: door check opened by scanning a booking's QR; green with "Girişi onayla" only during that session (from 15 minutes before the start), red with the reason otherwise.
 - `/admin/#yeni/<table>?<column>=<value>`, `#duzenle/<table>/<id>`: create and edit forms generated from the schema and the table document (value lists, references, help texts, fixed fields).
 
 Relative URLs work under the GitHub Pages project prefix. A guest visiting a member route is directed to onboarding; the intended club/view is restored after entry. An active preview can return to the public area and enter member again. This client-side navigation gate is UX, not an access-control boundary.

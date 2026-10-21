@@ -1,4 +1,5 @@
 import { initTheme, escapeHTML as esc } from './shared.js';
+import { passCard } from './pass.js';
 import { ready, mode, getCatalog, getSession, saveProfile, toggleClub, toggleEvent, bookEvent, cancelBooking, signOut, clearPreview, siteUrl } from './session.js';
 initTheme();
 const content = document.querySelector('#member-content');
@@ -29,7 +30,7 @@ function bookingControls(event) {
     const b = event.booking;
     const option = event.options.find(o => o.id_event_option === b.id_event_option);
     const label = b.booking_status === 'waitlisted' ? 'Bekleme listesindesin' : 'Yerin ayrıldı';
-    return `<p class="booking-state">✓ ${label}${option ? ' · ' + esc(option.option_name ?? option.location_name) : ''}</p><button class="shell-secondary" data-action="cancel-booking" data-id="${esc(b.id_booking)}">Rezervasyonu iptal et</button>`;
+    return `<p class="booking-state">✓ ${label}${option ? ' · ' + esc(option.option_name ?? option.location_name) : ''}</p>${['confirmed', 'checked_in'].includes(b.booking_status) ? `<button class="shell-primary option-button" data-action="pass" data-id="${esc(b.id_booking)}">QR kodum <span>▣</span></button>` : ''}<button class="shell-secondary" data-action="cancel-booking" data-id="${esc(b.id_booking)}">Rezervasyonu iptal et</button>`;
   }
   // Booking happens in the reservation flow (session → seat → details → confirm); here we show price and room availability.
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(event.start));
@@ -119,6 +120,7 @@ async function run(task, success) {
 document.addEventListener('click', event => {
   const target = event.target.closest('button'); if (!target) return;
   if (target.hasAttribute('data-signout')) { exit(); return; }
+  if (target.hasAttribute('data-close-pass')) { document.querySelector('#pass-dialog')?.close(); return; }
   if (target.dataset.category) { category=target.dataset.category; render(); return; }
   if (target.dataset.eventFilter) { eventFilter=target.dataset.eventFilter; if(location.hash==='#bulusmalar/tumu')history.replaceState(null,'','#bulusmalar'); render(); return; }
   const { action, id, option } = target.dataset;
@@ -126,6 +128,14 @@ document.addEventListener('click', event => {
   if (action==='club') { const had = getSession()?.clubIds.includes(id); run(async () => { await toggleClub(id); }, live() ? (had ? 'Kulüpten ayrıldın.' : 'Kulübe katıldın.') : (had ? 'Kulüp takipten çıkarıldı.' : 'Kulüp, kulüplerine eklendi.')).then(refocus); }
   if (action==='event') { const had = getSession()?.eventIds.includes(id); run(async () => { await toggleEvent(id); }, had ? 'Buluşma planından çıkarıldı.' : 'Buluşma planına eklendi. Gerçek katılım için etkinlik sayfasına devam et.').then(refocus); }
   if (action==='book') run(async () => { const s = await bookEvent(id, option); const b = s?.bookings[id]; if (b?.booking_status === 'waitlisted') flash('Bekleme listesine eklendin.'); }, 'Yerin ayrıldı. Görüşmek üzere!');
+  if (action==='pass') {
+    const dialog = document.querySelector('#pass-dialog') ?? document.body.appendChild(Object.assign(document.createElement('dialog'), { id: 'pass-dialog', className: 'pass-dialog' }));
+    dialog.innerHTML = '<p class="entry-loading">QR hazırlanıyor…</p>';
+    dialog.showModal();
+    passCard(id).then(html => { dialog.innerHTML = html + '<div class="dialog-actions"><button class="shell-secondary" data-close-pass>Kapat</button></div>'; })
+      .catch(err => { dialog.innerHTML = `<p>${esc(err?.message ?? 'QR gösterilemedi.')}</p><div class="dialog-actions"><button class="shell-secondary" data-close-pass>Kapat</button></div>`; });
+    return;
+  }
   if (action==='cancel-booking') run(async () => { await cancelBooking(id); }, 'Rezervasyonun iptal edildi.');
   if (action==='reset-search') {query='';category='all';render();document.querySelector('#club-search').focus();}
   if (action==='reset') document.querySelector('#reset-dialog').showModal();

@@ -76,6 +76,7 @@ Browsers authenticate with the httpOnly `fh_session` cookie; other clients can s
 | GET / PUT | `/me/interests`, `/me/skills` | replace the active set (max 10 / 12) |
 | GET | `/me/bookings`, `/me/freepasses`, `/me/membership` | |
 | POST | `/me/bookings/:id/cancel` | 24 h lock for owners |
+| GET | `/me/bookings/:id/pass`, `/me/bookings/:id/qr.svg`, `/me/bookings/:id/qr.png` | entry pass of a confirmed booking: date, session, place; QR as SVG, or PNG download named `fikirhane-qr-<date>-<start>-<end>.png` |
 | POST | `/me/membership-applications`, `/me/membership-applications/:id/withdraw` | |
 | GET | `/clubs`, `/clubs/:code`, `/events`, `/events/:id`, `/interests`, `/skills`, `/membership-types` | public; prices are personalized when signed in |
 | PUT / DELETE | `/clubs/:code/membership` | join / leave as MEMBER |
@@ -96,6 +97,7 @@ Browsers authenticate with the httpOnly `fh_session` cookie; other clients can s
 | GET | `/admin/events/:id/participants` | global or event/club-scoped permission |
 | POST | `/admin/bookings/:id/checkin` | |
 | POST | `/admin/users/:id/password-reset-link` | `user.reset_password`; refused for staff accounts; audited |
+| GET / POST | `/admin/pass?k=`, `/admin/pass/checkin` | door check of a scanned QR; valid only from `CHECKIN_EARLY_MINUTES` (15) before the session start until its end; `booking.checkin` or the event's attendance role |
 | POST / DELETE | `/admin/users/:id/roles[/:role]` | `role.assign` / `role.revoke`, audited |
 
 Writes through `/admin/data` follow `src/services/admin-meta.json`: per table, extracted from the 48 table documents, who may

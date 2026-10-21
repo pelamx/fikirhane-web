@@ -39,6 +39,8 @@ export interface Config {
   passwordResetMinutes: number;
   /** Whether people without a membership may pick their own seat (true: everyone can, as on fikirhane.co). */
   visitorSeatSelection: boolean;
+  /** How early before a session its QR pass opens the door. */
+  checkinEarlyMinutes: number;
   passwordResetRequestsPerHour: number;
 }
 
@@ -71,6 +73,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     mailFrom: process.env.MAIL_FROM || 'Fikirhane <onboarding@resend.dev>',
     passwordResetMinutes: int('PASSWORD_RESET_MINUTES', 60),
     visitorSeatSelection: (process.env.VISITOR_SEAT_SELECTION ?? 'true') !== 'false',
+    checkinEarlyMinutes: int('CHECKIN_EARLY_MINUTES', 15),
     passwordResetRequestsPerHour: int('PASSWORD_RESET_REQUESTS_PER_HOUR', 5),
     ...overrides,
   };

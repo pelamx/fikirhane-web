@@ -1,13 +1,14 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { ApiError, badRequest, forbidden, notFound } from '../errors.ts';
-import { body, idParam, linkBase, permissionsOf, query, requireUser, selfOrigin, type Deps, type Env } from '../http.ts';
+import { body, idParam, linkBase, permissionsOf, query, requireUser, selfOrigin, type Ctx, type Deps, type Env } from '../http.ts';
 import { catalog, getRecord, listRows, visibleSchema } from '../services/admin-data.ts';
 import { createRow, deleteRow, runAction, updateRow, writeInfo } from '../services/admin-write.ts';
 import { audit } from '../services/audit.ts';
 import { createResetToken, resetUrl } from '../services/password-reset.ts';
 import { hasClubPermission, hasEventPermission, requirePermission } from '../services/authz.ts';
 import { checkIn } from '../services/bookings.ts';
+import { passByToken, passInfo, verdict } from '../services/pass.ts';
 import { cancelEvent, createEvent, publishEvent } from '../services/events.ts';
 import { decideApplication } from '../services/membership.ts';
 
@@ -212,6 +213,32 @@ export function adminRoutes(deps: Deps) {
       where b.id_event = ${eventId} and b.booking_status not in ('cancelled', 'expired')
       order by o.sort_order, s.sort_order nulls last, u.first_name`;
     return c.json({ items: rows });
+  });
+
+  // Door check: staff scan a booking's QR. The pass is read from the database; it opens only during its own session.
+  const Token = z.object({ k: z.string().regex(/^[0-9a-f]{64}$/) });
+  async function scannedPass(c: Ctx, token: string) {
+    const userId = requireUser(c);
+    const row = await passByToken(sql, token);
+    if (!row) throw notFound('Pass');
+    const perms = await permissionsOf(c, deps);
+    if (!perms.has('booking.checkin') && !await hasEventPermission(sql, userId, row.id_event, 'event_attendance.manage', perms)) throw forbidden();
+    return { userId, row };
+  }
+  app.get('/pass', async c => {
+    const { k } = query(c, Token);
+    const { row } = await scannedPass(c, k);
+    return c.json({ pass: passInfo(row, config), verdict: verdict(row, config) });
+  });
+  app.post('/pass/checkin', async c => {
+    const { k } = await body(c, Token);
+    const { userId, row } = await scannedPass(c, k);
+    const v = verdict(row, config);
+    if (!v.ok) throw new ApiError(409, v.code, v.message);
+    await checkIn(sql, userId, row.id_booking);
+    await audit(sql, { actorUserId: userId, action: 'booking.checkin', entityType: 'booking', entityId: row.id_booking, source: 'admin_web', metadata: { via: 'qr' } });
+    const after = (await passByToken(sql, k))!;
+    return c.json({ pass: passInfo(after, config), verdict: { ok: true, code: 'checked_in', message: 'Giriş onaylandı.' } });
   });
 
   app.post('/bookings/:id/checkin', async c => {
