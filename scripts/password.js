@@ -8,9 +8,15 @@ function busy(form, on) { form.querySelector('[type=submit]').disabled = on; }
 function fail(id, message) { const el = $(id); el.textContent = message; el.hidden = false; }
 
 async function requestPanel() {
-  $('#request-panel').hidden = false;
+  // Ask first, so the email form never flashes up on a server that cannot send email.
   const { email_enabled: enabled } = await api('/auth/password-reset').catch(() => ({ email_enabled: true }));
-  if (!enabled) { $('#request-form').hidden = true; $('#request-unavailable').hidden = false; return; }
+  if (!enabled) {
+    $('#request-form').hidden = true; $('#request-unavailable').hidden = false;
+    $('#request-panel h2').textContent = 'Ekibimiz yardımcı olur.';
+    $('#password-intro').textContent = 'Fikirhane ekibi sana tek kullanımlık bir sıfırlama bağlantısı iletebilir. Bağlantı 24 saat geçerli.';
+  }
+  $('#request-panel').hidden = false;
+  if (!enabled) return;
   $('#request-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.target; busy(form, true); $('#request-error').hidden = true;
@@ -26,7 +32,7 @@ function confirmPanel(token) {
   // Keep the token out of the address bar and history once it has been read.
   history.replaceState(null, '', location.pathname);
   $('#confirm-panel').hidden = false;
-  $('.entry-story p').textContent = 'Yeni şifreni iki kez yaz. Kaydettiğinde bütün cihazlardan çıkış yapılır.';
+  $('#password-intro').textContent = 'Yeni şifreni iki kez yaz. Kaydettiğinde bütün cihazlardan çıkış yapılır.';
   $('#confirm-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.target; $('#confirm-error').hidden = true;
@@ -48,7 +54,8 @@ window.addEventListener('hashchange', () => { if (location.hash.includes('t=')) 
 
 (async () => {
   if (!await apiAvailable()) { $('#password-loading').textContent = 'Şifre yenileme yalnızca sunucuya bağlıyken çalışır.'; return; }
-  $('#password-loading').hidden = true;
   const token = new URLSearchParams(location.hash.slice(1)).get('t');
   if (token) confirmPanel(token); else await requestPanel();
+  $('#password-loading').hidden = true;
+  $('#password-intro').hidden = false;
 })().catch(() => { $('#password-loading').textContent = 'Şu anda bağlanamıyoruz. Biraz sonra tekrar dener misin?'; });
