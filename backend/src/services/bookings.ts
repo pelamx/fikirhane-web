@@ -139,10 +139,10 @@ async function insertNote(tx: Tx, table: 'needs' | 'offers', userId: string, tex
   return row.id;
 }
 
-/** Premium-style seat selection if allowed, else automatic assignment of the first free reservable seat (SEATS rule 13). */
+/** The person's own seat choice if their rights allow it, else automatic assignment of the first free reservable seat (SEATS rule 13). */
 async function pickSeat(tx: Tx, option: OptionRow, requested: string | null, selectionAllowed: boolean): Promise<string> {
   if (requested) {
-    if (!selectionAllowed) throw forbidden('Seat selection is available with Premium membership.');
+    if (!selectionAllowed) throw forbidden('Seat selection is not available for this account.');
     const [free] = await tx<{ id_seat: string }[]>`
       select s.id_seat from seats s where s.id_seat = ${requested} and s.id_space_setup = ${option.id_space_setup}
         and s.status = 'active' and s.reservable

@@ -125,7 +125,7 @@ function seatStep(e, s) {
   const canPick = !!policy?.seat_selection;
   const seatBased = opts.some(o => o.booking_unit === 'seat');
   return `<h1 class="booking-title">${seatBased ? 'Koltuğunu seç' : 'Alanını seç'}</h1><p class="booking-lead">${seatBased ? (canPick ? 'Planın üzerinden koltuğunu işaretle ya da seçimi bize bırak.' : 'Salonu seç; koltuğunu biz ayarlayalım.') : 'Bu etkinlik için alanı seç.'}</p>
-    ${!canPick && seatBased ? `<p class="booking-note">${policy?.signed_in ? 'Koltuk seçimi Premium üyelere açık. Seçtiğin salonda uygun ilk koltuk sana ayrılır.' : 'Koltuk seçimi Premium üyelere açık. Giriş yapmadan da salonları ve doluluğu görebilirsin.'}</p>` : ''}
+    ${!canPick && seatBased ? '<p class="booking-note">Bu hesapta koltuk seçimi kapalı. Seçtiğin salonda uygun ilk koltuk sana ayrılır.</p>' : ''}
     ${opts.length > 1 ? `<div class="booking-rooms" role="radiogroup" aria-label="Salon">${opts.map(o => `<button class="booking-room${o === option ? ' selected' : ''}" role="radio" aria-checked="${o === option}" data-room="${o.id_event_option}">
       <strong>${esc(o.location_name)}</strong><span>${o.available ? `${o.available} / ${o.capacity} yer boş` : 'Dolu · bekleme listesi'}</span><em>${o.price ? esc(money(o.price.finalPrice, o.price.currency)) : ''}</em></button>`).join('')}</div>` : ''}
     ${(option ? [option] : opts).filter(o => o.booking_unit === 'seat').map(o => `<section class="booking-plan-wrap"><div class="booking-plan-head"><h2>${esc(o.location_name)}</h2><span>${esc(e.plans.find(p => p.id_event_option === o.id_event_option)?.setup_name ?? '')}</span></div>${planView(e, o, s, canPick && (!option || o === option || opts.length === 1))}</section>`).join('')}

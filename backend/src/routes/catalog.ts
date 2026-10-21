@@ -119,7 +119,7 @@ export function catalogRoutes(deps: Deps) {
     return {
       signed_in: !!userId,
       membership: rights?.code ? rights.name : null,
-      seat_selection: !!rights?.seatSelectionEnabled,
+      seat_selection: rights ? rights.seatSelectionEnabled : deps.config.visitorSeatSelection,
       reservation_window_days: rights?.reservationWindowDays ?? deps.config.visitorReservationWindowDays,
       max_active_bookings: rights?.maxActiveBookings ?? deps.config.visitorMaxActiveBookings,
       cancellation_lock_hours: deps.config.cancellationLockHours,

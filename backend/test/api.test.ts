@@ -137,10 +137,7 @@ describe('reservation page data', () => {
     assert.equal(seats.length, 12);
     assert.ok(seats.every((x: { position_x: string; free: boolean }) => Number(x.position_x) > 0 && x.free));
     assert.equal(res.json.policy.signed_in, false);
-    assert.equal(res.json.policy.seat_selection, false);
-    const premium = await registered(env);
-    await giveMembership(env.sql, premium.userId, 'PREMIUM');
-    assert.equal((await premium.client.get(`/api/events/${eventId}`)).json.policy.seat_selection, true);
+    assert.equal(res.json.policy.seat_selection, true, 'seat picking is open to everyone');
   });
 });
 
@@ -192,17 +189,19 @@ describe('bookings', () => {
     assert.equal((await v2.client.post('/api/bookings', { event_id: events[2].eventId })).json.error.code, 'max_active_bookings');
   });
 
-  test('seat selection is a Premium right', async () => {
+  test('everyone may pick a seat, unless the membership type or visitor setting turns it off', async () => {
     const { eventId } = await makeEvent(env.sql, { hoursFromNow: 50 });
     const seats = (await new Client(env).get(`/api/events/${eventId}`)).json.event.seats;
-    const seat = seats.find((s: any) => s.seat_code === 'A07');
+    const seat = (code: string) => seats.find((s: any) => s.seat_code === code).id_seat;
+    const visitor = await registered(env);
+    assert.equal((await visitor.client.post('/api/bookings', { event_id: eventId, seat_id: seat('A07') })).json.booking.seat_code, 'A07');
     const member = await registered(env);
     await giveMembership(env.sql, member.userId, 'MEMBER');
-    assert.equal((await member.client.post('/api/bookings', { event_id: eventId, seat_id: seat.id_seat })).status, 403);
-    const premium = await registered(env);
-    await giveMembership(env.sql, premium.userId, 'PREMIUM');
-    const ok = await premium.client.post('/api/bookings', { event_id: eventId, seat_id: seat.id_seat });
-    assert.equal(ok.json.booking.seat_code, 'A07');
+    assert.equal((await member.client.post('/api/bookings', { event_id: eventId, seat_id: seat('A08') })).json.booking.seat_code, 'A08');
+    const closed = createApp({ sql: env.sql, config: { ...env.config, visitorSeatSelection: false } });
+    const other = await registered(env);
+    const res = await new Client({ ...env, app: closed }).call('POST', '/api/bookings', { event_id: eventId, seat_id: seat('A09') }, { cookie: other.client.cookie });
+    assert.equal(res.status, 403);
   });
 
   test('parallel bookings never exceed capacity', async () => {

@@ -37,6 +37,8 @@ export interface Config {
   resendApiKey: string | null;
   mailFrom: string;
   passwordResetMinutes: number;
+  /** Whether people without a membership may pick their own seat (true: everyone can, as on fikirhane.co). */
+  visitorSeatSelection: boolean;
   passwordResetRequestsPerHour: number;
 }
 
@@ -68,6 +70,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     resendApiKey: process.env.RESEND_API_KEY || null,
     mailFrom: process.env.MAIL_FROM || 'Fikirhane <onboarding@resend.dev>',
     passwordResetMinutes: int('PASSWORD_RESET_MINUTES', 60),
+    visitorSeatSelection: (process.env.VISITOR_SEAT_SELECTION ?? 'true') !== 'false',
     passwordResetRequestsPerHour: int('PASSWORD_RESET_REQUESTS_PER_HOUR', 5),
     ...overrides,
   };

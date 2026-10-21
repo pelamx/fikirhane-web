@@ -33,7 +33,7 @@ export async function membershipRights(db: Db, userId: string, config: Config): 
     return {
       idUserMembership: null, idMembershipType: null, code: null, name: 'Visitor', discountRate: null,
       reservationWindowDays: config.visitorReservationWindowDays, maxActiveBookings: config.visitorMaxActiveBookings,
-      seatSelectionEnabled: false, priorityBookingEnabled: false, endDate: null,
+      seatSelectionEnabled: config.visitorSeatSelection, priorityBookingEnabled: false, endDate: null,
     };
   }
   return {

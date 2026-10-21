@@ -48,7 +48,7 @@ choice made to get to one consistent schema. Items marked **Confirm** are assump
 
 | # | Assumption | Where to change |
 |---|---|---|
-| C-01 | **Premium**: 20% discount, 14-day booking window, 4 active bookings, seat selection. The docs give "7 or more / 2 or more" in one table and 14 / 4 elsewhere. **Member**: 15%, 7 days, 2 bookings. | `membership_types` rows |
+| C-01 | **Premium**: 20% discount, 14-day booking window, 4 active bookings. Seat selection is open to everyone since `0104` (as on fikirhane.co; `VISITOR_SEAT_SELECTION`, `membership_types.seat_selection_enabled` can close it again). The docs give "7 or more / 2 or more" in one table and 14 / 4 elsewhere. **Member**: 15%, 7 days, 2 bookings. | `membership_types` rows |
 | C-02 | **Visitor** (no membership): 7-day window, 2 active bookings, no discount. The docs leave this unspecified. | `VISITOR_*` env vars |
 | C-03 | **Payment**: there is no payment provider yet, so priced bookings are `confirmed` with `payment_status = unpaid` (pay at the venue). `PAYMENT_MODE=online` switches to 10-minute `pending_payment` holds once a provider is integrated. | `PAYMENT_MODE` |
 | C-04 | Approved memberships run 12 months from the approval date. | `MEMBERSHIP_PERIOD_MONTHS` |
