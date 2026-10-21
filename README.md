@@ -1,6 +1,17 @@
 # Fikirhane
 
-Fikirhane için hazırlanan, açık ve koyu temalı web sitesi tasarımı.
+Kulüp ve networking odaklı, açık/koyu temalı Fikirhane web sitesi. İlk aşama iki ayrı arayüz içerir:
+
+- **Public** (`/`): keşif, tanıtım, kulüpler ve program.
+- **Member** (`/member/`): kişisel ana sayfa, kulüp keşfi/takibi, kişisel buluşma planı ve profil.
+
+Host ve admin sonraki aşamalardır. Ayrıntılar: [Shell mimarisi](docs/shells.md).
+
+## Önemli: üyelik önizlemesi
+
+Mevcut GitHub Pages yayını bir arayüz prototipidir. `/uyelik/` üzerinden adını ve ilgi alanlarını seçerek member alanına geçebilirsin. Gerçek hesap oluşturulmaz; e-posta veya şifre toplanmaz. Seçimler yalnızca mevcut tarayıcıda saklanır. Oturumdan çıkma, kaldığın yerden devam etme ve önizlemeyi silme desteklenir.
+
+Gerçek kayıt/giriş, doğrulanmış üyelik, sunucuda rol kontrolü ve kalıcı çok kullanıcılı veriler için ayrı bir backend gerekir. İstemci tarafındaki yönlendirme bir güvenlik sınırı değildir.
 
 ## Yerel önizleme
 
@@ -8,23 +19,24 @@ Fikirhane için hazırlanan, açık ve koyu temalı web sitesi tasarımı.
 python -m http.server 4173
 ```
 
-Ardından http://localhost:4173 adresini açın. Derleme veya paket kurulumu gerekmez.
+http://localhost:4173 adresini aç. Derleme veya paket kurulumu gerekmez. ES modülleri kullanıldığı için HTML dosyalarını çift tıklamak yerine HTTP üzerinden aç.
 
-## GitHub Pages ile yayınlama
+## Yayın
 
-1. Deponun **Settings → Pages** sayfasını açın.
-2. **Build and deployment → Source → Deploy from a branch** seçin.
-3. **main** dalını ve **/(root)** klasörünü seçip kaydedin.
+GitHub Pages: https://pelamx.github.io/fikirhane-web/
 
-GitHub Free hesabında Pages için deponun public olması gerekir. GitHub Pro ve diğer desteklenen ücretli planlarda private depodan da Pages yayını yapılabilir. Yayınlanan Pages sitesi genel erişime açık olabilir; deponun private olması siteyi private yapmaz.
+`main` dalındaki kök klasör GitHub Pages üzerinden yayımlanır. Üyelik ve member yolları proje alt diziniyle uyumludur; özel rewrite gerekmez.
 
-Resmî belge: https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages
+## İçerik ve görseller
 
-## İçerik
-
-- Metinler, kulüp bağlantıları, takvim ve mekân görselleri: https://www.fikirhane.co/ng/ (21 Ekim 2026).
-- Açık ve koyu logolar Fikirhane tarafından sağlanmıştır.
+- Kulüp metinleri, kaynak bağlantıları ve örnek program: https://www.fikirhane.co/ng/ (21 Ekim 2026).
 - Takvim tarihli bir içerik örneğidir; gerçek zamanlı uygunluk göstermez.
-- Üyelik ve rezervasyon bağlantıları mevcut Fikirhane sitesine yönlendirir.
-- Tema tercihi tarayıcıda saklanır. Üyelik verisi toplanmaz.
+- Gerçek üyelik, etkinlik katılımı ve rezervasyonlar mevcut Fikirhane sitesinde tamamlanır.
+- Açık ve koyu logolar Fikirhane tarafından sağlanmıştır.
+- Önceki düşük çözünürlüklü fotoğraflar kaldırılmıştır. Yeni temsili Unsplash fotoğrafları 2301–2400 piksel genişliğindedir; responsive 960 piksel alternatifleri vardır. Gerçek mekân fotoğrafı oldukları iddia edilmez. [Fotoğraf kaynakları](assets/photos/README.md).
+- Tema tercihi ve önizleme profili tarayıcıda saklanır.
 - Yazı tipleri Google Fonts üzerinden yüklenir; sistem yazı tipi yedekleri vardır.
+
+## Doğrulama
+
+Tarayıcıda guest → onboarding → member geçişi, hedef kulübü koruma, kulüp takibi/çıkarma, arama/filtre, boş durumlar, plan ekleme/çıkarma, profil kaydetme ve güvenli metin gösterimi, açık/koyu tema, çıkış/devam/silme ve 360–1440 piksel arasında altı genişlikte üye sayfaları kontrol edilmiştir. Büyük ekran ana görselinin 2400 × 1601 piksel kaynağı kullandığı doğrulanmıştır.
