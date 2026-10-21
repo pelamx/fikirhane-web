@@ -128,3 +128,4 @@ body[data-shell=admin] .member-menu{display:none}
 @media(max-width:1200px){#admin-main{padding-inline:30px}}
 @media(max-width:900px){#admin-main{padding-inline:24px}}
 @media(max-width:650px){#admin-main{padding:18px 20px 30px}}
+.admin-switch{width:auto!important;margin:22px 14px 0 0}

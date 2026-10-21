@@ -274,7 +274,7 @@ async function render() {
     document.title = `${content.querySelector('h1')?.textContent ?? 'Yönetim'} · Fikirhane yönetim`;
   } catch (err) {
     if (id !== renderId) return;
-    if (err?.status === 401) { location.replace(siteUrl('uyelik/?view=yonetim')); return; }
+    if (err?.status === 401) { location.replace(siteUrl('uyelik/?view=yonetim&giris')); return; }
     content.innerHTML = empty(err?.status === 403 ? 'Bu bölüm için yetkin yok.' : err?.status === 404 ? 'Kayıt bulunamadı.' : 'Bu sayfa yüklenemedi.', esc(err?.message ?? ''));
   } finally { if (id === renderId) content.removeAttribute('aria-busy'); }
 }
@@ -282,7 +282,7 @@ async function render() {
 async function run(task, success) {
   if (busy) return; busy = true;
   try { await task(); if (success) flash(success); await render(); }
-  catch (err) { if (err?.status === 401) { location.replace(siteUrl('uyelik/?view=yonetim')); return; } flash(err?.message || 'İşlem tamamlanamadı.'); }
+  catch (err) { if (err?.status === 401) { location.replace(siteUrl('uyelik/?view=yonetim&giris')); return; } flash(err?.message || 'İşlem tamamlanamadı.'); }
   finally { busy = false; }
 }
 
@@ -295,6 +295,7 @@ const DECISIONS = {
 
 document.addEventListener('click', async event => {
   const t = event.target.closest('button'); if (!t) return;
+  if (t.hasAttribute('data-switch-account')) { await api('/auth/logout', { method: 'POST', body: {} }).catch(() => {}); location.assign(siteUrl('uyelik/?view=yonetim&giris')); return; }
   if (t.hasAttribute('data-signout')) { await api('/auth/logout', { method: 'POST', body: {} }).catch(() => {}); location.assign(siteUrl('')); return; }
   if (t.dataset.decide) {
     const d = DECISIONS[t.dataset.decide];
@@ -360,10 +361,13 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu();
 async function start() {
   const loading = document.querySelector('#admin-loading p');
   if (!await apiAvailable()) { loading.innerHTML = 'Yönetim paneli yalnızca sunucuya bağlıyken çalışır. <a class="text-link" href="../">Keşif sayfasına dön ↗</a>'; return; }
-  try { me = await api('/me'); } catch (err) { if (err.status === 401) { location.replace(siteUrl('uyelik/?view=yonetim')); return; } throw err; }
+  try { me = await api('/me'); } catch (err) { if (err.status === 401) { location.replace(siteUrl('uyelik/?view=yonetim&giris')); return; } throw err; }
   let schema;
   try { schema = await api('/admin/schema'); } catch (err) {
-    if (err.status === 403) { loading.innerHTML = 'Bu hesabın yönetim yetkisi yok. <a class="text-link" href="../member/">Üye alanına dön ↗</a>'; return; }
+    if (err.status === 403) {
+      loading.innerHTML = `<b>${esc(me.user.email ?? me.user.first_name)}</b> hesabıyla giriş yaptın; bu hesabın yönetim yetkisi yok.<br><button class="shell-primary admin-switch" data-switch-account>Başka bir hesapla giriş yap <span>↗</span></button> <a class="text-link" href="../member/">Üye alanına dön ↗</a>`;
+      return;
+    }
     throw err;
   }
   perms = new Set(schema.permissions); tables = schema.tables;
