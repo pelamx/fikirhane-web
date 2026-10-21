@@ -1,0 +1,80 @@
+-- Demo business data for local development and previews. Idempotent; safe to run repeatedly.
+-- Clubs mirror the public site (fikirhane.co/ng, 2026-10-21). Prices and account balances are illustrative values from the design docs.
+
+insert into financial_centers (center_code, center_name, center_type, description, sort_order) values
+  ('WORKING_CLUB', 'Working Club / Community Workspace', 'club', 'Community workspace sessions and Working Club activities.', 10),
+  ('ENGLISH_CLUB', 'English Club', 'club', 'Financial performance center for English Club activities.', 20),
+  ('WRITING_CLUB', 'Creative Writing Club', 'club', 'Financial performance center for Creative Writing Club activities.', 30)
+on conflict (center_code) do nothing;
+
+insert into clubs (club_code, club_name, club_description, club_type, id_financial_center, status, sort_order)
+select v.code, v.name, v.descr, v.type, fc.id_financial_center, 'active', v.ord
+from (values
+  ('WORKING', 'Çalışma Kulübü', 'Fikrini iş modeline dönüştürmek isteyenler için haftalık sohbetler ve mentor buluşmaları.', 'workspace', 'WORKING_CLUB', 10),
+  ('ENGLISH', 'İngilizce Konuşma Kulübü', 'Her hafta farklı bir konuda İngilizce sohbet: başlangıç seviyesinden akıcı konuşanlara herkes davetli. Buluşmalar Fikirhane’de; çay ve kahve bizden.', 'language', 'ENGLISH_CLUB', 20),
+  ('WRITING', 'Yaratıcı Yazarlık Kulübü', 'Kısa öykü, deneme ve şiir üzerine birlikte yazıp okuyoruz. Her buluşmada küçük bir yazma alıştırması ve nazik bir geri bildirim turu var; deneyim şartı yok, merak yeter.', 'creative', 'WRITING_CLUB', 30)
+) as v(code, name, descr, type, fc, ord)
+join financial_centers fc on fc.center_code = v.fc
+on conflict (club_code) do nothing;
+
+insert into accounts (account_code, account_name, account_type, currency_code, opening_balance, opening_balance_date, account_reference, sort_order) values
+  ('BANK_TRY', 'Bank Account TRY (demo)', 'bank', 'TRY', 0, '2026-10-01', 'Main operating account', 10),
+  ('CASH_TRY', 'Fikirhane Cash', 'cash', 'TRY', 0, '2026-10-01', null, 20)
+on conflict (account_code) do nothing;
+
+insert into items (item_code, item_name, item_type, item_category, unit, is_sellable, is_purchasable, is_stock_tracked, default_tax_rate,
+  default_revenue_category_id, sort_order)
+select 'WORKSPACE_SESSION', 'Community Workspace Session', 'service', 'workspace_service', 'session', true, false, false, 0,
+  (select id_financial_category from financial_categories where category_code = 'WORKSPACE_REVENUE'), 10
+on conflict (item_code) do nothing;
+
+-- Coworking sessions for the next 7 weekdays (morning 10-14, afternoon 14-18), two options each.
+with days as (
+  select d::date as day from generate_series(current_date, current_date + 9, interval '1 day') d
+  where extract(isodow from d) <= 5 limit 7
+), slots as (
+  select day, s.code, s.label, s.start_h, s.end_h from days
+  cross join (values ('AM', 'Sabah', 10, 14), ('PM', 'Öğleden sonra', 14, 18)) as s(code, label, start_h, end_h)
+), ins as (
+  insert into events (event_code, event_type, event_title, event_description, start_datetime, end_datetime, status, base_price, currency_code,
+                      networking_enabled, enable_need, enable_offer)
+  select 'WORKING-' || to_char(day, 'YYYY-MM-DD') || '-' || code, 'workspace', 'Coworking · ' || label,
+         'Fikirhane topluluk çalışma alanında ' || lower(label) || ' oturumu.',
+         (day + make_interval(hours => start_h)) at time zone 'Europe/Istanbul',
+         (day + make_interval(hours => end_h)) at time zone 'Europe/Istanbul',
+         'published', 500.00, 'TRY', true, true, true
+  from slots
+  where (day + make_interval(hours => start_h)) at time zone 'Europe/Istanbul' > now()
+  on conflict (event_code) do nothing
+  returning id_event
+)
+insert into event_options (id_event, id_location, id_space_setup, option_code, option_name, capacity, booking_unit, price_adjustment, status, sort_order)
+select ins.id_event, s.id_location, s.id_space_setup, o.code, o.name, o.cap, 'seat', l.default_price_adjustment, 'active', o.ord
+from ins
+cross join (values ('FIK', 'FIKIRHANE_COWORK_V1', 'Fikirhane — Network Zone', 16, 10), ('ATL', 'ATOLYE_COWORK_V1', 'Atölye — Focus Zone', 12, 20)) as o(code, setup, name, cap, ord)
+join space_setups s on s.setup_code = o.setup
+join locations l on l.id_location = s.id_location;
+
+insert into event_clubs (id_club, id_event, club_event_role, is_primary)
+select c.id_club, e.id_event, 'organizer', true from events e join clubs c on c.club_code = 'WORKING'
+where e.event_code like 'WORKING-%'
+  and not exists (select 1 from event_clubs ec where ec.id_event = e.id_event and ec.status = 'active');
+
+-- English conversation meetup from the public program (24 Oct 2026, 14:00-16:00), free; skipped once it is in the past.
+with ins as (
+  insert into events (event_code, event_type, event_title, event_description, start_datetime, end_datetime, status, base_price, currency_code,
+                      networking_enabled, show_interests)
+  select 'ENG-MEET-2026-10-24', 'meetup', 'Culture, Food and Traditions',
+         'Kültürler, yemekler ve gelenekler üzerine İngilizce sohbet.',
+         timestamptz '2026-10-24 14:00 Europe/Istanbul', timestamptz '2026-10-24 16:00 Europe/Istanbul', 'published', 0, 'TRY', true, true
+  where timestamptz '2026-10-24 14:00 Europe/Istanbul' > now()
+  on conflict (event_code) do nothing
+  returning id_event
+), opt as (
+  insert into event_options (id_event, id_location, id_space_setup, option_code, option_name, capacity, booking_unit, price_adjustment, status, sort_order)
+  select ins.id_event, s.id_location, s.id_space_setup, 'FIK', 'Fikirhane', 16, 'location', 0, 'active', 10
+  from ins, space_setups s where s.setup_code = 'FIKIRHANE_COWORK_V1'
+  returning id_event
+)
+insert into event_clubs (id_club, id_event, club_event_role, is_primary)
+select c.id_club, opt.id_event, 'organizer', true from opt, clubs c where c.club_code = 'ENGLISH';

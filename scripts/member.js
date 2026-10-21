@@ -1,16 +1,19 @@
-import { clubs, events } from './catalog.js';
 import { initTheme, escapeHTML as esc } from './shared.js';
-import { getSession, saveProfile, toggleClub, toggleEvent, signOut, clearPreview, siteUrl } from './session.js';
+import { ready, mode, getCatalog, getSession, saveProfile, toggleClub, toggleEvent, bookEvent, cancelBooking, applyForMembership, membershipStatus, signOut, clearPreview, siteUrl } from './session.js';
 initTheme();
 const content = document.querySelector('#member-content');
 const menu = document.querySelector('.member-menu');
 const sidebar = document.querySelector('.member-sidebar');
-let query = '', category = 'all', eventFilter = 'all', toastTimer;
+let query = '', category = 'all', eventFilter = 'all', toastTimer, busy = false, membershipInfo = null;
 const navNames = { anasayfa: 'Ana sayfam', kesfet: 'Kulüpleri keşfet', kuluplerim: 'Kulüplerim', bulusmalar: 'Buluşmalar', profil: 'Profilim', kulup: 'Kulüp' };
+const live = () => mode() === 'api';
+const clubs = () => getCatalog().clubs;
+const events = () => getCatalog().events;
+const money = (amount, currency) => Number(amount) === 0 ? 'Ücretsiz' : new Intl.NumberFormat('tr-TR', { style: 'currency', currency, maximumFractionDigits: 2 }).format(Number(amount));
 function route() { const [view, id] = location.hash.slice(1).split('/'); return { view: Object.hasOwn(navNames, view) ? view : 'anasayfa', id }; }
 function requireSession() {
   const session = getSession();
-  if (!session) { const { view, id } = route(); const params = new URLSearchParams(view === 'kulup' && clubs.some(c => c.id === id) ? { club: id } : { view }); location.replace(siteUrl('uyelik/?' + params)); return null; }
+  if (!session) { const { view, id } = route(); const params = new URLSearchParams(view === 'kulup' && clubs().some(c => c.id === id) ? { club: id } : { view }); location.replace(siteUrl('uyelik/?' + params)); return null; }
   return session;
 }
 function flash(message) { const toast = document.querySelector('#toast'); clearTimeout(toastTimer); toast.textContent = message; toast.hidden = false; toastTimer = setTimeout(() => toast.hidden = true, 3500); }
@@ -18,47 +21,92 @@ function heading(eyebrow, title, copy = '') { return `<div class="member-heading
 function empty(title, text, action = 'Kulüpleri keşfet', url = '#kesfet') { return `<div class="empty-state"><span class="empty-mark" aria-hidden="true">↗</span><h3>${title}</h3><p>${text}</p><a class="shell-secondary" href="${url}">${action} <span>↗</span></a></div>`; }
 function clubCard(club, session, compact = false) {
   const followed = session.clubIds.includes(club.id);
-  return `<article class="member-club ${compact ? 'compact' : ''}"><a class="member-club-art ${club.id}" href="#kulup/${club.id}"><span>${esc(club.category.toLocaleUpperCase('tr'))}</span><strong>${esc(club.words[0])}<br><em>${esc(club.words[1])}</em></strong><span>FİKİRHANE KULÜPLERİ <span>↗</span></span></a><div class="member-club-copy"><a href="#kulup/${club.id}"><h3>${esc(club.name)}</h3></a><p>${esc(club.description)}</p><div class="club-card-actions"><a class="text-link" href="#kulup/${club.id}">Kulübü tanı ↗</a><button class="follow-button ${followed ? 'is-followed' : ''}" data-action="club" data-id="${club.id}" aria-pressed="${followed}" aria-label="${esc(club.name)}: ${followed ? 'takipten çıkar' : 'takip et'}">${followed ? '✓ Takiptesin' : '+ Takip et'}</button></div></div></article>`;
+  const [on, off] = live() ? ['✓ Kulüptesin', '+ Katıl'] : ['✓ Takiptesin', '+ Takip et'];
+  return `<article class="member-club ${compact ? 'compact' : ''}"><a class="member-club-art ${esc(club.id)}" href="#kulup/${esc(club.id)}"><span>${esc(club.category.toLocaleUpperCase('tr'))}</span><strong>${esc(club.words[0])}<br><em>${esc(club.words[1])}</em></strong><span>FİKİRHANE KULÜPLERİ <span>↗</span></span></a><div class="member-club-copy"><a href="#kulup/${esc(club.id)}"><h3>${esc(club.name)}</h3></a><p>${esc(club.description)}</p><div class="club-card-actions"><a class="text-link" href="#kulup/${esc(club.id)}">Kulübü tanı ↗</a><button class="follow-button ${followed ? 'is-followed' : ''}" data-action="club" data-id="${esc(club.id)}" aria-pressed="${followed}" aria-label="${esc(club.name)}: ${followed ? (live() ? 'kulüpten ayrıl' : 'takipten çıkar') : (live() ? 'kulübe katıl' : 'takip et')}">${followed ? on : off}</button></div></div></article>`;
+}
+function bookingControls(event) {
+  if (event.booking) {
+    const b = event.booking;
+    const option = event.options.find(o => o.id_event_option === b.id_event_option);
+    const label = b.booking_status === 'waitlisted' ? 'Bekleme listesindesin' : 'Yerin ayrıldı';
+    return `<p class="booking-state">✓ ${label}${option ? ' · ' + esc(option.option_name ?? option.location_name) : ''}</p><button class="shell-secondary" data-action="cancel-booking" data-id="${esc(b.id_booking)}">Rezervasyonu iptal et</button>`;
+  }
+  return event.options.map(o => {
+    const full = o.available === 0;
+    const price = o.price ? money(o.price.finalPrice, o.price.currency) : '';
+    const was = o.price && o.price.discountAmount !== '0.00' ? ` <s>${money(o.price.listAmount, o.price.currency)}</s>` : '';
+    return `<button class="shell-secondary option-button" data-action="book" data-id="${esc(event.id)}" data-option="${esc(o.id_event_option)}" ${full ? 'disabled' : ''}><span>${esc(o.option_name ?? o.location_name)}</span><small>${price}${was} · ${full ? 'Dolu' : o.available + ' yer'}</small></button>`;
+  }).join('');
 }
 function eventCard(event, session) {
+  const club = clubs().find(c => c.id === event.clubId);
+  const label = club ? esc(club.category.toLocaleUpperCase('tr')) : 'FİKİRHANE';
+  if (live()) {
+    return `<article class="member-event"><div class="member-event-date"><strong>${esc(event.day)}</strong><span>${esc(event.month)}</span></div><div class="member-event-main"><span class="section-label">${label} / BULUŞMA</span><h3>${esc(event.name)}</h3><p>${esc(event.date)} · ${esc(event.time)} · ${esc(event.location)}</p>${club ? `<a class="text-link" href="#kulup/${esc(club.id)}">${esc(club.name)} ↗</a>` : ''}</div><div class="member-event-actions">${bookingControls(event)}</div></article>`;
+  }
   const saved = session.eventIds.includes(event.id);
-  const club = clubs.find(c => c.id === event.clubId);
-  return `<article class="member-event"><div class="member-event-date"><strong>${event.day}</strong><span>${event.month}</span></div><div class="member-event-main"><span class="section-label">${esc(club.category.toLocaleUpperCase('tr'))} / ÖRNEK PROGRAM</span><h3>${esc(event.name)}</h3><p>${esc(event.date)} · ${event.time} · ${event.location}</p><a class="text-link" href="#kulup/${club.id}">${esc(club.name)} ↗</a></div><div class="member-event-actions"><button class="shell-secondary" data-action="event" data-id="${event.id}" aria-pressed="${saved}">${saved ? '✓ Planımdan çıkar' : '+ Planıma ekle'}</button><a class="text-link" href="${event.sourceUrl}" target="_blank" rel="noopener">Gerçek etkinliği incele ↗</a></div></article>`;
+  return `<article class="member-event"><div class="member-event-date"><strong>${event.day}</strong><span>${event.month}</span></div><div class="member-event-main"><span class="section-label">${label} / ÖRNEK PROGRAM</span><h3>${esc(event.name)}</h3><p>${esc(event.date)} · ${event.time} · ${event.location}</p>${club ? `<a class="text-link" href="#kulup/${club.id}">${esc(club.name)} ↗</a>` : ''}</div><div class="member-event-actions"><button class="shell-secondary" data-action="event" data-id="${event.id}" aria-pressed="${saved}">${saved ? '✓ Planımdan çıkar' : '+ Planıma ekle'}</button>${event.sourceUrl ? `<a class="text-link" href="${event.sourceUrl}" target="_blank" rel="noopener">Gerçek etkinliği incele ↗</a>` : ''}</div></article>`;
 }
 function home(session) {
-  const followed = clubs.filter(c => session.clubIds.includes(c.id));
-  const planned = events.filter(e => session.eventIds.includes(e.id));
-  return heading('SENİN FİKİRHANE’N', `Merhaba, <em>${esc(session.profile.name)}.</em>`, 'Bir merakını takip et. Bir masaya katıl. Kendi çevreni burada kur.') + `<div class="member-stats"><a href="#kuluplerim"><strong>${followed.length.toString().padStart(2,'0')}</strong><span>Takip ettiğin kulüp <span>↗</span></span></a><a href="#bulusmalar"><strong>${planned.length.toString().padStart(2,'0')}</strong><span>Planındaki buluşma <span>↗</span></span></a><a href="#kesfet"><strong>${clubs.length.toString().padStart(2,'0')}</strong><span>Keşfedilecek kulüp <span>↗</span></span></a></div><div class="member-home-grid"><section><div class="member-section-top"><h2>Kulüplerim</h2><a class="text-link" href="#kuluplerim">Tümünü gör ↗</a></div>${followed.length ? `<div class="member-club-grid home-clubs">${followed.slice(0,2).map(c => clubCard(c,session,true)).join('')}</div>` : empty('İlk kulübün seni bekliyor.', 'Ortak bir merak, tanışmak için yeter. İlgi duyduğun kulübü takip ederek başla.')}</section><aside class="member-agenda"><span class="section-label">KENDİ TAKVİMİN</span><h2>Sıradaki<br><em>tanışmalar.</em></h2>${planned.length ? planned.map(e=>`<a class="agenda-item" href="#bulusmalar"><strong>${e.day} ${e.month}</strong><span>${esc(e.name)}</span><small>${e.time} ↗</small></a>`).join('') : '<p>Henüz planına bir buluşma eklemedin. Sana uyan bir sohbetle başlayabilirsin.</p>'}<a class="shell-secondary" href="#bulusmalar">Programı keşfet ↗</a><span class="agenda-note">21–27 Ekim 2026 · Örnek program</span></aside></div><section class="member-recommend"><div><span class="section-label">ORTAK NOKTAN BURADA OLABİLİR.</span><h2>Farklı bir kulübe<br><em>de göz at.</em></h2></div><p>Kulüpler arasında dolaş. Bir gün bir fikri, başka bir gün yeni bir kelimeyi paylaş.</p><a class="square-arrow" href="#kesfet" aria-label="Tüm kulüpleri keşfet">↗</a></section>`;
+  const followed = clubs().filter(c => session.clubIds.includes(c.id));
+  const planned = events().filter(e => session.eventIds.includes(e.id));
+  const note = live() ? 'Fikirhane takviminden' : '21–27 Ekim 2026 · Örnek program';
+  return heading('SENİN FİKİRHANE’N', `Merhaba, <em>${esc(session.profile.name)}.</em>`, 'Bir merakını takip et. Bir masaya katıl. Kendi çevreni burada kur.') + `<div class="member-stats"><a href="#kuluplerim"><strong>${followed.length.toString().padStart(2,'0')}</strong><span>${live() ? 'Üyesi olduğun kulüp' : 'Takip ettiğin kulüp'} <span>↗</span></span></a><a href="#bulusmalar"><strong>${planned.length.toString().padStart(2,'0')}</strong><span>${live() ? 'Rezervasyonun' : 'Planındaki buluşma'} <span>↗</span></span></a><a href="#kesfet"><strong>${clubs().length.toString().padStart(2,'0')}</strong><span>Keşfedilecek kulüp <span>↗</span></span></a></div><div class="member-home-grid"><section><div class="member-section-top"><h2>Kulüplerim</h2><a class="text-link" href="#kuluplerim">Tümünü gör ↗</a></div>${followed.length ? `<div class="member-club-grid home-clubs">${followed.slice(0,2).map(c => clubCard(c,session,true)).join('')}</div>` : empty('İlk kulübün seni bekliyor.', 'Ortak bir merak, tanışmak için yeter. İlgi duyduğun kulübe katılarak başla.')}</section><aside class="member-agenda"><span class="section-label">KENDİ TAKVİMİN</span><h2>Sıradaki<br><em>tanışmalar.</em></h2>${planned.length ? planned.map(e=>`<a class="agenda-item" href="#bulusmalar"><strong>${esc(e.day)} ${esc(e.month)}</strong><span>${esc(e.name)}</span><small>${esc(e.time)} ↗</small></a>`).join('') : `<p>${live() ? 'Henüz bir buluşmaya yer ayırtmadın.' : 'Henüz planına bir buluşma eklemedin.'} Sana uyan bir sohbetle başlayabilirsin.</p>`}<a class="shell-secondary" href="#bulusmalar">Programı keşfet ↗</a><span class="agenda-note">${note}</span></aside></div><section class="member-recommend"><div><span class="section-label">ORTAK NOKTAN BURADA OLABİLİR.</span><h2>Farklı bir kulübe<br><em>de göz at.</em></h2></div><p>Kulüpler arasında dolaş. Bir gün bir fikri, başka bir gün yeni bir kelimeyi paylaş.</p><a class="square-arrow" href="#kesfet" aria-label="Tüm kulüpleri keşfet">↗</a></section>`;
 }
-function discover(session) {
-  return heading('KEŞFET', 'Merakının <em>peşinden.</em>', 'Birlikte üretmek, konuşmak, yazmak. Kendine yakın bir kulüp bul.') + `<div class="club-toolbar"><label class="search-field"><span>Ara</span><input type="search" id="club-search" placeholder="Kulüp veya ilgi alanı ara" value="${esc(query)}" autocomplete="off"></label><div class="category-filter" role="group" aria-label="Kulüp kategorisi"><button data-category="all" aria-pressed="${category==='all'}">Tümü</button>${clubs.map(c=>`<button data-category="${c.id}" aria-pressed="${category===c.id}">${esc(c.category)}</button>`).join('')}</div></div><p class="search-count" id="search-count" aria-live="polite"></p><div id="discovery-results"></div>`;
+function discover() {
+  return heading('KEŞFET', 'Merakının <em>peşinden.</em>', 'Birlikte üretmek, konuşmak, yazmak. Kendine yakın bir kulüp bul.') + `<div class="club-toolbar"><label class="search-field"><span>Ara</span><input type="search" id="club-search" placeholder="Kulüp veya ilgi alanı ara" value="${esc(query)}" autocomplete="off"></label><div class="category-filter" role="group" aria-label="Kulüp kategorisi"><button data-category="all" aria-pressed="${category==='all'}">Tümü</button>${clubs().map(c=>`<button data-category="${esc(c.id)}" aria-pressed="${category===c.id}">${esc(c.category)}</button>`).join('')}</div></div><p class="search-count" id="search-count" aria-live="polite"></p><div id="discovery-results"></div>`;
 }
 function renderResults(session) {
-  const filtered = clubs.filter(c => (category === 'all' || category === c.id) && `${c.name} ${c.category} ${c.description}`.toLocaleLowerCase('tr').includes(query.toLocaleLowerCase('tr')));
+  const filtered = clubs().filter(c => (category === 'all' || category === c.id) && `${c.name} ${c.category} ${c.description}`.toLocaleLowerCase('tr').includes(query.toLocaleLowerCase('tr')));
   document.querySelector('#search-count').textContent = filtered.length + ' kulüp';
   document.querySelector('#discovery-results').innerHTML = filtered.length ? `<div class="member-club-grid">${filtered.map(c=>clubCard(c,session)).join('')}</div>` : `<div class="empty-state"><h3>Bu merak henüz bir kulübe dönüşmemiş.</h3><p>Başka bir kelimeyle arayabilir veya tüm kulüplere dönebilirsin.</p><button class="shell-secondary" data-action="reset-search">Aramayı temizle ↗</button></div>`;
 }
 function myClubs(session) {
-  const followed = clubs.filter(c => session.clubIds.includes(c.id));
-  return heading('KULÜPLERİM', 'Aynı merakta <em>buluştuk.</em>', 'Takip ettiğin kulüpler bir arada. Gerçek kulüp üyeliği için kulübün kayıt sayfasına devam edebilirsin.') + (followed.length ? `<div class="member-club-grid">${followed.map(c=>clubCard(c,session)).join('')}</div>` : empty('Burada ilk kulübüne yer var.', 'Bir kulübü takip ettiğinde burada göreceksin.'));
+  const followed = clubs().filter(c => session.clubIds.includes(c.id));
+  const copy = live() ? 'Katıldığın kulüpler bir arada.' : 'Takip ettiğin kulüpler bir arada. Gerçek kulüp üyeliği için kulübün kayıt sayfasına devam edebilirsin.';
+  return heading('KULÜPLERİM', 'Aynı merakta <em>buluştuk.</em>', copy) + (followed.length ? `<div class="member-club-grid">${followed.map(c=>clubCard(c,session)).join('')}</div>` : empty('Burada ilk kulübüne yer var.', live() ? 'Bir kulübe katıldığında burada göreceksin.' : 'Bir kulübü takip ettiğinde burada göreceksin.'));
 }
 function clubDetail(id, session) {
-  const club = clubs.find(c => c.id === id);
+  const club = clubs().find(c => c.id === id);
   if (!club) return heading('KULÜPLER', 'Bu kulüp <em>bulunamadı.</em>') + empty('Yeni bir kulüp keşfedelim.', 'Bu bağlantı artık geçerli olmayabilir.');
   const followed = session.clubIds.includes(id);
-  return `<a class="text-link back-link" href="#kesfet">← Kulüplere dön</a>` + heading(esc(club.category.toLocaleUpperCase('tr')), esc(club.name), esc(club.prompt)) + `<div class="club-detail-layout"><section><div class="club-art art-${club.id}" aria-hidden="true"><span>FİKİRLER, İNSANLAR, BAĞLANTILAR.</span><div class="bubble bubble-one">${esc(club.words[0])}</div><div class="bubble bubble-two">${esc(club.words[1])}</div></div><div class="club-about"><h2>Bu masada ne var?</h2><p>${esc(club.description)}</p><p class="source-note">Kaynak sitedeki adı: ${esc(club.sourceName)}</p></div><div class="member-section-top"><h2>Kulübün buluşmaları</h2></div>${events.some(e=>e.clubId===id) ? events.filter(e=>e.clubId===id).map(e=>eventCard(e,session)).join('') : '<p class="quiet-empty">Kaynak programda bu kulüp için yayımlanmış bir buluşma bulunmuyor. Yeni programı kulübün sayfasından kontrol edebilirsin.</p>'}</section><aside class="club-join-panel"><span class="section-label">KENDİ ÇEVRENE EKLE.</span><h2>Bir merak.<br><em>Yeni bir bağ.</em></h2><p>Kulübü takip ederek kişisel alanında tut. Gerçek üyelik ve katılım koşullarını kulübün sayfasından öğren.</p><button class="shell-primary" data-action="club" data-id="${id}" aria-pressed="${followed}">${followed ? '✓ Takipten çıkar' : '+ Kulüplerime ekle'}</button><a class="shell-secondary" href="${club.sourceUrl}" target="_blank" rel="noopener">Kulübün kayıt sayfası ↗</a><small>Takip işlemi bu tasarım önizlemesinde saklanır. Gerçek üyelik oluşturmaz.</small></aside></div>`;
+  const clubEvents = events().filter(e => e.clubId === id);
+  const panel = live()
+    ? `<p>Kulübe katılarak topluluğun bir parçası ol; buluşmalarını kendi alanında takip et.</p><button class="shell-primary" data-action="club" data-id="${esc(id)}" aria-pressed="${followed}">${followed ? '✓ Kulüpten ayrıl' : '+ Kulübe katıl'}</button><small>${club.memberCount ?? 0} üye · Kulüp üyeliği ücretsizdir ve Fikirhane üyeliğinden bağımsızdır.</small>`
+    : `<p>Kulübü takip ederek kişisel alanında tut. Gerçek üyelik ve katılım koşullarını kulübün sayfasından öğren.</p><button class="shell-primary" data-action="club" data-id="${id}" aria-pressed="${followed}">${followed ? '✓ Takipten çıkar' : '+ Kulüplerime ekle'}</button><a class="shell-secondary" href="${club.sourceUrl}" target="_blank" rel="noopener">Kulübün kayıt sayfası ↗</a><small>Takip işlemi bu tasarım önizlemesinde saklanır. Gerçek üyelik oluşturmaz.</small>`;
+  return `<a class="text-link back-link" href="#kesfet">← Kulüplere dön</a>` + heading(esc(club.category.toLocaleUpperCase('tr')), esc(club.name), esc(club.prompt)) + `<div class="club-detail-layout"><section><div class="club-art art-${esc(club.id)}" aria-hidden="true"><span>FİKİRLER, İNSANLAR, BAĞLANTILAR.</span><div class="bubble bubble-one">${esc(club.words[0])}</div><div class="bubble bubble-two">${esc(club.words[1])}</div></div><div class="club-about"><h2>Bu masada ne var?</h2><p>${esc(club.description)}</p>${live() ? '' : `<p class="source-note">Kaynak sitedeki adı: ${esc(club.sourceName)}</p>`}</div><div class="member-section-top"><h2>Kulübün buluşmaları</h2></div>${clubEvents.length ? clubEvents.map(e=>eventCard(e,session)).join('') : `<p class="quiet-empty">${live() ? 'Bu kulübün yakında yayımlanmış bir buluşması yok.' : 'Kaynak programda bu kulüp için yayımlanmış bir buluşma bulunmuyor. Yeni programı kulübün sayfasından kontrol edebilirsin.'}</p>`}</section><aside class="club-join-panel"><span class="section-label">KENDİ ÇEVRENE EKLE.</span><h2>Bir merak.<br><em>Yeni bir bağ.</em></h2>${panel}</aside></div>`;
 }
 function gatherings(session) {
-  const shown = eventFilter==='mine' ? events.filter(e=>session.eventIds.includes(e.id)) : events;
-  return heading('BULUŞMALAR', 'Bir sonraki <em>merhaba.</em>', 'İlgini çeken buluşmaları kişisel planına ekle. Gerçek katılım işlemini etkinliğin kendi sayfasında tamamla.') + `<div class="event-filter" role="group" aria-label="Buluşma görünümü"><button data-event-filter="all" aria-pressed="${eventFilter==='all'}">Tüm buluşmalar</button><button data-event-filter="mine" aria-pressed="${eventFilter==='mine'}">Planım (${session.eventIds.length})</button></div><p class="program-label">21–27 Ekim 2026 · Kaynak siteden alınan örnek program</p>` + (shown.length ? shown.map(e=>eventCard(e,session)).join('') : empty('Takviminde boş bir sandalye var.', 'Bir buluşmayı planına ekle; tarihi ve saati burada bir arada gör.', 'Tüm buluşmaları gör', '#bulusmalar/tumu'));
+  const shown = eventFilter==='mine' ? events().filter(e=>session.eventIds.includes(e.id)) : events();
+  const [intro, mine, label] = live()
+    ? ['Sana uyan buluşmada yerini ayırt. Fiyatlar üyeliğine göre hesaplanır.', `Rezervasyonlarım (${session.eventIds.length})`, 'Fikirhane takvimi · önümüzdeki 60 gün']
+    : ['İlgini çeken buluşmaları kişisel planına ekle. Gerçek katılım işlemini etkinliğin kendi sayfasında tamamla.', `Planım (${session.eventIds.length})`, '21–27 Ekim 2026 · Kaynak siteden alınan örnek program'];
+  return heading('BULUŞMALAR', 'Bir sonraki <em>merhaba.</em>', intro) + `<div class="event-filter" role="group" aria-label="Buluşma görünümü"><button data-event-filter="all" aria-pressed="${eventFilter==='all'}">Tüm buluşmalar</button><button data-event-filter="mine" aria-pressed="${eventFilter==='mine'}">${mine}</button></div><p class="program-label">${label}</p>` + (shown.length ? shown.map(e=>eventCard(e,session)).join('') : empty('Takviminde boş bir sandalye var.', live() ? 'Bir buluşmada yerini ayırt; tarihi ve saati burada bir arada gör.' : 'Bir buluşmayı planına ekle; tarihi ve saati burada bir arada gör.', 'Tüm buluşmaları gör', '#bulusmalar/tumu'));
+}
+function membershipPanel(session) {
+  const m = session.membership;
+  const open = membershipInfo?.applications?.find(a => ['submitted', 'under_review', 'waitlisted'].includes(a.status));
+  const statusText = { submitted: 'Başvurun alındı; ekibimiz inceleyecek.', under_review: 'Başvurun inceleniyor.', waitlisted: 'Başvurun bekleme listesinde.' };
+  const body = m?.code
+    ? `<p><strong>${esc(m.name)}</strong>${m.end_date ? ` · ${esc(new Date(m.end_date).toLocaleDateString('tr-TR'))} tarihine kadar` : ''}</p><p>%${Number(m.discount_rate)} indirim · ${m.reservation_window_days} gün önceden rezervasyon${m.seat_selection_enabled ? ' · koltuk seçimi' : ''}</p>`
+    : open ? `<p>${statusText[open.status]}</p>`
+    : `<p>Şu an ziyaretçisin. Üyeler buluşmalarda indirim ve öncelikli rezervasyon hakkı kazanır.</p><form id="membership-form" class="profile-form"><label for="membership-motivation">Fikirhane’ye neden katılmak istiyorsun?</label><textarea id="membership-motivation" maxlength="2000" rows="3" required></textarea><button class="shell-primary" type="submit">Üyelik başvurusu yap <span>↗</span></button></form>`;
+  return `<section class="preview-settings membership-panel"><h2>Fikirhane üyeliği</h2>${body}</section>`;
 }
 function profile(session) {
-  return heading('PROFİLİM', 'Biraz da <em>senden.</em>', 'Bir sonraki sohbet, ortak bir merakla başlayabilir.') + `<div class="profile-layout"><form id="profile-form" class="profile-form"><label for="profile-name">Adın</label><input id="profile-name" name="name" maxlength="50" required autocomplete="given-name" value="${esc(session.profile.name)}"><label for="profile-bio">Nelerle ilgileniyorsun?</label><textarea id="profile-bio" name="bio" maxlength="240" rows="4" placeholder="Kısaca kendinden ve merak ettiklerinden bahset.">${esc(session.profile.bio)}</textarea><p class="entry-footnote">Bu profil yalnızca senin tarayıcında görünür. Başka üyelerle paylaşılmaz.</p><button class="shell-primary" type="submit">Değişiklikleri kaydet <span>↗</span></button></form><aside class="profile-summary"><div class="profile-avatar">${esc(session.profile.name[0].toLocaleUpperCase('tr'))}</div><h2>${esc(session.profile.name)}</h2><p>${session.clubIds.length} kulüp · ${session.eventIds.length} buluşma</p><span class="preview-badge">ÜYE ALANI ÖNİZLEMESİ</span><a class="text-link" href="https://www.fikirhane.co/ng/uyelik" target="_blank" rel="noopener">Gerçek Fikirhane üyeliği ↗</a></aside></div><section class="preview-settings"><h2>Önizleme tercihleri</h2><p>Çıkış yaparsan seçimlerin korunur. Önizlemeyi silersen bu tarayıcıdaki profilin ve seçimlerin kaldırılır.</p><div><button class="shell-secondary" data-signout>Çıkış yap ↗</button><button class="text-danger" data-action="reset">Önizlemeyi sil</button></div></section>`;
+  const badge = live() ? esc((session.membership?.code ? session.membership.name : 'Ziyaretçi').toLocaleUpperCase('tr')) : 'ÜYE ALANI ÖNİZLEMESİ';
+  const foot = live() ? 'Profilin Fikirhane hesabında saklanır.' : 'Bu profil yalnızca senin tarayıcında görünür. Başka üyelerle paylaşılmaz.';
+  const settings = live()
+    ? membershipPanel(session) + `<section class="preview-settings"><h2>Hesap</h2><p>${esc(session.profile.email ?? '')}</p><div><button class="shell-secondary" data-signout>Çıkış yap ↗</button></div></section>`
+    : `<section class="preview-settings"><h2>Önizleme tercihleri</h2><p>Çıkış yaparsan seçimlerin korunur. Önizlemeyi silersen bu tarayıcıdaki profilin ve seçimlerin kaldırılır.</p><div><button class="shell-secondary" data-signout>Çıkış yap ↗</button><button class="text-danger" data-action="reset">Önizlemeyi sil</button></div></section>`;
+  return heading('PROFİLİM', 'Biraz da <em>senden.</em>', 'Bir sonraki sohbet, ortak bir merakla başlayabilir.') + `<div class="profile-layout"><form id="profile-form" class="profile-form"><label for="profile-name">Adın</label><input id="profile-name" name="name" maxlength="50" required autocomplete="given-name" value="${esc(session.profile.name)}"><label for="profile-bio">Nelerle ilgileniyorsun?</label><textarea id="profile-bio" name="bio" maxlength="240" rows="4" placeholder="Kısaca kendinden ve merak ettiklerinden bahset.">${esc(session.profile.bio)}</textarea><p class="entry-footnote">${foot}</p><button class="shell-primary" type="submit">Değişiklikleri kaydet <span>↗</span></button></form><aside class="profile-summary"><div class="profile-avatar">${esc(session.profile.name[0].toLocaleUpperCase('tr'))}</div><h2>${esc(session.profile.name)}</h2><p>${session.clubIds.length} kulüp · ${session.eventIds.length} ${live() ? 'rezervasyon' : 'buluşma'}</p><span class="preview-badge">${badge}</span>${live() ? '' : '<a class="text-link" href="https://www.fikirhane.co/ng/uyelik" target="_blank" rel="noopener">Gerçek Fikirhane üyeliği ↗</a>'}</aside></div>${settings}`;
 }
 function render() {
   const session = requireSession(); if (!session) return;
   document.querySelector('#member-loading').hidden = true;
   document.querySelector('#member-shell').hidden = false;
+  document.querySelector('#member-preview-note').hidden = live();
+  document.querySelector('#member-footnote').hidden = live();
   const { view, id } = route();
   document.title = `${navNames[view]} · Fikirhane`;
   document.querySelector('#header-name').textContent = session.profile.name;
@@ -66,29 +114,49 @@ function render() {
   document.querySelector('#sidebar-club-count').textContent = session.clubIds.length;
   document.querySelectorAll('[data-view]').forEach(link=> { const current = link.dataset.view === (view==='kulup' ? 'kesfet' : view); if(current)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current'); });
   if (view==='bulusmalar' && id==='tumu') eventFilter='all';
-  content.innerHTML = view==='anasayfa' ? home(session) : view==='kesfet' ? discover(session) : view==='kuluplerim' ? myClubs(session) : view==='kulup' ? clubDetail(id,session) : view==='bulusmalar' ? gatherings(session) : profile(session);
+  content.innerHTML = view==='anasayfa' ? home(session) : view==='kesfet' ? discover() : view==='kuluplerim' ? myClubs(session) : view==='kulup' ? clubDetail(id,session) : view==='bulusmalar' ? gatherings(session) : profile(session);
   if (view==='kesfet') renderResults(session);
+  if (view==='profil' && live() && !membershipInfo) membershipStatus().then(info => { membershipInfo = info; if (route().view === 'profil') render(); }).catch(() => {});
 }
-function exit() { try { signOut(); location.assign(siteUrl('')); } catch { flash('Çıkış kaydedilemedi. Tarayıcı depolama iznini kontrol et.'); } }
+async function exit() { try { await signOut(); location.assign(siteUrl('')); } catch { flash('Çıkış kaydedilemedi. Tarayıcı depolama iznini kontrol et.'); } }
+async function run(task, success) {
+  if (busy) return; busy = true;
+  try { await task(); render(); if (success) flash(success); }
+  catch (err) { if (err?.status === 401) { requireSession(); return; } flash(err?.message || 'Değişiklik kaydedilemedi.'); }
+  finally { busy = false; }
+}
 document.addEventListener('click', event => {
   const target = event.target.closest('button'); if (!target) return;
   if (target.hasAttribute('data-signout')) { exit(); return; }
   if (target.dataset.category) { category=target.dataset.category; render(); return; }
   if (target.dataset.eventFilter) { eventFilter=target.dataset.eventFilter; if(location.hash==='#bulusmalar/tumu')history.replaceState(null,'','#bulusmalar'); render(); return; }
-  const { action, id } = target.dataset;
-  try {
-    if(action==='club' || action==='event') { const current = getSession(); if (!current) { requireSession();return; } const had = (action==='club'?current.clubIds:current.eventIds).includes(id); if(action==='club')toggleClub(id);else toggleEvent(id); render(); const replacement=[...content.querySelectorAll('[data-action]')].find(b=>b.dataset.action===action&&b.dataset.id===id); replacement?.focus({preventScroll:true}); flash(action==='club'?(had?'Kulüp takipten çıkarıldı.':'Kulüp, kulüplerine eklendi.'):(had?'Buluşma planından çıkarıldı.':'Buluşma planına eklendi. Gerçek katılım için etkinlik sayfasına devam et.')); }
-    if(action==='reset-search') {query='';category='all';render();document.querySelector('#club-search').focus();}
-    if(action==='reset') document.querySelector('#reset-dialog').showModal();
-  } catch { flash('Değişiklik kaydedilemedi. Tarayıcı depolama iznini kontrol et.'); }
+  const { action, id, option } = target.dataset;
+  const refocus = () => [...content.querySelectorAll('[data-action]')].find(b=>b.dataset.action===action&&b.dataset.id===id)?.focus({preventScroll:true});
+  if (action==='club') { const had = getSession()?.clubIds.includes(id); run(async () => { await toggleClub(id); }, live() ? (had ? 'Kulüpten ayrıldın.' : 'Kulübe katıldın.') : (had ? 'Kulüp takipten çıkarıldı.' : 'Kulüp, kulüplerine eklendi.')).then(refocus); }
+  if (action==='event') { const had = getSession()?.eventIds.includes(id); run(async () => { await toggleEvent(id); }, had ? 'Buluşma planından çıkarıldı.' : 'Buluşma planına eklendi. Gerçek katılım için etkinlik sayfasına devam et.').then(refocus); }
+  if (action==='book') run(async () => { const s = await bookEvent(id, option); const b = s?.bookings[id]; if (b?.booking_status === 'waitlisted') flash('Bekleme listesine eklendin.'); }, 'Yerin ayrıldı. Görüşmek üzere!');
+  if (action==='cancel-booking') run(async () => { await cancelBooking(id); }, 'Rezervasyonun iptal edildi.');
+  if (action==='reset-search') {query='';category='all';render();document.querySelector('#club-search').focus();}
+  if (action==='reset') document.querySelector('#reset-dialog').showModal();
 });
 content.addEventListener('input', event => { if(event.target.id==='club-search'){query=event.target.value;renderResults(getSession());} if(event.target.id==='profile-name')event.target.setCustomValidity(''); });
-content.addEventListener('submit', event => { if(event.target.id!=='profile-form')return;event.preventDefault();const name=document.querySelector('#profile-name').value.trim();if(!name){document.querySelector('#profile-name').setCustomValidity('Adını yazabilir misin?');document.querySelector('#profile-name').reportValidity();return;}try{saveProfile(name,document.querySelector('#profile-bio').value.trim());render();flash('Profilin kaydedildi.');}catch{flash('Profil kaydedilemedi. Tarayıcı depolama iznini kontrol et.');} });
+content.addEventListener('submit', event => {
+  event.preventDefault();
+  if (event.target.id === 'membership-form') {
+    const text = document.querySelector('#membership-motivation').value.trim();
+    run(async () => { await applyForMembership('MEMBER', text); membershipInfo = await membershipStatus(); }, 'Başvurun alındı.');
+    return;
+  }
+  if (event.target.id!=='profile-form') return;
+  const name=document.querySelector('#profile-name').value.trim();
+  if(!name){document.querySelector('#profile-name').setCustomValidity('Adını yazabilir misin?');document.querySelector('#profile-name').reportValidity();return;}
+  run(() => saveProfile(name, document.querySelector('#profile-bio').value.trim()), 'Profilin kaydedildi.');
+});
 menu.addEventListener('click',()=>{const open=menu.getAttribute('aria-expanded')!=='true';menu.setAttribute('aria-expanded',String(open));menu.setAttribute('aria-label',open?'Üye menüsünü kapat':'Üye menüsünü aç');sidebar.classList.toggle('open',open);});
 function closeMenu(){sidebar.classList.remove('open');menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Üye menüsünü aç');}
 window.addEventListener('hashchange',()=>{closeMenu();render();document.querySelector('#member-main').focus({preventScroll:true});window.scrollTo({top:0});});
-window.addEventListener('fikirhane-session',()=>{if(!getSession())requireSession();});
+window.addEventListener('fikirhane-session',()=>{if(!mode())return;if(!getSession())requireSession();else if(!busy && !document.activeElement?.closest('form'))render();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu();});
 document.querySelector('#cancel-reset').addEventListener('click',()=>document.querySelector('#reset-dialog').close());
 document.querySelector('#confirm-reset').addEventListener('click',()=>{try{clearPreview();location.assign(siteUrl(''));}catch{flash('Önizleme silinemedi. Tarayıcı depolama iznini kontrol et.');}});
-render();
+ready().then(render).catch(() => { document.querySelector('#member-loading p').textContent = 'Üye alanı şu anda yüklenemedi. Biraz sonra tekrar dener misin?'; });

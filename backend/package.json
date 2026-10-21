@@ -1,0 +1,29 @@
+{
+  "name": "fikirhane-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fikirhane API and PostgreSQL schema",
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "start": "node src/server.ts",
+    "dev": "node scripts/dev.ts",
+    "migrate": "node src/migrate.ts",
+    "seed:demo": "node scripts/seed-demo.ts",
+    "create-admin": "node scripts/create-admin.ts",
+    "jobs": "node scripts/run-jobs.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.5",
+    "hono": "4.13.13",
+    "postgres": "3.4.9",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "embedded-postgres": "18.4.0-beta.17",
+    "typescript": "7.0.2"
+  }
+}

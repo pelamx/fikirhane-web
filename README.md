@@ -7,19 +7,30 @@ Kulüp ve networking odaklı, açık/koyu temalı Fikirhane web sitesi. İlk aş
 
 Host ve admin sonraki aşamalardır. Ayrıntılar: [Shell mimarisi](docs/shells.md).
 
-## Önemli: üyelik önizlemesi
+## Üyelik: gerçek hesaplar ve önizleme
 
-Mevcut GitHub Pages yayını bir arayüz prototipidir. `/uyelik/` üzerinden adını ve ilgi alanlarını seçerek member alanına geçebilirsin. Gerçek hesap oluşturulmaz; e-posta veya şifre toplanmaz. Seçimler yalnızca mevcut tarayıcıda saklanır. Oturumdan çıkma, kaldığın yerden devam etme ve önizlemeyi silme desteklenir.
+Site iki modda çalışır:
 
-Gerçek kayıt/giriş, doğrulanmış üyelik, sunucuda rol kontrolü ve kalıcı çok kullanıcılı veriler için ayrı bir backend gerekir. İstemci tarafındaki yönlendirme bir güvenlik sınırı değildir.
+- **API modu**: [backend](backend/README.md) erişilebilir olduğunda (backend siteyi kendisi sunduğunda ya da `scripts/config.js` içindeki `PAGES_API_URL` ayarlandığında). Bu modda gerçek hesap açılır ve giriş yapılır. Kulübe katılma, buluşmada yer ayırtma (üyeliğe göre fiyat, kapasite, koltuk), üyelik başvurusu ve profil sunucuda saklanır. Bütün yetki kontrolleri sunucudadır.
+- **Önizleme modu**: API yoksa (örneğin henüz backend yayında değilken GitHub Pages’te) eski tarayıcı içi prototip çalışır. Bu modda e-posta veya şifre istenmez ve seçimler yalnızca o tarayıcıda kalır.
+
+Veri modeli 48 tablo dokümanından üretilmiştir: [veri sözlüğü](docs/schema/README.md), [kararlar ve onay bekleyen varsayımlar](docs/backend-decisions.md).
 
 ## Yerel önizleme
+
+Gerçek hesaplarla (PostgreSQL + API + site, Docker gerekmez):
+
+```sh
+cd backend && npm install && npm run dev   # http://localhost:8080
+```
+
+Yalnızca statik önizleme:
 
 ```sh
 python -m http.server 4173
 ```
 
-http://localhost:4173 adresini aç. Derleme veya paket kurulumu gerekmez. ES modülleri kullanıldığı için HTML dosyalarını çift tıklamak yerine HTTP üzerinden aç.
+Statik önizleme için http://localhost:4173 adresini aç. Derleme veya paket kurulumu gerekmez. ES modülleri kullanıldığı için HTML dosyalarını çift tıklamak yerine HTTP üzerinden aç.
 
 ## Yayın
 

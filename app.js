@@ -1,5 +1,5 @@
 import { initTheme, initMenu } from './scripts/shared.js';
-import { getSession, siteUrl } from './scripts/session.js';
+import { ready, getSession, siteUrl } from './scripts/session.js';
 import { clubs } from './scripts/catalog.js';
 initTheme();
 initMenu();
@@ -29,5 +29,6 @@ function updateEntryLinks() {
     if (link) { link.href = siteUrl((session ? 'member/#kulup/' : 'uyelik/?club=') + club.id); link.setAttribute('aria-label', club.name + ' için üye alanına geç'); }
   });
 }
-updateEntryLinks();
 window.addEventListener('fikirhane-session', updateEntryLinks);
+updateEntryLinks();
+ready().catch(() => {});

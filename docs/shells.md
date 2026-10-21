@@ -3,14 +3,14 @@
 | Shell | Purpose | Phase 1 |
 | --- | --- | --- |
 | Public | Discover clubs, understand Fikirhane, view the program, enter membership flow | Implemented |
-| Member | Personal home, club discovery/details, followed clubs, personal program, profile | Implemented as an interactive browser-local prototype |
+| Member | Personal home, club discovery/details, joined clubs, bookings, profile, membership application | Implemented against the API; browser-local preview when no API is reachable |
 | Host | Club operations and event hosting | Deferred |
 | Admin | Platform and permission management | Deferred |
 
 ## Routes
 
 - `/`: public introduction/discovery.
-- `/uyelik/`: clearly labeled prototype onboarding/resume, no password or email collected.
+- `/uyelik/`: account sign-up / login in API mode; in preview mode the labeled prototype onboarding (no password or email collected).
 - `/member/#anasayfa`: personal home.
 - `/member/#kesfet`: all clubs, search/category filter.
 - `/member/#kulup/work` (also language, writing): club details.
@@ -24,16 +24,18 @@ Relative URLs work under the GitHub Pages project prefix. A guest visiting a mem
 
 - `scripts/catalog.js`: club/event data shared across shells; source snapshot dated 2026-10-21.
 - `scripts/shared.js`: theme, navigation, safe HTML interpolation.
-- `scripts/session.js`: browser-local preview adapter and state validation.
+- `scripts/config.js`: API location (same origin when served by the backend; `PAGES_API_URL` for GitHub Pages).
+- `scripts/api.js`: fetch wrapper (cookie session, Turkish error messages by error code).
+- `scripts/session.js`: session adapter; API mode (accounts, clubs, bookings, membership) or the browser-local preview.
 - `app.js`: public behavior and membership entry links.
 - `scripts/onboarding.js`: prototype entry/resume.
 - `scripts/member.js`: member navigation, views and actions.
 - `style.css`: brand tokens/public styling; `shells.css`: onboarding/member layout.
 
-No host/admin interface, endpoints or pretend role switches are exposed.
+No host/admin interface or pretend role switches are exposed in the site; admin endpoints exist only in the API and require server-checked permissions.
 
-## Before real membership
+## Real membership
 
-GitHub Pages is static hosting. This repository does not create accounts, verify identity, register actual event attendance, synchronize users, or protect private data. Preview state is explicitly labeled and stays in the current browser. No passwords or tokens are stored.
+The backend in [`backend/`](../backend/README.md) provides email + password sign-up and login (httpOnly cookie sessions; email verification is not built yet), server-side authorization (global roles, plus club/event-scoped roles), and persistent clubs, events and bookings. Public registration only ever creates a `USER`; admin roles are granted by `npm run create-admin` or by an admin holding `role.assign`. Client-side routing remains UX only: every API endpoint re-checks identity, permission and ownership.
 
-Production requires an authentication backend, server-validated sessions, verified account creation/login, persistent database records, server-side authorization for member/host/admin, and real club/event APIs. Replace `session.js` with an API-backed adapter; do not treat localStorage state or hidden routes as authorization. Every privileged server endpoint must validate identity, permission and ownership. Public registration must only create a member; host/admin elevation belongs to a separate authorized workflow.
+Host and admin interfaces are still deferred. Admin actions (approving memberships, creating/publishing/cancelling events, check-in, role assignment) are available through the API.
