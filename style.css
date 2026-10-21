@@ -8,3 +8,36 @@
 .gallery-pair .gallery-photo:first-child img{object-position:center 38%}
 .hero-photo>img{filter:none;object-position:center 44%}
 .photo-caption{background:#171711bd;padding:8px 10px;text-shadow:none}
+
+/* Shared top menu beside the logo (scripts/topnav.js), on every page */
+.member-header,.entry-header,.header{position:relative}
+.member-header{gap:22px}
+.member-header .brand{width:150px;flex-shrink:0}
+header .topnav{display:flex;align-items:center;gap:2px;flex:1;min-width:0;font-size:12px;position:static;padding:0;border:0;background:none}
+.topnav-main{display:flex;gap:1px;min-width:0;overflow-x:auto;scrollbar-width:none}
+.topnav-main::-webkit-scrollbar{display:none}
+.topnav a,.topnav summary{padding:9px 10px;border-radius:8px;white-space:nowrap;color:var(--ink);cursor:pointer}
+.topnav a:hover,.topnav summary:hover{color:var(--copper)}
+.topnav a[aria-current=page]{color:var(--copper);background:var(--surface)}
+.topnav-more{position:relative;flex-shrink:0}
+.topnav-more summary{list-style:none;display:block}
+.topnav-more summary::-webkit-details-marker{display:none}
+.topnav-more summary::after{content:' ▾';font-size:10px;color:var(--muted)}
+.topnav-more.has-current>summary{color:var(--copper)}
+.topnav-more>div{position:absolute;top:calc(100% + 6px);left:0;min-width:210px;background:var(--bg);border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.09);padding:6px;display:flex;flex-direction:column;z-index:60}
+.topnav-more:last-of-type>div{left:auto;right:0}
+.topnav-more>div a,.topnav-more>div button{display:block;padding:9px 12px;text-align:left;background:none;border:0;font:inherit;color:var(--ink);cursor:pointer;border-radius:6px;width:100%}
+.topnav-more>div a:hover,.topnav-more>div button:hover{background:var(--surface);color:var(--copper)}
+.topnav-login{border:1px solid var(--line);flex-shrink:0}
+.topnav-toggle{display:none;background:none;border:1px solid var(--line);border-radius:8px;color:var(--ink);font-size:18px;width:40px;height:40px;cursor:pointer;flex-shrink:0}
+@media(max-width:1180px){
+  header .topnav{display:none}
+  header .topnav.open{display:flex;flex-direction:column;align-items:stretch;gap:2px;position:absolute;top:100%;left:0;right:0;z-index:70;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 20px 18px;box-shadow:0 18px 30px rgba(0,0,0,.06);max-height:calc(100vh - 100px);overflow-y:auto}
+  .topnav.open .topnav-main{flex-direction:column;overflow:visible}
+  .topnav.open .topnav-more>div{position:static;box-shadow:none;border:0;padding:0 0 6px 12px;min-width:0}
+  .topnav.open .topnav-more>summary{color:var(--muted);font-size:10px;letter-spacing:1px;text-transform:uppercase;pointer-events:none}
+  .topnav.open .topnav-more>summary::after{content:''}
+  .topnav-toggle{display:grid;place-items:center;margin-left:8px}
+  .member-header,.entry-header,.header{flex-wrap:nowrap}
+  .member-header .member-header-actions,.header .header-actions,.entry-header>div{margin-left:auto}
+}

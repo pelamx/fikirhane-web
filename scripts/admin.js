@@ -3,11 +3,10 @@ import { initTheme, escapeHTML as esc } from './shared.js';
 import { api, apiAvailable } from './api.js';
 import { siteUrl } from './session.js';
 import { columnLabel, valueLabel } from './admin-labels.js';
+import './topnav.js';
 initTheme();
 
 const content = document.querySelector('#admin-content');
-const menu = document.querySelector('.member-menu');
-const sidebar = document.querySelector('.member-sidebar');
 
 const GROUPS = { identity: 'Kimlik ve erişim', profile: 'Profil', membership: 'Üyelik', clubs: 'Kulüpler ve kurumlar', growth: 'Büyüme ve sponsorluk', events: 'Etkinlik ve mekân', finance: 'Finans ve stok' };
 // The back office is organised by business area; each area has tabs for its own screens and tables.
@@ -481,10 +480,7 @@ async function rolePanel(userId, data) {
 
 // ---------- shell ----------
 
-function navigation() {
-  document.querySelector('#admin-nav').innerHTML = '<span class="sidebar-label">FİKİRHANE YÖNETİMİ</span><a href="#genel" data-view="genel"><span>⌂</span>Genel bakış</a>'
-    + visibleModules().map(m => `<a href="#m/${m.key}" data-view="${m.key}"><span>${m.icon}</span>${esc(m.title)}</a>`).join('');
-}
+function navigation() {}  // The menu lives in the shared top bar (topnav.js).
 
 async function render() {
   const id = ++renderId;
@@ -494,7 +490,7 @@ async function render() {
     if (first) { location.replace(first.href); return; }
   }
   const [nav, tab] = placeOf(view, a);
-  document.querySelectorAll('[data-view]').forEach(l => l.dataset.view === nav ? l.setAttribute('aria-current', 'page') : l.removeAttribute('aria-current'));
+  window.dispatchEvent(new CustomEvent('fikirhane-nav', { detail: { href: nav === 'genel' ? 'admin/#genel' : `admin/#m/${nav}` } }));
   content.setAttribute('aria-busy', 'true');
   try {
     const html = view === 'basvurular' ? await applications(params)
@@ -638,10 +634,7 @@ content.addEventListener('change', event => {
   if (capacity && input) { input.max = capacity; if (!input.value || Number(input.value) > Number(capacity)) input.value = capacity; }
 });
 
-menu.addEventListener('click', () => { const open = menu.getAttribute('aria-expanded') !== 'true'; menu.setAttribute('aria-expanded', String(open)); menu.setAttribute('aria-label', open ? 'Yönetim menüsünü kapat' : 'Yönetim menüsünü aç'); sidebar.classList.toggle('open', open); });
-function closeMenu() { sidebar.classList.remove('open'); menu.setAttribute('aria-expanded', 'false'); menu.setAttribute('aria-label', 'Yönetim menüsünü aç'); }
-window.addEventListener('hashchange', () => { closeMenu(); render().then(() => document.querySelector('#admin-main').focus({ preventScroll: true })); window.scrollTo({ top: 0 }); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+window.addEventListener('hashchange', () => { render().then(() => document.querySelector('#admin-main').focus({ preventScroll: true })); window.scrollTo({ top: 0 }); });
 
 async function start() {
   const loading = document.querySelector('#admin-loading p');
@@ -658,7 +651,6 @@ async function start() {
   perms = new Set(schema.permissions); tables = schema.tables;
   document.querySelector('#header-name').textContent = me.user.first_name;
   document.querySelector('#header-initial').textContent = me.user.first_name[0].toLocaleUpperCase('tr');
-  document.querySelector('#admin-roles').textContent = me.roles.filter(r => r !== 'USER').map(r => r.replace(/_/g, ' ')).join(' · ');
   navigation();
   document.querySelector('#admin-loading').hidden = true;
   document.querySelector('#admin-shell').hidden = false;

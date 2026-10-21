@@ -1,4 +1,5 @@
 import { initTheme } from './shared.js';
+import './topnav.js';
 import { ready, mode, getSession, getSavedPreview, startPreview, resumePreview, register, login, destination, siteUrl } from './session.js';
 initTheme();
 const params = new URLSearchParams(location.search);

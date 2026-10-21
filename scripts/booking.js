@@ -4,6 +4,7 @@ import { initTheme, escapeHTML as esc } from './shared.js';
 import { api, apiAvailable } from './api.js';
 import { siteUrl } from './session.js';
 import { passCard } from './pass.js';
+import './topnav.js';
 initTheme();
 
 const TZ = 'Europe/Istanbul';

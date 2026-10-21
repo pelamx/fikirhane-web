@@ -325,3 +325,4 @@ html[data-theme=dark] .booking-plan{background:#f4f1ea}
 .admin-pass-go{width:auto!important;font-size:14px!important;padding:14px 22px!important;margin-bottom:12px}
 .admin-pass-form input{width:420px}
 @media(max-width:650px){.pass-card{flex-direction:column;align-items:center;text-align:center}.pass-info dl div{text-align:left}.pass-download{align-self:center}.admin-pass{flex-direction:column}.admin-pass-form input{width:100%}}
+.member-layout{grid-template-columns:minmax(0,1fr)!important}

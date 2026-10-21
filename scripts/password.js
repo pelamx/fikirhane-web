@@ -1,6 +1,7 @@
 // Forgot password: request a link by email, or (with #t=<token> in the address) set a new password.
 import { initTheme } from './shared.js';
 import { api, apiAvailable } from './api.js';
+import './topnav.js';
 initTheme();
 const $ = selector => document.querySelector(selector);
 

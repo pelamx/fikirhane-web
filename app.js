@@ -1,4 +1,5 @@
 import { initTheme, initMenu } from './scripts/shared.js';
+import './scripts/topnav.js';
 import { ready, getSession, siteUrl } from './scripts/session.js';
 import { clubs } from './scripts/catalog.js';
 initTheme();

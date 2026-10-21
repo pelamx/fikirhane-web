@@ -1,10 +1,9 @@
 import { initTheme, escapeHTML as esc } from './shared.js';
 import { passCard } from './pass.js';
+import './topnav.js';
 import { ready, mode, getCatalog, getSession, saveProfile, toggleClub, toggleEvent, bookEvent, cancelBooking, signOut, clearPreview, siteUrl } from './session.js';
 initTheme();
 const content = document.querySelector('#member-content');
-const menu = document.querySelector('.member-menu');
-const sidebar = document.querySelector('.member-sidebar');
 let query = '', category = 'all', eventFilter = 'all', toastTimer, busy = false;
 const navNames = { anasayfa: 'Ana sayfam', kesfet: 'Kulüpleri keşfet', kuluplerim: 'Kulüplerim', bulusmalar: 'Buluşmalar', profil: 'Profilim', kulup: 'Kulüp' };
 const live = () => mode() === 'api';
@@ -102,10 +101,7 @@ function render() {
   document.title = `${navNames[view]} · Fikirhane`;
   document.querySelector('#header-name').textContent = session.profile.name;
   document.querySelector('#header-initial').textContent = session.profile.name[0].toLocaleUpperCase('tr');
-  document.querySelector('#sidebar-club-count').textContent = session.clubIds.length;
-  const staff = live() && session.roles?.some(r => r !== 'USER');
-  if (staff && !document.querySelector('#admin-link')) document.querySelector('#member-nav').insertAdjacentHTML('beforeend', `<a href="${siteUrl('admin/')}" id="admin-link"><span>⚙</span>Yönetim paneli</a>`);
-  document.querySelectorAll('[data-view]').forEach(link=> { const current = link.dataset.view === (view==='kulup' ? 'kesfet' : view); if(current)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current'); });
+  window.dispatchEvent(new CustomEvent('fikirhane-nav', { detail: { href: `member/#${view === 'kulup' ? 'kesfet' : view}` } }));
   if (view==='bulusmalar' && id==='tumu') eventFilter='all';
   content.innerHTML = view==='anasayfa' ? home(session) : view==='kesfet' ? discover() : view==='kuluplerim' ? myClubs(session) : view==='kulup' ? clubDetail(id,session) : view==='bulusmalar' ? gatherings(session) : profile(session);
   if (view==='kesfet') renderResults(session);
@@ -148,11 +144,8 @@ content.addEventListener('submit', event => {
   if(!name){document.querySelector('#profile-name').setCustomValidity('Adını yazabilir misin?');document.querySelector('#profile-name').reportValidity();return;}
   run(() => saveProfile(name, document.querySelector('#profile-bio').value.trim()), 'Profilin kaydedildi.');
 });
-menu.addEventListener('click',()=>{const open=menu.getAttribute('aria-expanded')!=='true';menu.setAttribute('aria-expanded',String(open));menu.setAttribute('aria-label',open?'Üye menüsünü kapat':'Üye menüsünü aç');sidebar.classList.toggle('open',open);});
-function closeMenu(){sidebar.classList.remove('open');menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Üye menüsünü aç');}
-window.addEventListener('hashchange',()=>{closeMenu();render();document.querySelector('#member-main').focus({preventScroll:true});window.scrollTo({top:0});});
+window.addEventListener('hashchange',()=>{render();document.querySelector('#member-main').focus({preventScroll:true});window.scrollTo({top:0});});
 window.addEventListener('fikirhane-session',()=>{if(!mode())return;if(!getSession())requireSession();else if(!busy && !document.activeElement?.closest('form'))render();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu();});
 document.querySelector('#cancel-reset').addEventListener('click',()=>document.querySelector('#reset-dialog').close());
 document.querySelector('#confirm-reset').addEventListener('click',()=>{try{clearPreview();location.assign(siteUrl(''));}catch{flash('Önizleme silinemedi. Tarayıcı depolama iznini kontrol et.');}});
 ready().then(render).catch(() => { document.querySelector('#member-loading p').textContent = 'Üye alanı şu anda yüklenemedi. Biraz sonra tekrar dener misin?'; });
