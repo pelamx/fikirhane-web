@@ -27,11 +27,65 @@ const MESSAGES = {
   motivation_required: 'Kısaca neden katılmak istediğini yazar mısın?',
   reset_token_invalid: 'Bu bağlantı geçersiz ya da süresi dolmuş. Yeni bir bağlantı isteyebilirsin.',
   staff_account: 'Yönetici hesapları için sıfırlama bağlantısı oluşturulamaz; e-postayla şifre yenileme kullanılmalı.',
+  not_editable: 'Bu tablodaki kayıtlar buradan değiştirilemez.',
+  not_deletable: 'Bu kayıt silinemez; durumunu değiştirebilirsin.',
+  invalid_transition: 'Bu durum değişikliğine izin verilmiyor.',
+  rule_violation: 'Bu değişiklik bir iş kuralına aykırı.',
+  not_allowed: 'Bu değişikliğe izin verilmiyor.',
+  duplicate: 'Bu kayıt zaten var (aynı kod ya da aynı ilişki).',
+  invalid_reference: 'Seçilen bağlı kayıt bulunamadı.',
+  reason_required: 'Bir gerekçe yazmalısın (en az 3 karakter).',
   management_role: 'Kulüpteki görevini devretmeden ayrılamazsın. Fikirhane ekibine yaz.',
 };
 
+// Database rule messages (guard triggers) in Turkish; the server sends them in English.
+const RULES = [
+  [/^Accounts must be active and in the transaction currency/, 'Hesaplar aktif olmalı ve işlemle aynı para biriminde olmalı.'],
+  [/^A document cannot be posted without lines/, 'Satırı olmayan belge kesinleştirilemez.'],
+  [/^Allocations exceed document total/, 'Eşleştirmeler belge toplamını aşıyor.'],
+  [/^Allocations exceed transaction amount/, 'Eşleştirmeler ödeme tutarını aşıyor.'],
+  [/^A posted transaction can only be reversed/, 'Kesinleşmiş para hareketi yalnızca geri alınabilir.'],
+  [/^Booking unit must match the event option/, 'Rezervasyon birimi etkinlik seçeneğiyle aynı olmalı.'],
+  [/^Cancelled documents are final/, 'İptal edilmiş belge değiştirilemez.'],
+  [/^(\w+)\.(\w+) cannot be changed/, 'Bu alan oluşturulduktan sonra değiştirilemez ($2).'],
+  [/^Category direction does not match document direction/, 'Kategori yönü (gelir/gider) belgenin yönüyle uyuşmuyor.'],
+  [/^Close the membership and create a new one/, 'Üyeliğin tipi ya da sahibi değiştirilemez; üyeliği kapatıp yenisini oluştur.'],
+  [/^Club is not open for new members/, 'Kulüp yeni üyeye açık değil.'],
+  [/^Club member role is not active/, 'Kulüp rolü aktif değil.'],
+  [/^Club relations of a non-draft event cannot be deleted/, 'Taslak olmayan etkinliğin kulüp bağlantısı silinemez.'],
+  [/^Document total (\S+) does not match lines (\S+)/, 'Belge toplamı ($1) satırların toplamıyla ($2) uyuşmuyor.'],
+  [/^Finalized transactions cannot be edited/, 'Kesinleşmiş para hareketi düzenlenemez; geri alıp yeniden gir.'],
+  [/^Financial center and category must be active/, 'Finans merkezi ve kategori aktif olmalı.'],
+  [/^Freepass usage limit reached/, 'Freepass kullanım hakkı doldu.'],
+  [/^Hard delete is not allowed/, 'Kayıt silinemez; durumunu değiştir.'],
+  [/^Interest is not active/, 'İlgi alanı aktif değil.'],
+  [/^(\w+) is append-only/, 'Bu kayıtlar değiştirilemez ve silinemez; yalnızca yenisi eklenir.'],
+  [/^Lines of a (\w+) document cannot be changed/, 'Kesinleşmiş ya da iptal edilmiş belgenin satırları değiştirilemez.'],
+  [/^Location and setup must be active/, 'Mekân ve yerleşim düzeni aktif olmalı.'],
+  [/^Membership type is not active/, 'Üyelik tipi aktif değil.'],
+  [/^Only pending transactions can be deleted/, 'Yalnızca bekleyen para hareketi silinebilir.'],
+  [/^Only posted documents can receive allocations/, 'Yalnızca kesinleşmiş belgeye ödeme eşleştirilebilir.'],
+  [/^Only posted transactions can be allocated/, 'Yalnızca kesinleşmiş ödeme eşleştirilebilir.'],
+  [/^Option capacity (\S+) exceeds setup capacity (\S+)/, 'Seçenek kapasitesi ($1), yerleşim düzeninin kapasitesini ($2) aşıyor.'],
+  [/^Option has bookings/, 'Bu seçeneğin rezervasyonları var; mekân, düzen ya da birim değişmez, yeni seçenek oluştur.'],
+  [/^Posted documents are locked/, 'Kesinleşmiş belge kilitli; iptal edip yeniden düzenle.'],
+  [/^Posted or cancelled documents cannot be deleted/, 'Kesinleşmiş ya da iptal edilmiş belge silinemez.'],
+  [/^Role is not active/, 'Rol aktif değil.'],
+  [/^Seat is not bookable for this option/, 'Bu koltuk bu seçenekte ayrılamaz.'],
+  [/^Setup capacity exceeds location max capacity/, 'Yerleşim kapasitesi mekânın azami kapasitesini aşıyor.'],
+  [/^Skill is not active/, 'Beceri aktif değil.'],
+  [/^Sponsor organization must be active/, 'Sponsor kurum aktif olmalı.'],
+  [/^Sponsorship plan must be active/, 'Sponsorluk paketi aktif olmalı.'],
+  [/^Stock movements require a stock-tracked item/, 'Stok hareketi yalnızca stok takibi yapılan ürüne girilebilir.'],
+  [/^Table is not bookable for this option/, 'Bu masa bu seçenekte ayrılamaz.'],
+  [/^Transaction and document currencies differ/, 'Ödeme ve belge para birimleri farklı.'],
+  [/^Transaction status (\w+) is final/, 'Bu para hareketinin durumu artık değişmez.'],
+  [/^Transfers are never allocated to documents/, 'Hesaplar arası transfer belgeye eşleştirilmez.'],
+];
+const ruleText = message => { for (const [re, tr] of RULES) if (re.test(message ?? '')) return message.replace(new RegExp(re.source + '.*$', 's'), tr); return null; };
+
 export class ApiError extends Error {
-  constructor(status, code, message) { super(MESSAGES[code] ?? message ?? 'Bir şeyler ters gitti. Tekrar dener misin?'); this.status = status; this.code = code; }
+  constructor(status, code, message, details) { super((['rule_violation', 'not_allowed'].includes(code) ? ruleText(message) : null) ?? MESSAGES[code] ?? message ?? 'Bir şeyler ters gitti. Tekrar dener misin?'); this.status = status; this.code = code; this.details = details; }
 }
 
 export async function api(path, { method = 'GET', body } = {}) {
@@ -45,7 +99,7 @@ export async function api(path, { method = 'GET', body } = {}) {
   } catch { throw new ApiError(0, 'network', 'Sunucuya ulaşılamadı. Bağlantını kontrol et.'); }
   if (res.status === 204) return null;
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, data?.error?.code, data?.error?.message);
+  if (!res.ok) throw new ApiError(res.status, data?.error?.code, data?.error?.message, data?.error?.details);
   return data;
 }
 

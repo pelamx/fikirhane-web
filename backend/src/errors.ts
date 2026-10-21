@@ -18,13 +18,15 @@ export const notFound = (what: string) => new ApiError(404, 'not_found', `${what
 export const conflict = (code: string, message: string) => new ApiError(409, code, message);
 export const unprocessable = (code: string, message: string) => new ApiError(422, code, message);
 
-interface PgError { code?: string; constraint_name?: string; message?: string; where?: string; routine?: string }
+interface PgError { code?: string; constraint_name?: string; column_name?: string; message?: string; where?: string; routine?: string }
 
 /** Maps PostgreSQL errors raised by constraints and guard triggers onto ApiErrors. Returns null for unknown errors. */
 export function fromPgError(err: unknown): ApiError | null {
   const pg = err as PgError;
   if (!pg || typeof pg.code !== 'string') return null;
   if (pg.code === '23505') return conflict('duplicate', 'This record already exists.');
+  if (pg.code === '23502') return badRequest('validation_failed', `${pg.column_name ?? 'A field'} is required.`,
+    pg.column_name ? [{ path: pg.column_name, message: `${pg.column_name}: zorunlu` }] : undefined);
   if (pg.code === '23503') return unprocessable('invalid_reference', 'A referenced record does not exist.');
   // Guard triggers raise with readable messages (routine exec_stmt_raise); plain CHECK constraint names stay internal.
   const raised = pg.routine === 'exec_stmt_raise';

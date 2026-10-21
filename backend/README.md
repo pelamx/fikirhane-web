@@ -37,7 +37,7 @@ The server migrates on start unless `MIGRATE_ON_START=false`, and runs the expir
 
 ```sh
 npm run typecheck
-npm test           # 38 tests against a real, throwaway PostgreSQL (embedded-postgres)
+npm test           # 42 tests against a real, throwaway PostgreSQL (embedded-postgres)
 ```
 
 They cover schema guards (no hard delete, append-only ledgers, document/allocation/stock rules, sponsor exclusivity), pricing,
@@ -84,6 +84,10 @@ Browsers authenticate with the httpOnly `fh_session` cookie; other clients can s
 | GET | `/admin/overview` | counts, only for the caller's permissions |
 | GET | `/admin/data/:table` | `q`, `limit`, `offset`, and `<column>=<value>` filters (empty value = null); foreign keys come with display labels |
 | GET | `/admin/data/:table/:id` | one record, its references, and the first rows of every table that points at it |
+| POST | `/admin/data/:table` | `{ values }` → create, if the table document allows it and you hold its create permission |
+| PATCH | `/admin/data/:table/:id` | `{ values }` → edit; fixed and system-managed fields are refused, status changes follow the lifecycle |
+| POST | `/admin/data/:table/:id/actions/:action` | `{ reason? }` → lifecycle step defined by the document (post, cancel, reverse, approve, suspend...) |
+| DELETE | `/admin/data/:table/:id` | only where the documents allow it: draft documents and their lines, pending transactions |
 | GET | `/admin/events` | `when=upcoming/past/all`, `status`; includes drafts, capacity, bookings |
 | GET | `/admin/membership-applications` | `membership.view` |
 | POST | `/admin/membership-applications/:id/decision` | `under_review / approved / waitlisted / declined` |
@@ -94,7 +98,11 @@ Browsers authenticate with the httpOnly `fh_session` cookie; other clients can s
 | POST | `/admin/users/:id/password-reset-link` | `user.reset_password`; refused for staff accounts; audited |
 | POST / DELETE | `/admin/users/:id/roles[/:role]` | `role.assign` / `role.revoke`, audited |
 
-The `/admin/data` endpoints are read-only. Each table opens with one of the permissions listed in `src/services/admin-data.ts`;
+Writes through `/admin/data` follow `src/services/admin-meta.json`: per table, extracted from the 48 table documents, who may
+create or edit, which fields are fixed after creation or managed by the system, Turkish help texts and value names, and the
+lifecycle actions. Table-specific steps live in `src/services/admin-write.ts` (document line amounts and totals, document
+numbering on posting, account balances, reversing a payment's allocations, stock signs and counter-movements, stock count
+posting, signing out a suspended user). Every write is audited with old and new values. Reads are as before: Each table opens with one of the permissions listed in `src/services/admin-data.ts`;
 `auth_identities` and `user_sessions` are never exposed, and guest emails/phones are masked without `user.view_contact`.
 Finance (documents, transactions, allocations), stock, campaigns, invitations and sponsorships are fully modelled and guarded
 in the database and readable in the admin shell (`/admin/`). Their write endpoints are the next phase.

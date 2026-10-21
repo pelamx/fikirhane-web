@@ -1,0 +1,3859 @@
+{
+ "event_series": {
+  "purpose_tr": "Bir satır, birden çok tarihli Event'i tek kimlik altında toplayan bir program/seridir (ör. 5 haftalık Borsa Okuryazarlığı). Rezervasyon, katılım, lokasyon ve fiyat burada değil, Event/EventOption düzeyinde tutulur.",
+  "fields": {
+   "series_code": "Sabit teknik kod, sistemde benzersiz (ör. STOCK_LITERACY_2026). Oluşturulduktan sonra değiştirilmez.",
+   "series_name": "Kullanıcıya görünen program adı (ör. \"Borsa Okuryazarlığı\").",
+   "description": "Programın açıklaması.",
+   "series_type": "Program sınıflandırması; V1'de zorunlu değil, etkinlik tipi alt Event'lerde tutulur.",
+   "cover_image": "Liste/detay sayfasındaki kapak görselinin dosya referansı veya URL'si.",
+   "status": "Programın yaşam döngüsü; alt Event'lerin durumundan bağımsızdır (ESER-D07).",
+   "start_date": "Planlanan genel başlangıç; ilk Event'ten türetilebilir, zorunlu değil.",
+   "end_date": "Planlanan genel bitiş; son Event'ten türetilebilir, zorunlu değil.",
+   "expected_event_count": "Planlanan oturum sayısı; gerçek Event sayısından farklı olabilir (ör. 5 planlandı, 1 ek eklendi).",
+   "booking_mode": "Rezervasyon modeli. V1'de 'event' kullanın; 'series' ve 'mixed' ileride paket kaydı (SERIES_ENROLLMENTS) gerektirir."
+  },
+  "enums": {
+   "series_type": {
+    "course": "Kurs",
+    "workshop_series": "Atölye serisi",
+    "training_program": "Eğitim programı",
+    "masterclass_series": "Masterclass serisi"
+   },
+   "status": {
+    "draft": "Taslak",
+    "published": "Yayında",
+    "active": "Devam ediyor",
+    "completed": "Tamamlandı",
+    "cancelled": "İptal edildi",
+    "archived": "Arşivlendi"
+   },
+   "booking_mode": {
+    "event": "Etkinlik bazlı",
+    "series": "Seri bazlı",
+    "mixed": "Karma"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "event.create",
+  "update_permission": "event.update_details",
+  "field_permissions": {},
+  "system_fields": [],
+  "immutable_fields": [
+   "series_code"
+  ],
+  "required_on_create": [
+   "series_code",
+   "series_name"
+  ],
+  "status_transitions": {
+   "draft": [
+    "published",
+    "cancelled",
+    "archived"
+   ],
+   "published": [
+    "active",
+    "cancelled"
+   ],
+   "active": [
+    "completed",
+    "cancelled"
+   ],
+   "completed": [
+    "archived"
+   ],
+   "cancelled": [
+    "archived"
+   ]
+  },
+  "rules_tr": [
+   "Bir Event en fazla bir seriye bağlanabilir; her Event'in seriye bağlı olması gerekmez (ESER-D03).",
+   "Seri rezervasyon/katılım kaydının yerine geçmez; rezervasyon Event bazlıdır (ESER-D04, ESER-D05).",
+   "Seride fiyat alanı yoktur; fiyat Event/EventOption düzeyindedir.",
+   "Seri durumu alt Event'lerden bağımsız yönetilir (ESER-D07).",
+   "Silme yok; iptal/arşiv geçmiş Event kayıtlarını silmez (ESER-D08)."
+  ]
+ },
+ "events": {
+  "purpose_tr": "Bir satır, gerçek ve tarihli tek bir etkinlik oturumudur (ne, ne zaman, ortak içerik ve baz fiyat). Lokasyon, setup, kapasite ve lokasyon farkı EVENT_OPTIONS'ta; kulüp, kurum, görevli ve katılımcılar ayrı tablolarda tutulur.",
+  "fields": {
+   "id_event_series": "Bağlı olduğu program/seri; tek başına etkinlikte boş bırakın. En fazla bir seri.",
+   "event_code": "İsteğe bağlı teknik/operasyonel kod (ör. WORKING-2026-09-22-PM); benzersiz olmalı.",
+   "event_type": "Etkinliğin işlevsel tipi (workspace, meetup, workshop, talk, class, social).",
+   "event_title": "Kullanıcıya görünen başlık; boş olamaz.",
+   "event_description": "Ayrıntılı açıklama.",
+   "start_datetime": "Başlangıç tarih-saati.",
+   "end_datetime": "Bitiş tarih-saati; başlangıçtan sonra olmalı (EVT-D02).",
+   "timezone": "IANA saat dilimi; varsayılan Europe/Istanbul.",
+   "status": "Yaşam döngüsü; yayınlama ve iptal kendi akışlarıyla değişir, formdan yazılmaz.",
+   "base_price": "Ortak baz fiyat (ücretsizse 0). Lokasyona özel nihai fiyat değildir; yayın öncesi dolu olmalı.",
+   "currency_code": "ISO 4217 para birimi (ör. TRY); base_price girildiyse zorunlu.",
+   "minimum_attendees": "Etkinliğin gerçekleşmesi için gereken asgari katılımcı; toplam kapasite değildir.",
+   "networking_enabled": "Bu etkinlikte katılımcı networking özelliği açık mı.",
+   "show_interests": "Katılımcı görünümünde ilgi alanları gösterilsin mi (kullanıcının gizlilik ayarı da gerekir).",
+   "show_skills": "Katılımcı görünümünde yetkinlikler gösterilsin mi (kullanıcının gizlilik ayarı da gerekir).",
+   "enable_need": "Rezervasyonda kullanıcı bir İhtiyaç (Need) seçebilsin mi.",
+   "enable_offer": "Rezervasyonda kullanıcı bir Katkı (Offer) seçebilsin mi."
+  },
+  "enums": {
+   "event_type": {
+    "workspace": "Çalışma alanı",
+    "meetup": "Buluşma",
+    "workshop": "Atölye",
+    "talk": "Konuşma",
+    "class": "Ders",
+    "social": "Sosyal"
+   },
+   "status": {
+    "draft": "Taslak",
+    "submitted": "Onaya gönderildi",
+    "approved": "Onaylandı",
+    "published": "Yayında",
+    "cancelled": "İptal edildi",
+    "completed": "Tamamlandı",
+    "archived": "Arşivlendi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "event.create",
+  "update_permission": "event.update_details",
+  "field_permissions": {
+   "start_datetime": "event.update_schedule",
+   "end_datetime": "event.update_schedule",
+   "timezone": "event.update_schedule",
+   "base_price": "event.update_pricing",
+   "currency_code": "event.update_pricing"
+  },
+  "system_fields": [
+   "status"
+  ],
+  "immutable_fields": [],
+  "required_on_create": [
+   "event_type",
+   "event_title",
+   "start_datetime",
+   "end_datetime"
+  ],
+  "status_transitions": {
+   "draft": [
+    "submitted",
+    "approved",
+    "published",
+    "cancelled"
+   ],
+   "submitted": [
+    "approved",
+    "published",
+    "cancelled"
+   ],
+   "approved": [
+    "published",
+    "cancelled"
+   ],
+   "published": [
+    "completed",
+    "cancelled"
+   ],
+   "completed": [
+    "archived"
+   ],
+   "cancelled": [
+    "archived"
+   ]
+  },
+  "rules_tr": [
+   "Lokasyon, setup ve kapasite Event'e değil EventOption'a girilir; tek lokasyonlu etkinlikte de 1 option açılır (EVT-D04).",
+   "Yayın için: geçerli tarih, çözülebilir fiyat, en az bir aktif EventOption ve lokasyon çakışması olmaması gerekir (EVT-D05, EVT-D12).",
+   "Fiyat formülü: baz fiyat + option farkı − üyelik indirimi; base_price değişikliği geçmiş rezervasyonları etkilemez (EVT-D11).",
+   "Katılımcılar BOOKINGS'te, eğitmen/konuşmacı vb. EVENT_USERS'ta tutulur (EVT-D06, EVT-D07).",
+   "İptal, ilgili aktif rezervasyonları da iptal eder; Event asla silinmez (EVT-D10).",
+   "Kota alanları (ör. Visitor %15) Event'e eklenmez."
+  ]
+ },
+ "event_options": {
+  "purpose_tr": "Bir satır, bir Event'in rezerve edilebilir somut varyantıdır: Lokasyon + Setup + kapasite + rezervasyon birimi. Saat, etkinlik tipi, kulüp ve satılık/dolu durumu burada tutulmaz.",
+  "fields": {
+   "id_event": "Bağlı olduğu Event.",
+   "id_location": "Fiziksel alan (Fikirhane, Atölye, Toplantı Odası); yeni option için aktif olmalı.",
+   "id_space_setup": "Kullanılan yerleşim düzeni; seçilen lokasyona ait ve aktif olmalı (EOPT-D03).",
+   "option_code": "Event içinde benzersiz teknik kod (ör. FIK, ATL).",
+   "option_name": "İsteğe bağlı UI adı (ör. \"Atölye — Focus Zone\"); boşsa lokasyon adı yeter.",
+   "capacity": "Bu option için gerçek satış kapasitesi; 0'dan büyük ve setup kapasitesinden küçük/eşit olmalı.",
+   "booking_unit": "Rezervasyon birimi (lokasyon/masa/koltuk); setup varsayılanı yalnızca öneridir, bu alan geçerlidir.",
+   "price_adjustment": "Baz fiyata eklenen fark (ör. -50). Lokasyon varsayılanından kopyalanır; sonradan yalnızca yeni rezervasyonları etkiler.",
+   "status": "Option'ın yaşam döngüsü; Event'i iptal etmeden tek bir option kapatılabilir.",
+   "sort_order": "Arayüzde sıralama (ör. 10, 20)."
+  },
+  "enums": {
+   "booking_unit": {
+    "location": "Lokasyon (yer seçimi yok)",
+    "table": "Masa",
+    "seat": "Koltuk"
+   },
+   "status": {
+    "draft": "Taslak",
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "cancelled": "İptal edildi",
+    "archived": "Arşivlendi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "event.update_location",
+  "update_permission": "event.update_location",
+  "field_permissions": {
+   "id_location": "event.update_location",
+   "id_space_setup": "event.update_location",
+   "booking_unit": "event.update_location",
+   "capacity": "event.update_capacity",
+   "price_adjustment": "event.update_pricing"
+  },
+  "system_fields": [],
+  "immutable_fields": [
+   "id_event"
+  ],
+  "required_on_create": [
+   "id_event",
+   "id_location",
+   "id_space_setup",
+   "option_code",
+   "capacity",
+   "booking_unit"
+  ],
+  "status_transitions": {
+   "draft": [
+    "active",
+    "cancelled",
+    "archived"
+   ],
+   "active": [
+    "inactive",
+    "cancelled"
+   ],
+   "inactive": [
+    "active",
+    "cancelled",
+    "archived"
+   ],
+   "cancelled": [
+    "archived"
+   ]
+  },
+  "rules_tr": [
+   "Kapasite hiyerarşisi: option kapasitesi ≤ setup kapasitesi ≤ lokasyon max kapasitesi (EOPT-D05, EOPT-D06).",
+   "Rezervasyon varsa lokasyon, setup ve booking_unit değiştirilemez; eski option'ı pasif/iptal yapıp yenisini açın (EOPT-D12).",
+   "Koltuk bazlı option'da setup'ta yeterli rezerve edilebilir koltuk, masa bazlıda rezerve edilebilir masa olmalı (EOPT-D08, EOPT-D09).",
+   "Aynı Event'te aynı lokasyon+setup için tek aktif option olabilir.",
+   "Fiyat farkı değişikliği geçmiş rezervasyon fiyatlarını değiştirmez (EOPT-D11).",
+   "Option iptal edilirse aktif rezervasyonları iptal/taşıma/iade akışına girer; farklı saatler ayrı Event olmalıdır."
+  ]
+ },
+ "event_clubs": {
+  "purpose_tr": "Bir satır, bir Kulübün bir Event'teki rolüdür (düzenleyen, ortak düzenleyen, partner). Katılım (BOOKINGS), kulüp üyeliği ve sponsorluk burada tutulmaz.",
+  "fields": {
+   "id_club": "İlişkili kulüp.",
+   "id_event": "İlişkili Event.",
+   "club_event_role": "Kulübün bu Event'teki rolü.",
+   "is_primary": "Ana kulüp mü; birden çok kulüp varsa tam bir tane olmalı ve rolü 'organizer' olmalıdır.",
+   "status": "İlişkinin durumu; yayınlanmış Event'te silmek yerine ended/inactive yapın.",
+   "notes": "Dahili not."
+  },
+  "enums": {
+   "club_event_role": {
+    "organizer": "Düzenleyen",
+    "co_organizer": "Ortak düzenleyen",
+    "partner": "Partner"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "cancelled": "İptal edildi",
+    "ended": "Sona erdi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "event.update_details",
+  "update_permission": "event.update_details",
+  "field_permissions": {},
+  "system_fields": [],
+  "immutable_fields": [
+   "id_club",
+   "id_event"
+  ],
+  "required_on_create": [
+   "id_club",
+   "id_event",
+   "club_event_role"
+  ],
+  "rules_tr": [
+   "Aynı kulüp + Event için aynı anda tek aktif ilişki olabilir (CLEVT-D02).",
+   "Kulübe bağlı Event'in tam bir ana kulübü olmalı; ana kulüp 'organizer' rolünde olmalı (CLEVT-D05, CLEVT-D06).",
+   "Event'in kulübü olmak zorunda değil; birden çok kulüp bağlanabilir (CLEVT-D03, CLEVT-D04).",
+   "Kulüp ilişkisi üyeleri otomatik katılımcı yapmaz (CLEVT-D07).",
+   "Club Lead'in Event yetkisi bu ilişkiden doğar (CLEVT-D09).",
+   "Yalnızca taslak Event'teki hatalı ilişki silinebilir; sonrasında status ile kapatın."
+  ]
+ },
+ "event_organizations": {
+  "purpose_tr": "Bir satır, bir Kurumun belirli bir Event'teki somut rolüdür (sponsor, ortak düzenleyen vb.). Para hareketi, kurum temsilcileri ve görevli kişiler burada tutulmaz.",
+  "fields": {
+   "id_event": "İlişkili Event.",
+   "id_organization": "İlişkili kurum.",
+   "organization_event_role": "Kurumun bu Event'teki rolü; aynı kurumun ikinci rolü ayrı satır olarak girilir.",
+   "status": "İlişkinin durumu.",
+   "is_primary": "Aynı roldeki kurumlar arasında ana kurum mu (ör. ana sponsor); rol başına tek aktif ana kurum.",
+   "start_at": "İlişki başlangıcı; isteğe bağlı, Event zamanından farklıysa doldurun.",
+   "end_at": "İlişki bitişi; isteğe bağlı, başlangıçtan önce olamaz.",
+   "notes": "Dahili not; partner rolünün ayrıntısı buraya yazılabilir."
+  },
+  "enums": {
+   "organization_event_role": {
+    "organizer": "Düzenleyen",
+    "co_organizer": "Ortak düzenleyen",
+    "partner": "Partner",
+    "sponsor": "Sponsor",
+    "content_partner": "İçerik partneri",
+    "venue_partner": "Mekân partneri"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "cancelled": "İptal edildi",
+    "ended": "Sona erdi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "event.update_details",
+  "update_permission": "event.update_details",
+  "field_permissions": {},
+  "system_fields": [],
+  "immutable_fields": [
+   "id_event",
+   "id_organization",
+   "organization_event_role"
+  ],
+  "required_on_create": [
+   "id_event",
+   "id_organization",
+   "organization_event_role"
+  ],
+  "rules_tr": [
+   "Aynı Event + kurum + rol için tek aktif satır olabilir (EVORG-D03).",
+   "İlişki kullanıcıya yetki vermez (EVORG-D04).",
+   "Sponsorluk geliri bu tabloya değil DOCUMENTS/DOCUMENT_ITEMS'a girilir (EVORG-D05).",
+   "Event sponsorluğu kulüp sponsorluğu (CLUB_SPONSORSHIPS) ile karıştırılmamalı (EVORG-D06).",
+   "Konuşmacı/temsilci kişiler EVENT_USERS ve ORGANIZATION_USERS'ta tutulur (EVORG-D07).",
+   "Silme yok; Event iptalinde satırlar kalır veya ended/cancelled yapılır (EVORG-D08)."
+  ]
+ },
+ "event_users": {
+  "purpose_tr": "Bir satır, bir kullanıcının belirli bir Event'teki görev rolüdür (eğitmen, konuşmacı, moderatör vb.). Katılımcılar (BOOKINGS), ücretler ve global/kulüp rolleri burada tutulmaz.",
+  "fields": {
+   "id_event": "Görevin ait olduğu Event.",
+   "id_user": "Görevli kullanıcı.",
+   "event_user_role": "Bu Event'teki görev rolü; yalnızca bu Event kapsamında yetki verir.",
+   "status": "Görev durumu; görevli değişirse eskiyi 'cancelled' yapıp yeni satır açın.",
+   "is_primary": "Aynı roldeki kişiler arasında ana kişi mi (ör. ana eğitmen); isteğe bağlı.",
+   "start_at": "Görev tüm Event boyunca değilse başlangıcı; boşsa Event saati geçerli.",
+   "end_at": "Görev bitişi; boşsa Event bitişi geçerli. Başlangıçtan önce olamaz.",
+   "notes": "Dahili operasyon notu (ör. \"HDMI adaptörü gerekli\")."
+  },
+  "enums": {
+   "event_user_role": {
+    "tutor": "Eğitmen",
+    "speaker": "Konuşmacı",
+    "moderator": "Moderatör",
+    "host": "Ev sahibi",
+    "facilitator": "Kolaylaştırıcı",
+    "staff": "Personel"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "cancelled": "İptal edildi",
+    "ended": "Sona erdi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "event.update_details",
+  "update_permission": "event.update_details",
+  "field_permissions": {},
+  "system_fields": [],
+  "immutable_fields": [
+   "id_event",
+   "id_user",
+   "event_user_role"
+  ],
+  "required_on_create": [
+   "id_event",
+   "id_user",
+   "event_user_role"
+  ],
+  "rules_tr": [
+   "Katılımcılar buraya değil BOOKINGS'e girilir (EVUSR-D02).",
+   "Aynı Event + kullanıcı + rol için tek aktif kayıt olabilir; aynı kişi farklı rollerde ayrı satır alır (EVUSR-D03, EVUSR-D04).",
+   "Event rolü yalnızca o Event kapsamında yetki üretir; global USER_ROLES'a taşınmaz (EVUSR-D05, EVUSR-D06).",
+   "Görev ücreti burada değil DOCUMENTS/DOCUMENT_ITEMS'ta tutulur (EVUSR-D07).",
+   "Silme yok; kritik rol değişiklikleri denetim kaydına yazılır (EVUSR-D08, EVUSR-D09)."
+  ]
+ },
+ "bookings": {
+  "purpose_tr": "Bir satır, bir katılımcının belirli Event ve EventOption için gerçek rezervasyonu ile o anki fiyat/üyelik anlık görüntüsüdür. Muhasebe kaydı (DOCUMENT_ITEMS), görevliler (EVENT_USERS) ve freepass kullanımının asıl kaydı burada değildir.",
+  "fields": {
+   "id_event": "Rezerve edilen Event; seçilen option'ın Event'i ile aynı olmalı (BOOK-D02).",
+   "id_event_option": "Seçilen lokasyon/setup option'ı; zorunlu.",
+   "id_user": "Kayıtlı katılımcı; misafir rezervasyonunda boş, o zaman misafir ad + e-posta/telefon gerekir.",
+   "booked_by_user_id": "Rezervasyonu oluşturan kullanıcı (ör. kullanıcı adına işlem yapan personel); akış doldurur.",
+   "id_invitation": "Rezervasyon bir davetle geldiyse ilgili davet.",
+   "id_freepass": "Kullanılan freepass (izlenebilirlik için; asıl kayıt FREEPASS_REDEMPTIONS).",
+   "id_membership_type_at_booking": "Rezervasyon anındaki üyelik tipi anlık görüntüsü; boş = Visitor. Akış doldurur.",
+   "booking_status": "Rezervasyon yaşam döngüsü; check-in, iptal, süre dolumu akışlarla değişir.",
+   "booking_source": "İşlem kanalı (web, personel, telefon...). Kullanıcı edinim kaynağı ile karıştırmayın.",
+   "booked_at": "Rezervasyonun oluşturulduğu an.",
+   "expires_at": "Ödeme bekleyen geçici tutmanın bitiş anı (ör. +10 dk); dolunca 'expired' olur.",
+   "booking_unit": "Rezervasyon birimi; option'ın booking_unit değeriyle aynı olmalı (anlık görüntü).",
+   "id_table": "Masa bazlı rezervasyonda masa; option setup'ına ait, aktif ve rezerve edilebilir olmalı.",
+   "id_seat": "Koltuk bazlı rezervasyonda koltuk; option setup'ına ait, aktif, rezerve edilebilir ve boş olmalı.",
+   "id_need": "Kullanıcının bu Event için seçtiği İhtiyaç (Event'te enable_need açıksa).",
+   "need_text_snapshot": "Rezervasyon anındaki İhtiyaç metni anlık görüntüsü.",
+   "id_offer": "Kullanıcının bu Event için seçtiği Katkı (Event'te enable_offer açıksa).",
+   "offer_text_snapshot": "Rezervasyon anındaki Katkı metni anlık görüntüsü.",
+   "price_list_amount": "İndirimsiz liste fiyatı anlık görüntüsü (ör. 500.00).",
+   "discount_amount": "Uygulanan toplam indirim (üyelik/freepass/promosyon).",
+   "final_price": "Rezervasyon anındaki nihai fiyat = liste fiyatı − indirim; sonradan değişmez.",
+   "currency_code": "Para birimi (ör. TRY).",
+   "payment_status": "Ödeme durumu; rezervasyon durumundan bağımsızdır, finans akışı günceller.",
+   "checkin_at": "Gerçek giriş (check-in) zamanı; check-in akışı yazar.",
+   "checkout_at": "Çıkış zamanı (özellikle çalışma alanı oturumları); check-out akışı yazar.",
+   "cancelled_at": "İptal zamanı; iptal akışı yazar.",
+   "cancelled_by_user_id": "İptal eden kullanıcı veya admin; iptal akışı yazar.",
+   "cancellation_reason": "İptal nedeni kodu.",
+   "is_manual_booking": "Personel tarafından manuel oluşturuldu mu; manuel rezervasyon akışı işaretler.",
+   "override_reason": "Admin bir iş kuralını aştıysa (kapasite, ödeme, 24 saat kilidi) gerekçesi; denetime de yazılır.",
+   "guest_first_name": "Misafir adı (kayıtlı kullanıcı yoksa zorunlu).",
+   "guest_last_name": "Misafir soyadı.",
+   "guest_email": "Misafir e-postası (e-posta veya telefondan biri zorunlu).",
+   "guest_phone": "Misafir telefonu (e-posta veya telefondan biri zorunlu)."
+  },
+  "enums": {
+   "booking_status": {
+    "pending_payment": "Ödeme bekliyor",
+    "confirmed": "Onaylandı",
+    "waitlisted": "Bekleme listesinde",
+    "checked_in": "Giriş yaptı",
+    "completed": "Tamamlandı",
+    "cancelled": "İptal edildi",
+    "expired": "Süresi doldu",
+    "no_show": "Gelmedi"
+   },
+   "booking_source": {
+    "web": "Web",
+    "mobile_app": "Mobil uygulama",
+    "staff": "Personel",
+    "phone": "Telefon",
+    "whatsapp": "WhatsApp",
+    "walk_in": "Kapıdan",
+    "invitation": "Davet",
+    "freepass": "Freepass"
+   },
+   "booking_unit": {
+    "location": "Lokasyon",
+    "table": "Masa",
+    "seat": "Koltuk"
+   },
+   "payment_status": {
+    "unpaid": "Ödenmedi",
+    "pending": "Ödeme bekleniyor",
+    "paid": "Ödendi",
+    "partially_paid": "Kısmen ödendi",
+    "refunded": "İade edildi",
+    "partially_refunded": "Kısmen iade edildi",
+    "waived": "Ücretsiz / muaf"
+   },
+   "cancellation_reason": {
+    "user_request": "Kullanıcı talebi",
+    "event_cancelled": "Etkinlik iptal edildi",
+    "payment_failed": "Ödeme başarısız",
+    "duplicate": "Mükerrer kayıt",
+    "admin_override": "Admin müdahalesi",
+    "other": "Diğer"
+   }
+  },
+  "write_mode": "workflow_only",
+  "create_permission": "booking.manual_create",
+  "update_permission": "booking.update",
+  "field_permissions": {
+   "checkin_at": "booking.checkin",
+   "checkout_at": "booking.checkout",
+   "cancelled_at": "booking.cancel",
+   "cancelled_by_user_id": "booking.cancel",
+   "cancellation_reason": "booking.cancel",
+   "payment_status": "booking.override_payment"
+  },
+  "system_fields": [
+   "booked_by_user_id",
+   "id_membership_type_at_booking",
+   "booking_status",
+   "booked_at",
+   "expires_at",
+   "booking_unit",
+   "need_text_snapshot",
+   "offer_text_snapshot",
+   "price_list_amount",
+   "discount_amount",
+   "final_price",
+   "currency_code",
+   "payment_status",
+   "checkin_at",
+   "checkout_at",
+   "cancelled_at",
+   "cancelled_by_user_id",
+   "is_manual_booking"
+  ],
+  "immutable_fields": [
+   "id_event",
+   "id_user",
+   "booked_by_user_id",
+   "id_invitation",
+   "id_freepass",
+   "id_membership_type_at_booking",
+   "booking_source",
+   "booked_at",
+   "price_list_amount",
+   "discount_amount",
+   "final_price",
+   "currency_code",
+   "need_text_snapshot",
+   "offer_text_snapshot"
+  ],
+  "required_on_create": [
+   "id_event",
+   "id_event_option",
+   "booking_source"
+  ],
+  "status_transitions": {
+   "pending_payment": [
+    "confirmed",
+    "expired",
+    "cancelled"
+   ],
+   "waitlisted": [
+    "pending_payment",
+    "confirmed",
+    "cancelled",
+    "expired"
+   ],
+   "confirmed": [
+    "checked_in",
+    "no_show",
+    "cancelled"
+   ],
+   "checked_in": [
+    "completed"
+   ]
+  },
+  "rules_tr": [
+   "Bir kullanıcının aynı Event'te tek aktif rezervasyonu olabilir; option değişikliği mevcut rezervasyon üzerinden yapılır (BOOK-D06).",
+   "Option kapasitesi aşılamaz; aşmak için özel yetki (booking.override_capacity) ve override_reason gerekir (BOOK-D07).",
+   "Aynı option'da aynı koltuk/masa için tek aktif rezervasyon olabilir (BOOK-D08).",
+   "Fiyat anlık görüntüdür; sonraki fiyat/üyelik değişiklikleri geçmişi etkilemez (BOOK-D09, BOOK-D10).",
+   "Event başlangıcına 24 saatten az kala kullanıcı iptal edemez; yalnızca yetkili admin iptal eder (BOOK-D12).",
+   "İptal ödemeyi silmez; iade ayrı finans akışıdır. Rezervasyon asla silinmez (BOOK-D11, BOOK-D14)."
+  ]
+ },
+ "locations": {
+  "purpose_tr": "Bir satır, Fikirhane'nin kalıcı bir fiziksel alanı ve güvenli azami kapasitesidir (ör. Fikirhane, Atölye, Toplantı Odası). Yerleşim düzenleri, masa/koltuklar, etkinlik kapasitesi ve rezervasyon birimi burada tutulmaz.",
+  "fields": {
+   "location_code": "Sabit teknik kod; büyük harf, rakam ve _ (ör. FIKIRHANE, ATOLYE). Benzersiz.",
+   "location_name": "Arayüzde görünen ad (ör. Atölye).",
+   "location_type": "Alan sınıflandırması; filtreleme için isteğe bağlı.",
+   "description": "Kısa açıklama.",
+   "max_capacity": "Fiziksel güvenli üst sınır (ör. Fikirhane 16); 0'dan büyük. Etkinlik kapasitesi değildir.",
+   "floor": "Kat bilgisi (ör. \"Zemin Kat\", \"Teras\").",
+   "indoor_outdoor": "Kapalı / açık / yarı açık alan.",
+   "reservable": "EventOption/rezervasyon için kullanılabilir mi (mutfak, depo = hayır).",
+   "default_price_adjustment": "Yeni EventOption'a önerilen varsayılan fiyat farkı (ör. Atölye -50); yalnızca varsayılandır.",
+   "currency_code": "Fiyat farkının para birimi (ör. TRY).",
+   "status": "Alanın durumu; pasif/bakımdaki alan yeni option'da kullanılamaz.",
+   "sort_order": "Arayüzde sıralama (ör. 10, 20)."
+  },
+  "enums": {
+   "location_type": {
+    "workspace": "Çalışma alanı",
+    "meeting_room": "Toplantı odası",
+    "event_space": "Etkinlik alanı",
+    "cafeteria": "Kafeterya",
+    "terrace": "Teras",
+    "support_area": "Destek alanı"
+   },
+   "indoor_outdoor": {
+    "indoor": "Kapalı",
+    "outdoor": "Açık",
+    "semi_outdoor": "Yarı açık"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "maintenance": "Bakımda",
+    "archived": "Arşivlendi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "event.update_location",
+  "update_permission": "event.update_location",
+  "field_permissions": {},
+  "system_fields": [],
+  "immutable_fields": [
+   "location_code"
+  ],
+  "required_on_create": [
+   "location_code",
+   "location_name",
+   "max_capacity"
+  ],
+  "rules_tr": [
+   "location_code benzersizdir; max_capacity 0'dan büyük olmalı (LOC-D02, LOC-D03).",
+   "Pasif veya bakımdaki lokasyon yeni EventOption'da kullanılamaz (LOC-D04).",
+   "Kapasite hiyerarşisi: lokasyon max ≥ setup ≥ option kapasitesi (LOC-D05).",
+   "Masa ve koltuklar lokasyona değil Setup'a bağlanır; yerleşim düzenleri SPACE_SETUPS'tadır (LOC-D06, LOC-D07).",
+   "Varsayılan fiyat farkı değişikliği mevcut option ve rezervasyon fiyatlarını değiştirmez (LOC-D09).",
+   "Aynı lokasyonda çakışan saatlerde iki etkinlik yayınlanamaz (LOC-D10)."
+  ]
+ },
+ "space_setups": {
+  "purpose_tr": "Bir satır, bir lokasyonun belirli bir masa/koltuk yerleşim düzeni ve sürümüdür (ör. Fikirhane — 4 Masa x 4 Koltuk V1). Etkinlik takvimi, fiyat ve kesin rezervasyon birimi burada tutulmaz.",
+  "fields": {
+   "id_location": "Bağlı olduğu fiziksel alan.",
+   "setup_code": "Sistemde benzersiz sabit kod; büyük harf, rakam ve _ (ör. FIKIRHANE_COWORK_V1).",
+   "setup_name": "Arayüz/admin adı (ör. \"Community Workspace — 4 Tables\").",
+   "setup_type": "Yerleşim tipi; filtreleme ve seçim için.",
+   "description": "Açıklama (ör. \"4 masa, her birinde 4 koltuk\").",
+   "capacity": "Bu düzenin azami kullanılabilir kapasitesi; lokasyon max kapasitesini aşamaz.",
+   "default_booking_unit": "Önerilen rezervasyon birimi; EventOption kendi değeriyle ezebilir.",
+   "map_image": "Koltuk/masa haritası arka planı (tercihen SVG) dosya referansı veya URL'si.",
+   "map_aspect_ratio": "Harita en/boy oranı (ör. 1.60); koordinatların ekranlarda sabit kalması için.",
+   "version_no": "Setup sürüm numarası; büyük geometri değişikliğinde yeni kayıt ve artan sürüm açılır.",
+   "status": "Düzen durumu; yalnızca aktif setup yeni EventOption'da kullanılabilir.",
+   "sort_order": "Arayüzde sıralama."
+  },
+  "enums": {
+   "setup_type": {
+    "cowork": "Ortak çalışma",
+    "classroom": "Sınıf düzeni",
+    "u_shape": "U düzeni",
+    "boardroom": "Toplantı masası",
+    "chairs_only": "Yalnızca sandalye",
+    "standing": "Ayakta",
+    "custom": "Özel"
+   },
+   "default_booking_unit": {
+    "seat": "Koltuk",
+    "table": "Masa",
+    "location": "Lokasyon"
+   },
+   "status": {
+    "draft": "Taslak",
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "archived": "Arşivlendi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "event.update_location",
+  "update_permission": "event.update_location",
+  "field_permissions": {},
+  "system_fields": [
+   "version_no"
+  ],
+  "immutable_fields": [
+   "id_location",
+   "setup_code"
+  ],
+  "required_on_create": [
+   "id_location",
+   "setup_code",
+   "setup_name",
+   "capacity"
+  ],
+  "status_transitions": {
+   "draft": [
+    "active",
+    "archived"
+   ],
+   "active": [
+    "inactive",
+    "archived"
+   ],
+   "inactive": [
+    "active",
+    "archived"
+   ]
+  },
+  "rules_tr": [
+   "Setup kapasitesi lokasyon max kapasitesini aşamaz; option kapasitesi de setup kapasitesini aşamaz (SETUP-D04, SETUP-D07).",
+   "Pasif/arşivlenmiş setup yeni EventOption'da kullanılamaz (SETUP-D05).",
+   "Yayınlanmış/rezervasyonlu option'da kullanılan setup'ın geometrisi ve kapasitesi geriye dönük değiştirilmez (SETUP-D08).",
+   "Büyük yerleşim değişikliği = yeni setup sürümü (\"Setup'ı Kopyala\" → V2); küçük açıklama düzeltmeleri yerinde yapılabilir (SETUP-D09).",
+   "Koltuk bazlı setup'ta rezerve edilebilir koltuk sayısı ≥ kapasite olmalı.",
+   "Setup fiyat veya takvim bilgisi taşımaz (SETUP-D10)."
+  ]
+ },
+ "tables": {
+  "purpose_tr": "Bir satır, belirli bir Setup içindeki fiziksel/harita masa nesnesidir (ör. T01). Lokasyona veya Event'e doğrudan bağlanmaz; rezervasyon bilgisi BOOKINGS'te tutulur.",
+  "fields": {
+   "id_space_setup": "Masanın ait olduğu setup.",
+   "table_code": "Setup içinde benzersiz teknik kod (ör. T01); fiziksel etiketle aynı olabilir.",
+   "table_name": "Arayüz adı (ör. \"Masa 1\").",
+   "seat_capacity": "Masadaki varsayılan koltuk sayısı; kontrol amaçlıdır, asıl kaynak SEATS kayıtlarıdır.",
+   "reservable": "Masanın tamamı rezerve edilebilir mi; normal cowork (koltuk bazlı) düzende hayır.",
+   "position_x": "Setup tuvali üzerinde normalize X (0–1), nesnenin merkez noktası.",
+   "position_y": "Setup tuvali üzerinde normalize Y (0–1), nesnenin merkez noktası.",
+   "width": "Haritadaki normalize genişlik (0–1); cm değil.",
+   "height": "Haritadaki normalize yükseklik (0–1); cm değil.",
+   "rotation": "Derece cinsinden dönüş (ör. 0, 90).",
+   "shape": "Masa şekli; programatik harita çizimi için.",
+   "status": "Masanın durumu; pasif/bloklu/arşiv masa yeni rezervasyonda seçilemez.",
+   "sort_order": "Arayüzde sıralama."
+  },
+  "enums": {
+   "shape": {
+    "rectangle": "Dikdörtgen",
+    "round": "Yuvarlak",
+    "oval": "Oval",
+    "square": "Kare",
+    "custom": "Özel"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "blocked": "Bloklu",
+    "archived": "Arşivlendi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "event.update_location",
+  "update_permission": "event.update_location",
+  "field_permissions": {},
+  "system_fields": [],
+  "immutable_fields": [
+   "id_space_setup"
+  ],
+  "required_on_create": [
+   "id_space_setup",
+   "table_code",
+   "table_name"
+  ],
+  "rules_tr": [
+   "table_code setup içinde benzersizdir; masa lokasyona veya Event'e bağlanmaz (TABLE-D02, TABLE-D03, TABLE-D04).",
+   "Masa bazlı rezervasyon yalnızca option booking_unit = table iken yapılır (TABLE-D05).",
+   "Koordinatlar setup tuvaline göre 0–1 normalize ve merkez noktasıdır (TABLE-D07).",
+   "Geometri değişikliğinde masalar yeni setup sürümü altında yeniden açılır; eski sürüm korunur (TABLE-D08).",
+   "Pasif/arşiv masa yeni rezervasyonda seçilemez; aynı option'da aynı masa iki kez rezerve edilemez (TABLE-D09, TABLE-D10).",
+   "Aynı option'da masa ve koltuk rezervasyonu karıştırılmaz."
+  ]
+ },
+ "seats": {
+  "purpose_tr": "Bir satır, belirli bir Setup içindeki tek bir rezerve edilebilir koltuk/oturma yeridir; masaya bağlılık isteğe bağlıdır. Event, lokasyon, fiyat ve gerçek kullanım (BOOKINGS) burada tutulmaz.",
+  "fields": {
+   "id_space_setup": "Koltuğun ait olduğu setup; zorunlu.",
+   "id_table": "Bağlı olduğu masa; masasız düzende boş. Masa aynı setup'a ait olmalı (SEAT-D02).",
+   "seat_code": "Setup içinde benzersiz kısa kod (ör. F01); fiziksel etikette de kullanılır.",
+   "seat_name": "Arayüz adı (ör. \"Masa 1 — Koltuk 1\").",
+   "seat_type": "İsteğe bağlı koltuk sınıfı.",
+   "reservable": "Rezervasyona açık mı (ör. personel koltuğu = hayır).",
+   "position_x": "Setup tuvali üzerinde normalize X (0–1), merkez noktası; masaya göre değil.",
+   "position_y": "Setup tuvali üzerinde normalize Y (0–1), merkez noktası.",
+   "rotation": "Koltuğun baktığı yön, derece (ör. 0, 90, 180).",
+   "status": "Koltuğun durumu; pasif/bloklu koltuk yeni rezervasyona atanamaz.",
+   "sort_order": "Arayüzde sıralama."
+  },
+  "enums": {
+   "seat_type": {
+    "standard": "Standart",
+    "accessible": "Erişilebilir",
+    "high_stool": "Yüksek tabure",
+    "window": "Pencere kenarı"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "blocked": "Bloklu",
+    "archived": "Arşivlendi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "event.update_location",
+  "update_permission": "event.update_location",
+  "field_permissions": {},
+  "system_fields": [],
+  "immutable_fields": [
+   "id_space_setup"
+  ],
+  "required_on_create": [
+   "id_space_setup",
+   "seat_code",
+   "seat_name"
+  ],
+  "rules_tr": [
+   "seat_code setup içinde benzersizdir; masa seçilirse aynı setup'a ait olmalı (SEAT-D02, SEAT-D03).",
+   "Koltuk bazlı rezervasyon yalnızca option booking_unit = seat iken yapılır (SEAT-D05).",
+   "Aynı option'da aynı koltuk için tek aktif rezervasyon olabilir (SEAT-D06).",
+   "Pasif, bloklu veya rezerve edilemez koltuk yeni rezervasyona atanamaz (SEAT-D07).",
+   "Kullanımdaki setup'ta koltuk sayısı, numarası veya masa ilişkisi değişecekse yeni setup sürümü açın; küçük koordinat düzeltmesi yerinde yapılabilir (SEAT-D09).",
+   "Koltukta fiyat tutulmaz (SEAT-D10)."
+  ]
+ },
+ "accounts": {
+  "purpose_tr": "Fikirhane'nin kendi parasının durduğu veya geçtiği hesap: banka, kasa, POS ya da clearing hesabı (\"para nerede?\"). Finans merkezi, kategori, müşteri/tedarikçi banka hesapları ve hareket toplamları burada tutulmaz.",
+  "fields": {
+   "account_code": "Sabit teknik kod (A-Z, 0-9, _), benzersiz. Örn. GARANTI_TRY, CASH_TRY, POS_CLEARING. Oluşturulduktan sonra değiştirilemez.",
+   "account_name": "Görünen ad; değiştirilebilir. Örn. Garanti Bankası TRY, Fikirhane Kasa.",
+   "account_type": "Hesap türü: banka, nakit kasa, POS, clearing (geçici bekleme) veya diğer.",
+   "currency_code": "Hesabın tek para birimi (TRY/USD/EUR). Karışık olamaz; Garanti TRY ve Garanti USD iki ayrı hesaptır. Sonradan değişmez.",
+   "opening_balance": "Sistem başlangıcındaki bakiye; geçmiş hareketleri girmeden başlamak için. Yalnızca ilk kurulumda düzeltilir.",
+   "opening_balance_date": "Açılış bakiyesinin geçerli olduğu tarih (örn. 2026-10-01).",
+   "current_balance": "Yalnızca önbellek; elle girilmez. Açılış bakiyesi + kesinleşmiş (posted) hareketlerden hesaplanır.",
+   "bank_name": "Banka hesabıysa banka adı (örn. Garanti BBVA).",
+   "account_reference": "Güvenli operasyonel referans: IBAN son 6 hane, POS terminal no, merchant ID vb. Tam IBAN yazmayın.",
+   "status": "active: yeni işlemlerde kullanılır; inactive: geçici olarak kullanılmaz; archived: kapanmış hesap.",
+   "sort_order": "Listelerde sıralama.",
+   "notes": "İç not."
+  },
+  "enums": {
+   "account_type": {
+    "bank": "Banka",
+    "cash": "Nakit kasa",
+    "pos": "POS",
+    "clearing": "Clearing (geçici)",
+    "other": "Diğer"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "archived": "Arşivlendi (kapalı)"
+   }
+  },
+  "derived": {
+   "current_balance": "opening_balance + SUM(transactions.amount WHERE to_account_id = id_account AND status = 'posted') - SUM(transactions.amount WHERE from_account_id = id_account AND status = 'posted')"
+  },
+  "write_mode": "crud",
+  "create_permission": "account.create",
+  "update_permission": "account.update",
+  "actions": [
+   {
+    "action": "deactivate",
+    "from_status": [
+     "active"
+    ],
+    "to_status": "inactive",
+    "permission": "account.update",
+    "needs_reason": false,
+    "label_tr": "Pasife al",
+    "effects_tr": "Hesap yeni Transaction'larda seçilemez; geçmiş hareketler ve bakiye korunur."
+   },
+   {
+    "action": "activate",
+    "from_status": [
+     "inactive"
+    ],
+    "to_status": "active",
+    "permission": "account.update",
+    "needs_reason": false,
+    "label_tr": "Aktifleştir",
+    "effects_tr": "Hesap yeniden yeni işlemlerde kullanılabilir."
+   },
+   {
+    "action": "close",
+    "from_status": [
+     "active",
+     "inactive"
+    ],
+    "to_status": "archived",
+    "permission": "account.close",
+    "needs_reason": false,
+    "label_tr": "Hesabı kapat",
+    "effects_tr": "Kapanan banka hesabı arşivlenir; eski Transaction'lar aynı hesaba bağlı kalır, geçmiş raporlar bozulmaz. Silme yok."
+   }
+  ],
+  "system_fields": [
+   "current_balance"
+  ],
+  "immutable_fields": [
+   "account_code",
+   "currency_code"
+  ],
+  "required_on_create": [
+   "account_code",
+   "account_name",
+   "account_type",
+   "currency_code",
+   "opening_balance_date"
+  ],
+  "status_transitions": {
+   "active": [
+    "inactive",
+    "archived"
+   ],
+   "inactive": [
+    "active",
+    "archived"
+   ],
+   "archived": []
+  },
+  "rules_tr": [
+   "ACC-D01/D02: account_code benzersizdir ve değişmez; ad değişebilir.",
+   "ACC-D03: Her hesap tek para birimi kullanır; para birimi sonradan değişmez.",
+   "ACC-D04: Bakiye = opening_balance + kesinleşmiş girişler − kesinleşmiş çıkışlar; yalnızca posted hareketler bakiyeyi etkiler.",
+   "ACC-D05/D06: current_balance elle yazılmaz; düzeltme adjustment Transaction ile (veya ilk kurulumda açılış bakiyesi düzeltmesiyle) yapılır.",
+   "ACC-D07: Hesapta finans merkezi/kategori tutulmaz.",
+   "ACC-D08: Hareketi olan hesap silinmez; kapanan hesap archived yapılır.",
+   "ACC-D09/D10: Pasif/arşiv hesap yeni işlemde kullanılamaz; V1'de işlem para birimi = hesap para birimi.",
+   "Kasa sayım farkı: type = adjustment Transaction (örn. Kasa'dan 150); sebep ve audit zorunlu."
+  ]
+ },
+ "financial_centers": {
+  "purpose_tr": "Gelir/giderin ait olduğu iş birimi (English Club, Cafeteria, General...). Para hesabı (Account) ya da gelir/gider türü (Category) değildir; bakiye, bütçe ve yönetici burada tutulmaz.",
+  "fields": {
+   "center_code": "Sabit teknik kod (A-Z, 0-9, _), benzersiz. Örn. ENGLISH_CLUB, CAFETERIA, GENERAL. İsim/marka değişse de değişmez.",
+   "center_name": "Görünen ad; değiştirilebilir (örn. Working Club → Community Workspace).",
+   "center_type": "Merkez türü: kulüp, kafeterya, genel (ortak giderler) veya diğer.",
+   "description": "Açıklama; merkezin hangi gelir/giderleri kapsadığı.",
+   "status": "active: yeni belge satırlarında seçilebilir; inactive: yeni kayıtta kullanılmaz; archived: artık kullanılmayan birim.",
+   "sort_order": "Liste ve raporlarda sıralama."
+  },
+  "enums": {
+   "center_type": {
+    "club": "Kulüp",
+    "cafeteria": "Kafeterya",
+    "general": "Genel",
+    "other": "Diğer"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "archived": "Arşivlendi"
+   }
+  },
+  "derived": {},
+  "write_mode": "crud",
+  "create_permission": "financial_center.update",
+  "update_permission": "financial_center.update",
+  "actions": [
+   {
+    "action": "deactivate",
+    "from_status": [
+     "active"
+    ],
+    "to_status": "inactive",
+    "permission": "financial_center.update",
+    "needs_reason": false,
+    "label_tr": "Pasife al",
+    "effects_tr": "Yeni belge satırlarında seçilemez; tarihsel veriler korunur."
+   },
+   {
+    "action": "activate",
+    "from_status": [
+     "inactive"
+    ],
+    "to_status": "active",
+    "permission": "financial_center.update",
+    "needs_reason": false,
+    "label_tr": "Aktifleştir",
+    "effects_tr": "Yeniden yeni atamalarda kullanılabilir."
+   },
+   {
+    "action": "archive",
+    "from_status": [
+     "active",
+     "inactive"
+    ],
+    "to_status": "archived",
+    "permission": "financial_center.update",
+    "needs_reason": false,
+    "label_tr": "Arşivle",
+    "effects_tr": "Kapanan kulübün merkezi arşivlenir; eski DOCUMENT_ITEMS bağlı kalır, raporlar bozulmaz. Silme yok."
+   }
+  ],
+  "system_fields": [],
+  "immutable_fields": [
+   "center_code"
+  ],
+  "required_on_create": [
+   "center_code",
+   "center_name",
+   "center_type"
+  ],
+  "status_transitions": {
+   "active": [
+    "inactive",
+    "archived"
+   ],
+   "inactive": [
+    "active",
+    "archived"
+   ],
+   "archived": []
+  },
+  "rules_tr": [
+   "FC-D01/D02: center_code benzersizdir ve değişmez; ad değişebilir.",
+   "FC-D03/D04: Her kulübün tam bir merkezi vardır, merkez başka kulüple paylaşılmaz; kulüp oluşturulunca merkezi otomatik açılır.",
+   "FC-D05: Kulüp dışı merkezler (Cafeteria, General) olabilir.",
+   "FC-D06: Merkez para hesabı değildir; bakiye tutulmaz, performans raporla hesaplanır.",
+   "FC-D08/D09: Merkez ataması belge satırında yapılır; belge başlığında ve Transaction'da tutulmaz.",
+   "Ortak giderler (muhasebe, internet, elektrik...) V1'de General'a yazılır; kulüplere yüzdesel dağıtım yok.",
+   "Aynı hizmet için iki merkez açmayın (Working Club = Community Workspace ise tek merkez).",
+   "FC-D10: Silme yok; kullanılmayan merkez archived yapılır."
+  ]
+ },
+ "financial_categories": {
+  "purpose_tr": "Gelir veya giderin ekonomik türü (Etkinlik Geliri, Sponsorluk Geliri, Tutor Gideri...). İş birimi, para hesabı, transfer/iade/ödeme yöntemi, vergi, indirim ve freepass kategori değildir; toplamlar burada tutulmaz.",
+  "fields": {
+   "category_code": "Sabit teknik kod (A-Z, 0-9, _), benzersiz. Örn. EVENT_REVENUE, TUTOR_EXPENSE. Sonradan değiştirilemez.",
+   "category_name": "Görünen ad; değiştirilebilir (örn. Etkinlik Geliri → Etkinlik & Atölye Geliri).",
+   "direction": "Gelir mi gider mi. Satış belgesi satırları gelir, alış belgesi satırları gider kategorisi kullanır.",
+   "category_group": "Üst rapor grubu; yönle uyumlu olmalı (gelir grupları / gider grupları).",
+   "description": "Kategorinin kapsamı; hangi gelir/giderler buraya yazılır.",
+   "status": "active: yeni satırlarda seçilebilir; inactive/archived: yeni satırda kullanılamaz, geçmiş satırlar bağlı kalır.",
+   "sort_order": "Liste ve raporlarda sıralama."
+  },
+  "enums": {
+   "direction": {
+    "income": "Gelir",
+    "expense": "Gider"
+   },
+   "category_group": {
+    "operating_revenue": "Operasyon geliri",
+    "sponsorship": "Sponsorluk",
+    "membership": "Üyelik",
+    "cafeteria": "Kafeterya",
+    "other_income": "Diğer gelir",
+    "people": "Personel / eğitmen",
+    "marketing": "Pazarlama",
+    "facilities": "Mekân / tesis",
+    "technology": "Teknoloji",
+    "cafeteria_cost": "Kafeterya maliyeti",
+    "administrative": "İdari",
+    "other_expense": "Diğer gider"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "archived": "Arşivlendi"
+   }
+  },
+  "derived": {},
+  "write_mode": "crud",
+  "create_permission": "financial_category.update",
+  "update_permission": "financial_category.update",
+  "actions": [
+   {
+    "action": "deactivate",
+    "from_status": [
+     "active"
+    ],
+    "to_status": "inactive",
+    "permission": "financial_category.update",
+    "needs_reason": false,
+    "label_tr": "Pasife al",
+    "effects_tr": "Yeni belge satırlarında seçilemez; geçmiş satırlar bağlı kalır."
+   },
+   {
+    "action": "activate",
+    "from_status": [
+     "inactive"
+    ],
+    "to_status": "active",
+    "permission": "financial_category.update",
+    "needs_reason": false,
+    "label_tr": "Aktifleştir",
+    "effects_tr": "Yeniden yeni satırlarda seçilebilir."
+   },
+   {
+    "action": "archive",
+    "from_status": [
+     "active",
+     "inactive"
+    ],
+    "to_status": "archived",
+    "permission": "financial_category.update",
+    "needs_reason": false,
+    "label_tr": "Arşivle",
+    "effects_tr": "Kategori kullanımdan kalkar; geçmiş finans satırlarından silinmez."
+   }
+  ],
+  "system_fields": [],
+  "immutable_fields": [
+   "category_code",
+   "direction"
+  ],
+  "required_on_create": [
+   "category_code",
+   "category_name",
+   "direction",
+   "category_group"
+  ],
+  "status_transitions": {
+   "active": [
+    "inactive",
+    "archived"
+   ],
+   "inactive": [
+    "active",
+    "archived"
+   ],
+   "archived": []
+  },
+  "rules_tr": [
+   "FCAT-D01/D02: category_code benzersizdir ve değişmez; görünen ad değişebilir.",
+   "FCAT-D03: Yön yalnızca income veya expense; refund yönü ve transfer kategorisi yoktur.",
+   "category_group yönle uyumlu olmalı: gelir → operating_revenue/sponsorship/membership/cafeteria/other_income; gider → people/marketing/facilities/technology/cafeteria_cost/administrative/other_expense.",
+   "FCAT-D04/D05: Kategori merkeze veya hesaba bağlı değildir; V1'de her aktif kategori her aktif merkezle kullanılabilir.",
+   "FCAT-D06/D07: Kategori belge satırında tutulur; satır başına tek kategori, bölmek için ayrı satır açılır.",
+   "FCAT-D08: Transfer, iade, ödeme yöntemi, vergi, indirim ve freepass kategori olarak açılmaz.",
+   "Kategorileri üst seviyede tutun (~15-20); 'Diğer'i sınırlı kullanın, büyüyorsa yeni kategori gerekir.",
+   "FCAT-D09/D10: Silme yok, archived yapılır; gelir/gider toplamları burada tutulmaz."
+  ]
+ },
+ "documents": {
+  "purpose_tr": "Bir ticari belgenin başlığı: satış veya alış (fatura, fiş, iç belge); giderler de alış belgesidir. Satır detayı, merkez/kategori (DOCUMENT_ITEMS), gerçek para hareketi (TRANSACTIONS) ve ödeme durumu burada tutulmaz.",
+  "fields": {
+   "direction": "Ekonomik yön: sale = Fikirhane satıyor, purchase = Fikirhane alıyor (gider faturaları dahil).",
+   "document_type": "Belge türü (V1): fatura, fiş/makbuz veya iç belge.",
+   "document_number": "Belge no. Taslakta boş olabilir; kesinleştirmede zorunlu. Satışta sistem verir (SALE-YYYY-NNNNNN), alışta tedarikçinin numarası.",
+   "document_date": "Ticari belge tarihi; kayıt oluşturma zamanı değildir.",
+   "id_user": "Karşı taraf bir kişiyse. Kurum seçiliyse boş bırakın (ikisi birden olamaz).",
+   "id_organization": "Karşı taraf kurumsa (müşteri veya tedarikçi). Kişi seçiliyse boş bırakın.",
+   "currency_code": "Belgenin tek para birimi (TRY/USD/EUR); tüm satırlar bu para birimindedir.",
+   "subtotal_amount": "Satırlardan hesaplanır: indirim ve vergi öncesi brüt toplam. Elle girilmez.",
+   "discount_amount": "Satırlardan hesaplanır: satır indirimlerinin toplamı. Elle girilmez.",
+   "tax_amount": "Satırlardan hesaplanır: satır vergilerinin toplamı. Elle girilmez.",
+   "grand_total": "Satırlardan hesaplanır: ara toplam − indirim + vergi = satır toplamları. Elle girilmez.",
+   "due_date": "Vadeli ise son ödeme tarihi (örn. sponsorluk faturası); peşin kafeterya satışında boş.",
+   "status": "Belge yaşam döngüsü: taslak, kesinleşmiş, iptal. Ödeme durumu ayrıca hesaplanır.",
+   "reference_number": "Dış referans: ödeme sağlayıcı sipariş no, POS ref, dış rezervasyon no. Sağlayıcı işlem ID'si Transaction'a yazılır.",
+   "description": "Belge açıklaması.",
+   "billing_name": "Belge üzerindeki ad/unvan; oluşturulurken kişi/kurumdan kopyalanır (snapshot).",
+   "billing_tax_number": "Vergi/TC kimlik no snapshot'ı; kurum kaydı değişse de belge değişmez.",
+   "billing_tax_office": "Vergi dairesi snapshot'ı.",
+   "billing_address": "Fatura adresi snapshot'ı.",
+   "posted_at": "Kesinleştirme zamanı; sistem yazar.",
+   "posted_by_user_id": "Kesinleştiren kullanıcı; sistem yazar (sistem işlemi ise boş, AUDIT_LOG'da aktör tutulur).",
+   "cancelled_at": "İptal zamanı; sistem yazar.",
+   "cancelled_by_user_id": "İptal eden kullanıcı; sistem yazar.",
+   "cancellation_reason": "İptal sebebi; yalnızca İptal et işleminde girilir."
+  },
+  "enums": {
+   "direction": {
+    "sale": "Satış",
+    "purchase": "Alış"
+   },
+   "document_type": {
+    "invoice": "Fatura",
+    "receipt": "Fiş / makbuz",
+    "internal": "İç belge"
+   },
+   "status": {
+    "draft": "Taslak",
+    "posted": "Kesinleşti",
+    "cancelled": "İptal"
+   }
+  },
+  "derived": {
+   "subtotal_amount": "SUM(document_items.gross_amount)",
+   "discount_amount": "SUM(document_items.discount_amount)",
+   "tax_amount": "SUM(document_items.tax_amount)",
+   "grand_total": "subtotal_amount - discount_amount + tax_amount (= SUM(document_items.line_total))"
+  },
+  "write_mode": "crud",
+  "create_permission": "document.create",
+  "update_permission": "document.update",
+  "actions": [
+   {
+    "action": "post",
+    "from_status": [
+     "draft"
+    ],
+    "to_status": "posted",
+    "permission": "document.post",
+    "needs_reason": false,
+    "label_tr": "Kesinleştir",
+    "effects_tr": "En az bir satır ve grand_total = SUM(line_total) şartı; belge no yoksa atanır; posted_at/posted_by yazılır; karşı taraf, satırlar, tutarlar, vergi ve para birimi kilitlenir; stoklu kalemler için stok hareketi oluşur; audit document.posted."
+   },
+   {
+    "action": "cancel",
+    "from_status": [
+     "draft",
+     "posted"
+    ],
+    "to_status": "cancelled",
+    "permission": "document.cancel",
+    "needs_reason": true,
+    "label_tr": "İptal et",
+    "effects_tr": "status = cancelled, cancelled_at/by ve sebep yazılır; belge silinmez ve kesindir. Bağlı Transaction'lar silinmez; ödeme alınmışsa ayrıca iade Transaction'ı ve allocation ters kaydı gerekir; audit document.cancelled."
+   }
+  ],
+  "system_fields": [
+   "subtotal_amount",
+   "discount_amount",
+   "tax_amount",
+   "grand_total",
+   "posted_at",
+   "posted_by_user_id",
+   "cancelled_at",
+   "cancelled_by_user_id",
+   "status"
+  ],
+  "immutable_fields": [],
+  "required_on_create": [
+   "direction",
+   "document_type",
+   "currency_code"
+  ],
+  "status_transitions": {
+   "draft": [
+    "posted",
+    "cancelled"
+   ],
+   "posted": [
+    "cancelled"
+   ],
+   "cancelled": []
+  },
+  "rules_tr": [
+   "DOC-D03: Belge tek para birimi kullanır; tüm satırlar o para birimindedir.",
+   "DOC-D04: Başlık toplamları satırlardan gelir; grand_total = SUM(satır line_total) olmadan kesinleştirilemez.",
+   "DOC-D05/D11: Merkez ve kategori başlıkta değil satırlarda; bir belge birden çok merkez/kategori içerebilir.",
+   "DOC-D06: Kesinleşmiş belgenin kritik alanları değişmez; düzeltme = iptal + yeni belge.",
+   "DOC-D07: Kesinleşmiş/iptal belge silinmez; yalnızca taslak silinebilir.",
+   "DOC-D08: İptal Transaction'ları silmez; iade ayrı refund Transaction'ıdır.",
+   "DOC-D09: Ödeme durumu (unpaid/partially_paid/paid) saklanmaz; aktif allocation toplamından hesaplanır.",
+   "DOC-D10/D12: Karşı taraf en fazla bir (kişi veya kurum); fatura bilgileri oluşturulurken kopyalanır, master değişikliği eski belgeyi değiştirmez."
+  ],
+  "deletable_when": {
+   "column": "status",
+   "values": [
+    "draft"
+   ]
+  }
+ },
+ "document_items": {
+  "purpose_tr": "Bir belgenin tek satırı: kalem/rezervasyon bağlantısı, finans merkezi ve kategorisi, miktar, fiyat, indirim ve vergi. Para birimi (belgeden gelir), ödeme, etkinlik/kulüp bağlantısı ve stok hareketi burada tutulmaz.",
+  "fields": {
+   "id_document": "Bağlı olduğu belge; yalnızca taslak belgeye satır eklenir/değiştirilir.",
+   "line_no": "Belge içindeki sıra (1, 2, 3...); belge içinde benzersiz.",
+   "id_item": "Standart ürün/hizmet bağlantısı; serbest metin satırlarda boş (örn. acil tesisat tamiri).",
+   "id_booking": "Satır bir etkinlik rezervasyonundan geliyorsa ilgili rezervasyon.",
+   "id_financial_center": "Satırın iş birimi (English Club, Cafeteria, General). Zorunlu; yalnızca aktif merkez seçilir.",
+   "id_financial_category": "Gelir/gider türü. Satış belgesinde gelir, alışta gider kategorisi; yalnızca aktif kategori.",
+   "description": "Satır açıklaması snapshot'ı; kalem adı sonradan değişse de korunur. Zorunlu.",
+   "quantity": "Miktar; 0'dan büyük, ondalıklı olabilir (örn. 2,5 kg). İade için negatif satır kullanılmaz.",
+   "unit": "Birim snapshot'ı (piece, kg, liter, session, hour, month, year); kalemden kopyalanır.",
+   "unit_price": "Birim fiyat snapshot'ı (varsayılan kalem satış fiyatı); 0 veya üstü.",
+   "gross_amount": "Hesaplanır: miktar × birim fiyat. Elle girilmez.",
+   "discount_amount": "Satır indirimi tutarı (indirimlerin asıl kaynağı); brüt tutarı aşamaz.",
+   "net_amount": "Hesaplanır: brüt − indirim (vergi öncesi). Elle girilmez.",
+   "tax_rate": "Vergi oranı yüzde olarak (20 = %20); varsayılan kalemden gelir, tarihsel olarak saklanır.",
+   "tax_amount": "Hesaplanır: net × vergi oranı / 100. Elle girilmez.",
+   "line_total": "Hesaplanır: net + vergi. Elle girilmez.",
+   "notes": "İç not (örn. 'Üye %15 indirimi')."
+  },
+  "enums": {},
+  "derived": {
+   "gross_amount": "round(quantity * unit_price, 2)",
+   "net_amount": "gross_amount - discount_amount",
+   "tax_amount": "round(net_amount * tax_rate / 100, 2)",
+   "line_total": "net_amount + tax_amount"
+  },
+  "write_mode": "crud",
+  "create_permission": "document.update",
+  "update_permission": "document.update",
+  "actions": [],
+  "system_fields": [
+   "gross_amount",
+   "net_amount",
+   "tax_amount",
+   "line_total"
+  ],
+  "immutable_fields": [
+   "id_document"
+  ],
+  "required_on_create": [
+   "id_document",
+   "id_financial_center",
+   "id_financial_category",
+   "description",
+   "quantity",
+   "unit_price"
+  ],
+  "status_transitions": {},
+  "rules_tr": [
+   "DITEM-D02: line_no belge içinde benzersizdir.",
+   "DITEM-D03/D04/D12: Her satırda tam bir merkez ve tam bir kategori; ikisi de aktif olmalı.",
+   "DITEM-D05: Satış satırı gelir, alış satırı gider kategorisi kullanır.",
+   "DITEM-D06..D09: quantity > 0; brüt = miktar × fiyat; net = brüt − indirim; toplam = net + vergi.",
+   "DITEM-D10/D14: Kesinleşmiş/iptal belgenin satırları değiştirilemez ve silinemez; taslakta eklenip silinebilir.",
+   "DITEM-D11: Açıklama, birim, fiyat snapshot'tır; kalem master değişikliği geçmiş satırı değiştirmez.",
+   "DITEM-D13: Bir gider iki merkeze/kategoriye bölünecekse iki ayrı satır açın (yüzdesel bölme yok).",
+   "Freepass: brüt 500, indirim 500, net 0, toplam 0 yazılır; iade için negatif satır yerine refund Transaction kullanılır."
+  ],
+  "deletable_when": {
+   "column": "*",
+   "values": []
+  }
+ },
+ "transactions": {
+  "purpose_tr": "Gerçek para hareketi defteri: ne zaman, ne kadar, hangi hesaptan hangi hesaba (tahsilat, gider ödemesi, transfer, iade, düzeltme). Belge bağlantısı (TRANSACTION_ALLOCATIONS), merkez/kategori, karşı taraf ve türetilmiş tutarlar burada tutulmaz.",
+  "fields": {
+   "transaction_at": "Paranın gerçekten hareket ettiği zaman.",
+   "transaction_type": "Hareket türü; hangi hesap alanlarının dolacağını belirler. Düzeltme (adjustment) ayrı yetki ister.",
+   "from_account_id": "Paranın çıktığı hesap. Gider ödemesi, iade ve transferde zorunlu; tahsilatta boş. Aktif ve aynı para biriminde olmalı.",
+   "to_account_id": "Paranın girdiği hesap. Tahsilat ve transferde zorunlu; gider ödemesi ve iadede boş. Aktif ve aynı para biriminde olmalı.",
+   "amount": "Her zaman pozitif tutar; yön türden ve hesaplardan gelir.",
+   "currency_code": "Tek para birimi; V1'de hesap ve belge para birimiyle aynı olmalı.",
+   "payment_method": "Ödeme yöntemi (nakit, kredi/banka kartı, havale, online...). Hesapla aynı şey değildir.",
+   "status": "pending: kesinleşmedi; posted: kesinleşti; failed: başarısız; cancelled: kesinleşmeden iptal; reversed: terslendi.",
+   "reference_number": "İç/dış referans (BANK-REF-12345, POS-2026-8891, CASH-000231).",
+   "provider_name": "Ödeme/POS sağlayıcı (iyzico, PayTR, Garanti POS); zorunlu değil.",
+   "provider_transaction_id": "Sağlayıcının işlem ID'si; sağlayıcı bazında benzersiz, mükerrer callback'i engeller.",
+   "description": "Serbest açıklama; düzeltme (adjustment) türünde zorunlu (sebep).",
+   "posted_at": "Kesinleştirme zamanı; sistem yazar.",
+   "reversed_at": "Ters kayıt zamanı; sistem yazar.",
+   "reversed_by_user_id": "Ters kaydı yapan kullanıcı; sistem yazar.",
+   "reversal_reason": "Ters kayıt sebebi; yalnızca Tersine çevir işleminde girilir."
+  },
+  "enums": {
+   "transaction_type": {
+    "collection": "Tahsilat",
+    "expense_payment": "Gider ödemesi",
+    "transfer": "Hesaplar arası transfer",
+    "refund": "İade",
+    "adjustment": "Düzeltme"
+   },
+   "payment_method": {
+    "cash": "Nakit",
+    "credit_card": "Kredi kartı",
+    "debit_card": "Banka kartı",
+    "bank_transfer": "Havale / EFT",
+    "online_payment": "Online ödeme",
+    "other": "Diğer"
+   },
+   "status": {
+    "pending": "Beklemede",
+    "posted": "Kesinleşti",
+    "failed": "Başarısız",
+    "cancelled": "İptal",
+    "reversed": "Terslendi"
+   }
+  },
+  "derived": {},
+  "write_mode": "crud",
+  "create_permission": "transaction.create",
+  "update_permission": "transaction.update_pending",
+  "actions": [
+   {
+    "action": "post",
+    "from_status": [
+     "pending"
+    ],
+    "to_status": "posted",
+    "permission": "transaction.post",
+    "needs_reason": false,
+    "label_tr": "Kesinleştir",
+    "effects_tr": "posted_at yazılır; hesap bakiyesini etkiler (tahsilat: to +; gider/iade: from −; transfer: from −, to +); belgelere dağıtılabilir hale gelir; tutar/hesap/tür/tarih kilitlenir; audit transaction.posted."
+   },
+   {
+    "action": "fail",
+    "from_status": [
+     "pending"
+    ],
+    "to_status": "failed",
+    "permission": "transaction.update_pending",
+    "needs_reason": false,
+    "label_tr": "Başarısız işaretle",
+    "effects_tr": "Bakiye etkisi yok, dağıtım yapılamaz, rezervasyonu ödenmiş yapmaz; kesindir; audit transaction.failed."
+   },
+   {
+    "action": "cancel",
+    "from_status": [
+     "pending"
+    ],
+    "to_status": "cancelled",
+    "permission": "transaction.update_pending",
+    "needs_reason": false,
+    "label_tr": "İptal et",
+    "effects_tr": "Kesinleşmeden iptal; bakiye etkisi yok, kesindir."
+   },
+   {
+    "action": "reverse",
+    "from_status": [
+     "posted"
+    ],
+    "to_status": "reversed",
+    "permission": "transaction.reverse",
+    "needs_reason": true,
+    "label_tr": "Tersine çevir",
+    "effects_tr": "reversed_at/by ve sebep yazılır; kayıt silinmez/değişmez. Bağlı aktif allocation'lar aynı işlemde reversed yapılır; tercihen karşı Transaction oluşturulur (örn. tahsilat 500 → iade 500); audit transaction.reversed."
+   }
+  ],
+  "system_fields": [
+   "posted_at",
+   "reversed_at",
+   "reversed_by_user_id",
+   "status",
+   "reversal_reason"
+  ],
+  "immutable_fields": [],
+  "required_on_create": [
+   "transaction_type",
+   "amount",
+   "currency_code"
+  ],
+  "status_transitions": {
+   "pending": [
+    "posted",
+    "failed",
+    "cancelled"
+   ],
+   "posted": [
+    "reversed"
+   ],
+   "failed": [],
+   "cancelled": [],
+   "reversed": []
+  },
+  "rules_tr": [
+   "TRX-D02/D04: amount > 0; from ve to aynı hesap olamaz.",
+   "TRX-D05..D07: tahsilat → yalnız to; gider ödemesi/iade → yalnız from; transfer → ikisi de; düzeltme → ikisinden yalnızca biri + açıklama.",
+   "ACC-D09/D10: Hesaplar aktif ve işlemle aynı para biriminde olmalı.",
+   "TRX-D08: Transfer belgelere dağıtılmaz (gelir/gider değildir).",
+   "TRX-D09/D10: Yalnızca posted işlemler bakiyeyi ve belge ödemesini etkiler; pending/failed/cancelled etkilemez.",
+   "TRX-D11: Kesinleşmiş işlemin tutar, para birimi, hesap, tür ve tarihi değişmez; düzeltme = ters kayıt + yeni işlem.",
+   "TRX-D12: Posted işlem silinmez; yalnızca pending işlem silinebilir.",
+   "Düzeltme (adjustment) işlemi transaction.adjust yetkisi ister; sebep ve audit zorunlu."
+  ],
+  "deletable_when": {
+   "column": "status",
+   "values": [
+    "pending"
+   ]
+  }
+ },
+ "transaction_allocations": {
+  "purpose_tr": "Bir para hareketinin (Transaction) bir belgeye uygulanan kısmı: hangi ödeme hangi belgeyi ne kadar kapattı. Merkez, kategori, hesap, para birimi, satır bazlı dağıtım ve ödenen/kalan tutarlar burada tutulmaz.",
+  "fields": {
+   "id_transaction": "Dağıtılan para hareketi; kesinleşmiş (posted) olmalı ve transfer olamaz.",
+   "id_document": "Ödemenin uygulandığı belge; kesinleşmiş olmalı ve aynı para biriminde.",
+   "allocated_amount": "Bu belgeye uygulanan tutar; pozitif. İşlemin kalanını ve belgenin açık tutarını aşamaz.",
+   "allocation_at": "Belgeye uygulama zamanı; işlem zamanından farklı olabilir (örn. 10 Eylül tahsil, 12 Eylül eşleştirme).",
+   "status": "active: geçerli; reversed: geri alındı (silinmez).",
+   "reversed_at": "Geri alma zamanı; sistem yazar.",
+   "reversed_by_user_id": "Geri alan kullanıcı; sistem yazar.",
+   "reversal_reason": "Geri alma sebebi (yanlış faturaya bağlandı, belge iptal, chargeback...); yalnızca Geri al işleminde girilir.",
+   "notes": "İç not."
+  },
+  "enums": {
+   "status": {
+    "active": "Aktif",
+    "reversed": "Geri alındı"
+   }
+  },
+  "derived": {},
+  "write_mode": "append_only",
+  "create_permission": "transaction.create",
+  "update_permission": null,
+  "actions": [
+   {
+    "action": "reverse",
+    "from_status": [
+     "active"
+    ],
+    "to_status": "reversed",
+    "permission": "transaction.reverse",
+    "needs_reason": true,
+    "label_tr": "Geri al",
+    "effects_tr": "status = reversed, reversed_at/by ve sebep yazılır; kayıt silinmez; tutar artık belge ödemesi ve işlemin dağıtılmış tutarında sayılmaz."
+   }
+  ],
+  "system_fields": [
+   "status",
+   "reversed_at",
+   "reversed_by_user_id",
+   "reversal_reason"
+  ],
+  "immutable_fields": [
+   "id_transaction",
+   "id_document",
+   "allocated_amount",
+   "allocation_at"
+  ],
+  "required_on_create": [
+   "id_transaction",
+   "id_document",
+   "allocated_amount"
+  ],
+  "status_transitions": {
+   "active": [
+    "reversed"
+   ],
+   "reversed": []
+  },
+  "rules_tr": [
+   "TALLOC-D02: allocated_amount > 0; işaretli (negatif) tutar yok.",
+   "TALLOC-D03: Bir işlemin aktif dağıtımları toplamı işlem tutarını aşamaz.",
+   "TALLOC-D04: Bir belgenin aktif dağıtımları grand_total'ı aşamaz; fazla ödeme işlemde dağıtılmamış kalır.",
+   "TALLOC-D05: Aynı işlem + belge için tek aktif kayıt; parçaları tek tutarda birleştirin.",
+   "TALLOC-D06/D07: Transfer dağıtılmaz; yalnızca posted işlem ve posted belge eşleştirilir.",
+   "TALLOC-D09: Kayıt silinmez; hata ters kayıt (reversed) + yeni dağıtım ile düzeltilir.",
+   "TALLOC-D10: İşlem ve belge para birimi aynı olmalı.",
+   "Ödenen = SUM(aktif dağıtım); kalan = grand_total − ödenen; ikisi de saklanmaz."
+  ]
+ },
+ "campaigns": {
+  "purpose_tr": "Bir satır = bir edinim/davet/freepass/promosyon programının çatı kimliği ve bu programla verilecek freepass'lerin varsayılanları. Tekil davet, freepass, kullanım, booking, indirim kuralı, gerçek harcama ve KPI sayaçları burada tutulmaz.",
+  "fields": {
+   "campaign_code": "Teknik, sabit ve benzersiz kod (yalnız A-Z, 0-9, _). QR, UTM ve raporlarda referans; ör. LAUNCH_FREEPASS_2026.",
+   "campaign_name": "UI ve raporlarda görünen kampanya adı.",
+   "campaign_type": "Kampanyanın amacı (edinim, freepass, referans...). Dağıtım kanalı değildir.",
+   "description": "Kampanyanın kısa açıklaması.",
+   "start_at": "Kampanyanın aktif dönem başlangıcı. Freepass geçerlilik tarihlerinden bağımsızdır.",
+   "end_at": "Kampanyanın aktif dönem bitişi; başlangıçtan önce olamaz.",
+   "target_audience": "Hedef kitlenin okunabilir tanımı (V1'de serbest metin, segment motoru yok).",
+   "default_freepass_usage_limit": "Bu kampanyayla verilecek freepass'lerin varsayılan kullanım hakkı (>0). Oluşturulurken freepass'e kopyalanır.",
+   "default_freepass_valid_days": "Varsayılan geçerlilik günü (>0): valid_until = veriliş tarihi + N gün.",
+   "default_booking_unit_grant": "Freepass'in varsayılan hak seviyesi (lokasyon/masa/koltuk). Boşsa seviye kısıtı yok.",
+   "status": "Kampanya yaşam döngüsü durumu. Arşivleme ayrı yetki ister.",
+   "budget_amount": "Planlanan bütçe (≥0). Yalnızca plan değeri; gerçek masraflar Documents/Transactions üzerinden izlenir.",
+   "currency_code": "Bütçe para birimi, ISO 4217 (ör. TRY).",
+   "notes": "İç not."
+  },
+  "enums": {
+   "campaign_type": {
+    "acquisition": "Edinim",
+    "freepass": "Freepass",
+    "referral": "Referans",
+    "invitation": "Davet",
+    "promotion": "Promosyon",
+    "partnership": "İş ortaklığı",
+    "retention": "Elde tutma",
+    "reactivation": "Yeniden kazanım"
+   },
+   "default_booking_unit_grant": {
+    "location": "Lokasyon",
+    "table": "Masa",
+    "seat": "Koltuk"
+   },
+   "status": {
+    "draft": "Taslak",
+    "scheduled": "Planlandı",
+    "active": "Aktif",
+    "paused": "Duraklatıldı",
+    "completed": "Tamamlandı",
+    "cancelled": "İptal edildi",
+    "archived": "Arşivlendi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "campaign.create",
+  "update_permission": "campaign.update",
+  "system_fields": [],
+  "immutable_fields": [
+   "campaign_code"
+  ],
+  "required_on_create": [
+   "campaign_code",
+   "campaign_name",
+   "campaign_type"
+  ],
+  "status_transitions": {
+   "draft": [
+    "scheduled",
+    "active",
+    "cancelled"
+   ],
+   "scheduled": [
+    "draft",
+    "active",
+    "cancelled"
+   ],
+   "active": [
+    "paused",
+    "completed",
+    "cancelled"
+   ],
+   "paused": [
+    "active",
+    "completed",
+    "cancelled"
+   ],
+   "completed": [
+    "archived"
+   ],
+   "cancelled": [
+    "archived"
+   ],
+   "archived": []
+  },
+  "rules_tr": [
+   "CAMP-D02: campaign_code benzersizdir; QR/UTM/referans bağlantıları kırılmasın diye sonradan değiştirmeyin.",
+   "CAMP-D05/D06: Varsayılanlar yeni freepass'e kopyalanır; değiştirmek mevcut freepass'leri geriye dönük değiştirmez.",
+   "CAMP-D04: Davet ve freepass kampanyasız da oluşturulabilir (goodwill, telafi, VIP).",
+   "CAMP-D08: Kampanya silinmez; completed/archived ile kapatılır. Arşivleme için campaign.archive gerekir.",
+   "CAMP-D09: budget_amount gerçek gider değildir; pazarlama giderleri finans belgeleriyle girilir.",
+   "CAMP-D07: Davet/booking/dönüşüm sayıları saklanmaz, ilişkili tablolardan türetilir."
+  ]
+ },
+ "invitations": {
+  "purpose_tr": "Bir satır = belirli bir kişiye (kayıtlı kullanıcı veya misafir) bir kullanıcı/kurum ya da kampanya tarafından gönderilen tek bir davet ve sonucu. Ücretsiz kullanım hakkı (FREEPASSES), rezervasyon (BOOKINGS) veya kullanım limiti burada tutulmaz.",
+  "fields": {
+   "id_campaign": "Davet bir kampanya kapsamında ise kampanya; özel bireysel davetlerde boş.",
+   "id_event": "Belirli bir etkinliğe davetse etkinlik; boşsa genel Fikirhane daveti.",
+   "id_club": "Kulüp daveti ise hedef kulüp (opsiyonel); kabul bir kulüp üyeliği oluşturabilir.",
+   "invited_by_user_id": "Daveti gönderen kullanıcı (ör. Bring a Guest yapan üye).",
+   "invited_by_organization_id": "Daveti gönderen kurum (ör. sponsor şirket). Genelde davet eden kullanıcı ile birlikte doldurulmaz.",
+   "invited_user_id": "Davetli zaten kayıtlı bir kullanıcıysa o kullanıcı.",
+   "guest_first_name": "Davetli kayıtlı değilse adı.",
+   "guest_last_name": "Davetli kayıtlı değilse soyadı.",
+   "guest_email": "Davetli e-postası; küçük harf ve boşluksuz kaydedilir.",
+   "guest_phone": "Davetli telefonu.",
+   "invitation_code": "Sistemin ürettiği benzersiz, tahmin edilemez davet kodu/URL token'ı (≥8 karakter). Elle girilmez.",
+   "invitation_type": "Davetin işlevsel tipi; raporlama ve booking davranışını belirler.",
+   "source": "Davetin dağıtım kanalı (e-posta, QR, WhatsApp...). Kampanya tipi değildir.",
+   "status": "Davet yaşam döngüsü durumu.",
+   "sent_at": "Davetin fiilen gönderildiği an; oluşturma zamanından farklı olabilir.",
+   "expires_at": "Davetin geçerlilik sonu; sonrasında claim edilemez.",
+   "accepted_at": "Davetin kabul/claim edildiği an.",
+   "declined_at": "Davetlinin daveti reddettiği an.",
+   "claimed_by_user_id": "Misafir davet linkiyle hesap açtığında/bağladığında daveti claim eden kullanıcı.",
+   "cancelled_at": "Davetin iptal edildiği an; status=cancelled için zorunlu.",
+   "notes": "İç not."
+  },
+  "enums": {
+   "invitation_type": {
+    "general": "Genel",
+    "event": "Etkinlik",
+    "bring_a_guest": "Misafir getir",
+    "campaign": "Kampanya",
+    "organization_guest": "Kurum misafiri",
+    "club_invitation": "Kulüp daveti",
+    "membership_invitation": "Üyelik daveti"
+   },
+   "source": {
+    "email": "E-posta",
+    "sms": "SMS",
+    "whatsapp": "WhatsApp",
+    "qr": "QR kod",
+    "physical_card": "Fiziksel kart",
+    "instagram": "Instagram",
+    "linkedin": "LinkedIn",
+    "staff": "Personel",
+    "partner": "İş ortağı",
+    "web": "Web",
+    "mobile_app": "Mobil uygulama"
+   },
+   "status": {
+    "draft": "Taslak",
+    "sent": "Gönderildi",
+    "opened": "Açıldı",
+    "accepted": "Kabul edildi",
+    "expired": "Süresi doldu",
+    "cancelled": "İptal edildi",
+    "declined": "Reddedildi"
+   }
+  },
+  "write_mode": "workflow_only",
+  "create_permission": "invitation.create",
+  "update_permission": null,
+  "system_fields": [
+   "invitation_code",
+   "sent_at",
+   "accepted_at",
+   "declined_at",
+   "claimed_by_user_id",
+   "cancelled_at"
+  ],
+  "immutable_fields": [
+   "invitation_code",
+   "invitation_type",
+   "id_campaign",
+   "id_event",
+   "id_club",
+   "invited_by_user_id",
+   "invited_by_organization_id",
+   "invited_user_id"
+  ],
+  "required_on_create": [
+   "invitation_type"
+  ],
+  "status_transitions": {
+   "draft": [
+    "sent",
+    "cancelled",
+    "expired"
+   ],
+   "sent": [
+    "opened",
+    "accepted",
+    "declined",
+    "expired",
+    "cancelled"
+   ],
+   "opened": [
+    "accepted",
+    "declined",
+    "expired",
+    "cancelled"
+   ],
+   "accepted": [],
+   "declined": [],
+   "expired": [],
+   "cancelled": []
+  },
+  "rules_tr": [
+   "INV-D05: Davetli ya kayıtlı kullanıcı ya da misafir e-posta/telefon ile tanımlanmalı.",
+   "Davet eden kullanıcı, kurum veya kampanyadan en az biri dolu olmalı; aynı kampanya + e-postaya açık ikinci davet açılamaz.",
+   "INV-D02/D10: invitation_code benzersiz ve tahmin edilemez olmalı; sistem üretir.",
+   "INV-D07: Süresi dolmuş/iptal edilmiş davet yeni claim veya booking için kullanılamaz. Süre dolumu job ile işlenir.",
+   "Claim edilmemiş davet iptal edilebilir; bağlı freepass varsa onun durumu ayrıca değerlendirilir, sessizce iptal edilmez.",
+   "INV-D06/D09: Davet booking/freepass yerine geçmez ve silinmez; kullanım hakkı FREEPASSES'tadır."
+  ]
+ },
+ "freepasses": {
+  "purpose_tr": "Bir satır = bir kullanıcıya veya henüz kayıtlı olmayan bir kişiye/koda verilmiş %100 ücretsiz kullanım hakkı (kapsam, kullanım sayısı, geçerlilik). Davet, booking, tek tek kullanımlar (FREEPASS_REDEMPTIONS), kullanım sayacı ve kısmi indirimler burada tutulmaz.",
+  "fields": {
+   "id_campaign": "Kampanya kapsamında verildiyse kampanya; goodwill/telafi/VIP gibi tekil verilişlerde boş.",
+   "id_invitation": "Freepass bir davetten doğduysa (ör. kabul edilen Bring a Guest) ilgili davet.",
+   "id_user": "Hakkın sahibi kullanıcı. Misafir/fiziksel kartta boş kalır; kod claim edilince sistem doldurur.",
+   "issued_to_name": "Kullanıcı yoksa hak sahibinin adı (snapshot).",
+   "issued_to_email": "Kullanıcı yoksa hak sahibinin e-postası; küçük harf ve boşluksuz.",
+   "issued_to_phone": "Kullanıcı yoksa hak sahibinin telefonu.",
+   "freepass_code": "Sistemin güvenli ürettiği benzersiz, tahmin edilemez kod (≥8 karakter); QR/fiziksel kartta kullanılır.",
+   "freepass_type": "Freepass'in işlevsel tipi (deneme, kampanya, referans, sponsor misafiri...).",
+   "distribution_source": "Bu freepass'in dağıtıldığı kanal; aynı kampanyada kanal bazlı dönüşüm analizi için.",
+   "valid_from": "Geçerlilik başlangıcı. Kampanyadan verilirse veriliş tarihi.",
+   "valid_until": "Geçerlilik sonu; valid_from'dan sonra olmalı. Sonrasında yeni kullanım yapılamaz.",
+   "usage_limit": "Azami kullanım sayısı (>0, genelde 1). Kampanya varsayılanından kopyalanır.",
+   "booking_unit_grant": "Hak seviyesi (lokasyon/masa/koltuk); yalnızca gerçekten gerekiyorsa doldurun.",
+   "id_event": "Uygunluk: yalnızca bu etkinlikte geçerli.",
+   "id_club": "Uygunluk: yalnızca bu kulübün etkinliklerinde geçerli.",
+   "event_type": "Uygunluk: yalnızca bu etkinlik tipinde geçerli (ör. workspace).",
+   "status": "Kalıcı durum: aktif / iptal / süresi dolmuş. Kullanım durumu kullanım kayıtlarından türetilir.",
+   "issued_at": "Hakkın verildiği an; sistem atar.",
+   "issued_by_user_id": "Hakkı veren kullanıcı; sistem üretiminde boş. Oturumdan atanır.",
+   "claimed_at": "Misafirin kodu bir hesaba bağladığı an; claim akışı doldurur.",
+   "cancelled_at": "İptal anı; status=cancelled için zorunlu.",
+   "cancelled_by_user_id": "İptal eden kullanıcı; iptal işleminde oturumdan atanır.",
+   "cancellation_reason": "İptal gerekçesi; iptalde girilmesi beklenir.",
+   "notes": "İç not."
+  },
+  "enums": {
+   "freepass_type": {
+    "trial": "Deneme",
+    "campaign": "Kampanya",
+    "referral": "Referans",
+    "guest": "Misafir",
+    "sponsor_guest": "Sponsor misafiri",
+    "compensation": "Telafi",
+    "vip": "VIP",
+    "manual": "Manuel"
+   },
+   "distribution_source": {
+    "instagram": "Instagram",
+    "linkedin": "LinkedIn",
+    "email": "E-posta",
+    "university_partner": "Üniversite partneri",
+    "gym_partner": "Spor salonu partneri",
+    "physical_card": "Fiziksel kart",
+    "admin": "Yönetici",
+    "referral": "Referans",
+    "sponsor": "Sponsor",
+    "other": "Diğer"
+   },
+   "booking_unit_grant": {
+    "location": "Lokasyon",
+    "table": "Masa",
+    "seat": "Koltuk"
+   },
+   "event_type": {
+    "workspace": "Çalışma alanı",
+    "meetup": "Buluşma",
+    "workshop": "Atölye",
+    "talk": "Konuşma",
+    "class": "Ders",
+    "social": "Sosyal"
+   },
+   "status": {
+    "active": "Aktif",
+    "cancelled": "İptal edildi",
+    "expired": "Süresi doldu"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "freepass.create",
+  "update_permission": "freepass.cancel",
+  "system_fields": [
+   "freepass_code",
+   "issued_at",
+   "issued_by_user_id",
+   "claimed_at",
+   "cancelled_at",
+   "cancelled_by_user_id"
+  ],
+  "immutable_fields": [
+   "freepass_code",
+   "freepass_type",
+   "id_campaign",
+   "id_invitation",
+   "id_user",
+   "issued_to_name",
+   "issued_to_email",
+   "issued_to_phone",
+   "distribution_source",
+   "valid_from",
+   "valid_until",
+   "usage_limit",
+   "booking_unit_grant",
+   "id_event",
+   "id_club",
+   "event_type"
+  ],
+  "required_on_create": [
+   "freepass_type",
+   "valid_from",
+   "valid_until"
+  ],
+  "status_transitions": {
+   "active": [
+    "cancelled",
+    "expired"
+   ],
+   "cancelled": [],
+   "expired": []
+  },
+  "rules_tr": [
+   "FP-D02: freepass_code benzersiz ve tahmin edilemez olmalı; sistem üretir, elle girilmez.",
+   "FP-D04: Hak ya bir kullanıcıya bağlı olmalı ya da kodla claim edilebilir olmalı (fiziksel kartta yalnız kod yeterli).",
+   "FP-D12: Kampanya varsayılanları verilişte kopyalanır; sonradan kampanya değişikliği bu freepass'i etkilemez.",
+   "Uygunluk alanları (etkinlik, kulüp, etkinlik tipi) birlikte (VE) sağlanmalı; hepsi boşsa her uygun etkinlikte geçerli.",
+   "FP-D07/D08: İptal/süresi dolmuş freepass kullanılamaz; aktif kullanım sayısı usage_limit'i aşamaz (aşım: freepass.override_limit).",
+   "Silme yok: iptalde status=cancelled + cancelled_at + iptal eden ve gerekçe girilir. Kısmi indirimler freepass değildir."
+  ]
+ },
+ "freepass_redemptions": {
+  "purpose_tr": "Bir satır = bir freepass hakkının belirli bir booking'de fiilen kullanılması (kullanım defteri). Fiyat/finansal etki, uygunluk kopyası veya para hareketi burada tutulmaz.",
+  "fields": {
+   "id_freepass": "Kullanılan freepass hakkı.",
+   "id_booking": "Freepass'in uygulandığı booking; bir booking'de en fazla bir aktif kullanım olabilir.",
+   "redeemed_at": "Kullanım anı = booking'in onaylandığı an; sistem atar.",
+   "status": "Bu kullanım geçerli mi: aktif kullanım limitten düşer, geri alınmış/iptal edilmiş düşmez.",
+   "reversed_at": "Kullanımın geri alındığı an; status=reversed için zorunlu.",
+   "reversed_by_user_id": "Kullanımı geri alan kullanıcı; oturumdan atanır.",
+   "reversal_reason": "Geri alma gerekçesi (ör. event_cancelled, zamanında iptal)."
+  },
+  "enums": {
+   "status": {
+    "active": "Aktif",
+    "reversed": "Geri alındı",
+    "cancelled": "İptal edildi"
+   }
+  },
+  "write_mode": "workflow_only",
+  "create_permission": null,
+  "update_permission": "freepass.cancel",
+  "system_fields": [
+   "redeemed_at",
+   "reversed_at",
+   "reversed_by_user_id"
+  ],
+  "immutable_fields": [
+   "id_freepass",
+   "id_booking",
+   "redeemed_at"
+  ],
+  "required_on_create": [
+   "id_freepass",
+   "id_booking"
+  ],
+  "status_transitions": {
+   "active": [
+    "reversed",
+    "cancelled"
+   ],
+   "reversed": [],
+   "cancelled": []
+  },
+  "rules_tr": [
+   "Kayıt yalnızca booking onaylandığında booking akışıyla oluşur; pending/terk edilmiş booking hak tüketmez.",
+   "FPRED-D03: Aktif kullanım sayısı freepass usage_limit'ini aşamaz (veritabanı tetikleyicisi de engeller).",
+   "FPRED-D04/D05: Bir booking'de en fazla bir aktif freepass kullanımı olur.",
+   "FPRED-D07/D08: Booking iptali kullanımı otomatik geri almaz; geç iptal ve no-show'da kullanım aktif kalır.",
+   "FPRED-D09: Silinmez; hatalı veya iade edilen kullanım status=reversed + reversed_at + gerekçe ile kapatılır.",
+   "Fiyat burada değil, booking fiyat snapshot'ında (liste fiyatı, indirim, final_price=0) tutulur."
+  ]
+ },
+ "user_acquisitions": {
+  "purpose_tr": "Bir satır = bir kullanıcının Fikirhane'ye ilk tanımlanabilir geliş kaynağının (first-touch) atıf snapshot'ı; kullanıcı başına bir kayıt. Booking kanalı, freepass dağıtım kanalı, gelir/LTV ve tüm temas noktaları burada tutulmaz.",
+  "fields": {
+   "id_user": "Edinilen kullanıcı; her kullanıcı için en fazla bir kayıt.",
+   "source": "Ana edinim kaynağı (kontrollü liste). Booking kaynağı ile karıştırmayın.",
+   "medium": "Kaynağın iletişim/dağıtım türü (ör. paid_social, organic_search, qr). Kaynakla karıştırmayın.",
+   "id_campaign": "Kampanya üzerinden geldiyse kampanya.",
+   "id_invitation": "Bir davetle geldiyse davet.",
+   "id_freepass": "Bir freepass claim ederek geldiyse freepass.",
+   "referrer_user_id": "Kullanıcıyı getiren mevcut kullanıcı (referans); kullanıcının kendisi olamaz.",
+   "referrer_organization_id": "Kullanıcıyı yönlendiren kurum (üniversite, şirket, spor salonu, sponsor).",
+   "landing_source": "Fiziksel/dijital giriş noktası (ör. kabatas_qr_poster, instagram_bio).",
+   "utm_source": "UTM kaynak değeri; hesap açılışında normalize edilip saklanır.",
+   "utm_medium": "UTM medium değeri.",
+   "utm_campaign": "UTM kampanya değeri.",
+   "utm_content": "UTM içerik/reklam varyantı.",
+   "utm_term": "UTM anahtar kelime.",
+   "first_touch_at": "Fikirhane ile ilk ölçülebilir temas anı; hesap açılışından önce olabilir.",
+   "converted_at": "Kullanıcının funnel'da 'edinildi' sayıldığı an; dönüşüm akışları doldurur.",
+   "conversion_type": "Edinim dönüşümü sayılan olay (ilk booking, üyelik onayı...); akışlar doldurur.",
+   "notes": "İç not; atıf düzeltmesinin gerekçesi için kullanın."
+  },
+  "enums": {
+   "source": {
+    "organic": "Organik",
+    "instagram": "Instagram",
+    "linkedin": "LinkedIn",
+    "google": "Google",
+    "email": "E-posta",
+    "referral": "Referans",
+    "invitation": "Davet",
+    "freepass": "Freepass",
+    "partner": "İş ortağı",
+    "university": "Üniversite",
+    "corporate": "Kurumsal",
+    "walk_in": "Kapıdan giriş",
+    "event": "Etkinlik",
+    "other": "Diğer"
+   },
+   "conversion_type": {
+    "account_created": "Hesap oluşturuldu",
+    "first_booking": "İlk booking",
+    "first_attendance": "İlk katılım",
+    "first_paid_booking": "İlk ücretli booking",
+    "membership_approved": "Üyelik onaylandı"
+   }
+  },
+  "write_mode": "workflow_only",
+  "create_permission": null,
+  "update_permission": "acquisition.update",
+  "system_fields": [
+   "converted_at",
+   "conversion_type"
+  ],
+  "immutable_fields": [
+   "id_user"
+  ],
+  "required_on_create": [
+   "id_user",
+   "source"
+  ],
+  "rules_tr": [
+   "Kayıt, kullanıcı hesabı açılırken otomatik oluşur; UACQ-D02: kullanıcı başına en fazla bir kayıt.",
+   "UACQ-D05: Atıf ilk tanımlanabilir kaynaktır (first-touch); sonraki booking'lerle değişmez.",
+   "UACQ-D06: Yalnızca hatalı atıf düzeltilir; değişiklik denetim kaydına (audit) düşer, hassas yetkidir.",
+   "UACQ-D03: Edinim kaynağı ile booking kaynağı ayrı kavramlardır; source ile medium da karıştırılmamalı.",
+   "UACQ-D09: Referans kullanıcı/kurum varsa FK kullanın; serbest metin yalnızca yedek.",
+   "UACQ-D07: Gelir, LTV, booking sayısı gibi metrikler burada saklanmaz; türetilir."
+  ]
+ },
+ "sponsorship_plans": {
+  "purpose_tr": "Bir satır = tekrar kullanılabilir standart sponsorluk paketi şablonu (varsayılan süre, ücret, faturalama ve temel hak limitleri). Gerçek sponsorluk anlaşması, kulüp/kurum bağı, gerçek gelir ve hak kullanımı burada tutulmaz.",
+  "fields": {
+   "plan_code": "Teknik, sabit ve benzersiz kod (yalnız A-Z, 0-9, _); ör. MAIN_SPONSOR.",
+   "plan_name": "Paketin görünen adı.",
+   "description": "Paketin kapsamı.",
+   "default_duration_months": "Standart süre (ay, >0). Yalnızca varsayılan; gerçek tarihler sponsorluk anlaşmasında.",
+   "default_fee_amount": "Standart liste fiyatı (≥0). Gerçek tutar anlaşmaya kopyalanır; gelir kaydı değildir.",
+   "currency_code": "Varsayılan para birimi, ISO 4217 (TRY/EUR/USD).",
+   "billing_period": "Varsayılan faturalama yapısı; anlaşmada değiştirilebilir.",
+   "sponsored_events_limit": "Plan süresince sponsor olunabilecek etkinlik sayısı (≥0).",
+   "guest_pass_limit": "Ücretsiz misafir geçişi/davet hakkı sayısı (≥0).",
+   "content_post_limit": "Fikirhane kanallarında sponsor içerik paylaşım hakkı (≥0).",
+   "speaker_nomination_limit": "Konuşmacı aday gösterme hakkı (≥0); otomatik konuşmacı ataması değildir.",
+   "branding_level": "Marka görünürlük seviyesi.",
+   "priority_level": "Paketler arası sıralama/karşılaştırma (ör. 10/20/30); yetki veya hak kaynağı değildir.",
+   "status": "Aktif paketler yeni sponsorluklarda kullanılabilir.",
+   "sort_order": "UI sıralaması."
+  },
+  "enums": {
+   "billing_period": {
+    "one_time": "Tek seferlik",
+    "monthly": "Aylık",
+    "quarterly": "Üç aylık",
+    "annual": "Yıllık",
+    "custom": "Özel"
+   },
+   "branding_level": {
+    "basic": "Temel (sponsor sayfası)",
+    "standard": "Standart (etkinlik logosu)",
+    "enhanced": "Gelişmiş (kulüp sayfası)",
+    "main": "Ana sponsor görünürlüğü"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "archived": "Arşivlendi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "sponsorship.manage",
+  "update_permission": "sponsorship.manage",
+  "system_fields": [],
+  "immutable_fields": [
+   "plan_code"
+  ],
+  "required_on_create": [
+   "plan_code",
+   "plan_name"
+  ],
+  "status_transitions": {
+   "active": [
+    "inactive",
+    "archived"
+   ],
+   "inactive": [
+    "active",
+    "archived"
+   ],
+   "archived": []
+  },
+  "rules_tr": [
+   "SPLAN-D02: plan_code benzersizdir ve sabit kalmalıdır.",
+   "SPLAN-D03: Plan bir şablondur; belirli bir kulüp veya kuruma bağlanmaz.",
+   "SPLAN-D06: Plan değişiklikleri mevcut anlaşmaları etkilemez; haklar anlaşmaya agreed_* olarak kopyalanır.",
+   "SPLAN-D07: Pasif/arşivlenmiş plan yeni sponsorlukta kullanılamaz (veritabanı da engeller).",
+   "SPLAN-D04/D08: Varsayılan ücret gerçek gelir değildir; hak kullanımı SPONSORSHIP_USAGE'da izlenir.",
+   "Plan silinmez; kullanılmayan paket arşivlenir."
+  ]
+ },
+ "club_sponsorships": {
+  "purpose_tr": "Bir satır = bir kurum ile bir kulüp arasındaki tarihli, ticari sponsorluk anlaşması (dönem, plan, ücret ve anlaşılan haklar). Kurumun kendisi, sponsor temsilcileri, gerçek gelir/ödeme, hak kullanımı ve etkinlik bazlı sponsorluk burada tutulmaz.",
+  "fields": {
+   "id_club": "Sponsor olunan kulüp.",
+   "id_organization": "Sponsor kurum; oluşturulurken aktif olmalı.",
+   "id_sponsorship_plan": "Kullanılan standart paket; tamamen özel anlaşmalarda boş. Oluştururken aktif olmalı.",
+   "sponsorship_name": "Opsiyonel özel ad, ör. '2027 English Club Main Sponsorship'.",
+   "start_date": "Sponsorluk başlangıç tarihi.",
+   "end_date": "Sponsorluk bitiş tarihi; boş = süresiz. Başlangıçtan önce olamaz.",
+   "status": "Anlaşma yaşam döngüsü durumu.",
+   "fee_amount": "Sözleşmedeki tutar (≥0); plandan farklı olabilir. Gelir kaydı değildir.",
+   "currency_code": "Para birimi, ISO 4217 (TRY/USD/EUR).",
+   "billing_period": "Sözleşmenin ticari yapısı; gerçek fatura takvimi finansta.",
+   "is_primary_sponsor": "Kulübün ana sponsoru mu? Aynı dönemde kulüp başına tek aktif ana sponsor olabilir.",
+   "contract_reference": "Sözleşme/teklif referansı, ör. ENG-SPON-2027-001.",
+   "agreed_event_limit": "Anlaşılan sponsorlu etkinlik hakkı (≥0); plandan kopyalanır, kalan hak hesabının esasıdır.",
+   "agreed_guest_pass_limit": "Anlaşılan misafir geçişi hakkı (≥0); plandan kopyalanır, kalan hak hesabının esasıdır.",
+   "agreed_content_post_limit": "Anlaşılan içerik paylaşım hakkı (≥0); plandan kopyalanır.",
+   "agreed_speaker_nomination_limit": "Anlaşılan konuşmacı aday gösterme hakkı (≥0); plandan kopyalanır.",
+   "notes": "İç operasyon notu."
+  },
+  "enums": {
+   "status": {
+    "draft": "Taslak",
+    "pending": "Onay bekliyor",
+    "active": "Aktif",
+    "expired": "Süresi doldu",
+    "cancelled": "İptal edildi",
+    "terminated": "Erken sonlandırıldı"
+   },
+   "billing_period": {
+    "one_time": "Tek seferlik",
+    "monthly": "Aylık",
+    "quarterly": "Üç aylık",
+    "annual": "Yıllık",
+    "custom": "Özel"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "sponsorship.manage",
+  "update_permission": "sponsorship.manage",
+  "system_fields": [],
+  "immutable_fields": [
+   "id_club",
+   "id_organization"
+  ],
+  "required_on_create": [
+   "id_club",
+   "id_organization",
+   "start_date"
+  ],
+  "status_transitions": {
+   "draft": [
+    "pending",
+    "active",
+    "cancelled"
+   ],
+   "pending": [
+    "draft",
+    "active",
+    "cancelled"
+   ],
+   "active": [
+    "expired",
+    "terminated"
+   ],
+   "expired": [],
+   "cancelled": [],
+   "terminated": []
+  },
+  "rules_tr": [
+   "CSPON-D02 / SPLAN-D07: Sponsor kurum aktif olmalı; plan seçildiyse aktif olmalı.",
+   "Plan değerleri varsayılandır; ücret ve agreed_* hakları anlaşmaya kopyalanır, plan değişse de değişmez.",
+   "CSPON-D06: Aynı kulüpte çakışan dönemlerde en fazla bir aktif ana sponsor olabilir.",
+   "CSPON-D08: Yenileme yeni kayıtla yapılır; eski kaydın tarihleri uzatılmaz. Kayıt silinmez (D07).",
+   "CSPON-D03: Sponsorluk kulüp yönetim yetkisi vermez; gerekiyorsa temsilciye ayrıca rol atanır.",
+   "CSPON-D04/D05: fee_amount ödeme kaydı değildir; gelir finans belgeleri/işlemleriyle izlenir."
+  ]
+ },
+ "sponsorship_usage": {
+  "purpose_tr": "Bir satır = bir sponsorluk anlaşmasındaki bir hakkın tek bir tüketim hareketi (hangi hak, ne kadar, ne zaman). Hak tanımı, para hareketi ve misafirin kendi ücretsiz hakkı (FREEPASSES) burada tutulmaz.",
+  "fields": {
+   "id_club_sponsorship": "Hakkın düştüğü sponsorluk anlaşması.",
+   "usage_type": "Kullanılan hak türü; plandaki hak adlarıyla eşleşir.",
+   "quantity": "Kullanılan miktar (>0, genelde 1). Geri alma negatif satırla yapılmaz.",
+   "usage_date": "Hakkın fiilen kullanıldığı an; sponsorluk dönemi içinde olmalı.",
+   "id_event": "İlgili etkinlik (sponsorlu etkinlik, etkinliğe özel konuşmacı vb.); yoksa boş.",
+   "id_user": "İlgili kişi (talep eden sponsor temsilcisi, aday gösterilen konuşmacı); zorunlu değil.",
+   "reference_type": "Bağlı kaydın türü (freepass/davet). reference_id ile birlikte doldurulur.",
+   "reference_id": "Bağlı freepass veya davet kaydının ID'si; reference_type ile birlikte doldurulur.",
+   "status": "Kullanım geçerli mi: yalnızca aktif olanlar kalan haktan düşer.",
+   "description": "Okunabilir açıklama, ör. 'English Networking Night için sponsor misafir geçişi'.",
+   "notes": "İç not; manuel giriş veya geri alma gerekçesi."
+  },
+  "enums": {
+   "usage_type": {
+    "sponsored_event": "Sponsorlu etkinlik",
+    "guest_pass": "Misafir geçişi",
+    "content_post": "İçerik paylaşımı",
+    "speaker_nomination": "Konuşmacı aday gösterme",
+    "branding": "Markalama",
+    "other": "Diğer"
+   },
+   "reference_type": {
+    "freepass": "Freepass",
+    "invitation": "Davet"
+   },
+   "status": {
+    "active": "Aktif",
+    "reversed": "Geri alındı",
+    "cancelled": "İptal edildi"
+   }
+  },
+  "write_mode": "append_only",
+  "create_permission": "sponsorship.manage",
+  "update_permission": "sponsorship.manage",
+  "system_fields": [],
+  "immutable_fields": [
+   "id_club_sponsorship",
+   "usage_type",
+   "quantity",
+   "usage_date",
+   "id_event",
+   "id_user",
+   "reference_type",
+   "reference_id"
+  ],
+  "required_on_create": [
+   "id_club_sponsorship",
+   "usage_type"
+  ],
+  "status_transitions": {
+   "active": [
+    "reversed",
+    "cancelled"
+   ],
+   "reversed": [],
+   "cancelled": []
+  },
+  "rules_tr": [
+   "SUSE-D08: Kullanım mümkünse otomatik oluşur (sponsor freepass'i verilince vb.); manuel giriş istisnadır.",
+   "SUSE-D05/D10: Aktif kullanım toplamı anlaşmadaki agreed_* limitini aşamaz; aşım için sponsorship.override_limit gerekir.",
+   "SUSE-D04: usage_date sponsorluk başlangıç–bitiş aralığında olmalı; istisnalar denetlenir.",
+   "SUSE-D06/D09: Kayıt silinmez/düzenlenmez; düzeltme status=reversed ile yapılır, kalan haktan düşmez.",
+   "Konuşmacı adaylığı ancak Fikirhane kabul ederse kullanım sayılır; toplu freepass verilişinde freepass başına bir satır açılır.",
+   "SUSE-D07: Kullanım ödeme kaydı değildir; misafirin hakkı ayrıca FREEPASSES'ta tutulur."
+  ]
+ },
+ "users": {
+  "purpose_tr": "Bir satır = sistemde kimliği olan tek bir gerçek kişi (ana kişi kaydı). Üyelik, roller, e-posta/telefon, şifre ve ilgi/beceriler burada tutulmaz; ilgili tablolarda yer alır.",
+  "fields": {
+   "first_name": "Kişinin adı. Zorunlu; ekranda ad soyad first_name + last_name birleştirilerek gösterilir.",
+   "last_name": "Kişinin soyadı. Zorunlu.",
+   "profile_photo": "Profil fotoğrafının dosya kimliği veya URL'si. Görsel veritabanında saklanmaz.",
+   "headline": "Kısa profesyonel başlık (ör. \"Architect & Entrepreneur\"). Serbest metin; Skill değildir.",
+   "bio": "Kişinin kendini birkaç cümleyle anlattığı uzun açıklama.",
+   "account_status": "Hesap sistemi kullanabilir mi? Üyelikten bağımsızdır. Askıya alma/yeniden etkinleştirme özel işlemlerle yapılır.",
+   "networking_enabled": "Kişi networking özelliklerine katılıyor mu? Görünürlük için Event'in de networking_enabled olması gerekir.",
+   "profile_visibility": "Profili kimin görebileceği. networking_enabled'dan farklı bir kavramdır."
+  },
+  "enums": {
+   "account_status": {
+    "active": "Aktif",
+    "suspended": "Askıya alınmış",
+    "inactive": "Pasif",
+    "deleted": "Silinmiş (fiziksel silme değil)"
+   },
+   "profile_visibility": {
+    "private": "Gizli",
+    "community": "Topluluk"
+   }
+  },
+  "write_mode": "workflow_only",
+  "create_permission": null,
+  "update_permission": null,
+  "system_fields": [
+   "account_status"
+  ],
+  "immutable_fields": [],
+  "required_on_create": [
+   "first_name",
+   "last_name"
+  ],
+  "rules_tr": [
+   "Kullanıcı hard delete edilmez; kapatmak için account_status = deleted kullanılır (USR-D03, USR-D10).",
+   "Askıya alma user.suspend, yeniden etkinleştirme user.reactivate yetkisiyle özel işlemle yapılır ve audit'e yazılır.",
+   "Üyelik, sistem rolü ve club/event/organization rolleri USERS'a yazılmaz (USR-D04, USR-D05, USR-D06).",
+   "E-posta/telefon/adres ayrı iletişim tablolarındadır; şifre ve kimlik doğrulama verileri USERS'ta tutulmaz (USR-D07, USR-D08).",
+   "Bir gerçek kişi için mümkün olduğunca tek User kaydı olmalıdır; mükerrer kayıt açmayın (USR-D02).",
+   "Hesap durumu ile üyelik bağımsızdır: aktif bir hesap Visitor, Member veya Premium olabilir."
+  ],
+  "actions": [
+   {
+    "action": "suspend",
+    "label_tr": "Hesabı askıya al",
+    "from_status": [
+     "active"
+    ],
+    "to_status": "suspended",
+    "permission": "user.suspend",
+    "needs_reason": true,
+    "status_column": "account_status",
+    "effects_tr": "Kişi giriş yapamaz; açık oturumları kapatılır. Kayıtları silinmez."
+   },
+   {
+    "action": "reactivate",
+    "label_tr": "Hesabı yeniden aç",
+    "from_status": [
+     "suspended",
+     "inactive"
+    ],
+    "to_status": "active",
+    "permission": "user.reactivate",
+    "needs_reason": false,
+    "status_column": "account_status",
+    "effects_tr": "Kişi yeniden giriş yapabilir."
+   }
+  ]
+ },
+ "user_emails": {
+  "purpose_tr": "Bir satır = bir kullanıcıya ait bir iletişim e-posta adresi. Giriş kimliği (şifre/sağlayıcı) burada değil, auth_identities'tedir.",
+  "fields": {
+   "id_user": "E-postanın sahibi olan kullanıcı.",
+   "email": "Küçük harfli, boşluksuz e-posta adresi. Aktif bir adres yalnızca tek bir kullanıcıya ait olabilir.",
+   "email_type": "Adresin türü: kişisel, iş veya diğer.",
+   "is_primary": "Kullanıcının birincil e-postası mı? Kullanıcı başına en fazla bir aktif birincil adres olabilir.",
+   "is_verified": "Adresin doğrulanıp doğrulanmadığı. Doğrulama akışı tarafından işaretlenir.",
+   "verified_at": "Adresin doğrulandığı zaman. Sistem tarafından doldurulur.",
+   "status": "Adres kullanımda mı? Kaldırılan adres pasife alınır."
+  },
+  "enums": {
+   "email_type": {
+    "personal": "Kişisel",
+    "work": "İş",
+    "other": "Diğer"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif"
+   }
+  },
+  "write_mode": "workflow_only",
+  "create_permission": null,
+  "update_permission": null,
+  "system_fields": [
+   "is_verified",
+   "verified_at"
+  ],
+  "immutable_fields": [
+   "id_user"
+  ],
+  "required_on_create": [
+   "id_user",
+   "email"
+  ],
+  "rules_tr": [
+   "İletişim verisi USERS'ta değil bu tabloda yönetilir (USR-D07).",
+   "Aktif bir e-posta adresi en fazla bir kullanıcıya ait olabilir; kullanıcı başına tek aktif birincil adres vardır.",
+   "Bu tablodaki adresi değiştirmek giriş e-postasını değiştirmez; şifreli giriş auth_identities üzerindedir.",
+   "İletişim bilgisi değişikliği (user.contact_change) audit'e yazılmalıdır.",
+   "Görüntüleme user.view_contact yetkisi gerektirir."
+  ]
+ },
+ "roles": {
+  "purpose_tr": "Bir satır = bir global sistem rolü (yetki paketi), ör. FIKIRHANE_ADMIN. Üyelik tipleri (Member/Premium/Visitor) ve Club Admin, Tutor, Organization Admin gibi kapsamlı roller burada tutulmaz.",
+  "fields": {
+   "role_code": "Kodda kullanılan sabit teknik kod (ör. FIKIRHANE_ADMIN). Benzersiz; oluşturulduktan sonra değiştirilmez.",
+   "role_name": "Arayüzde gösterilen okunabilir ad (ör. \"Fikirhane Admin\").",
+   "description": "Rolün amacı ve kapsamı.",
+   "role_type": "Rol kategorisi. V1'de yalnızca system kullanılır.",
+   "is_system_role": "Sistemle gelen çekirdek rol mü? Bu roller silinmeye ve kod değişikliğine karşı korunur.",
+   "status": "Rolün yaşam döngüsü. Pasif/arşiv rol yeni kullanıcıya atanamaz.",
+   "sort_order": "Admin ekranlarında sıralama (10, 20, 30...)."
+  },
+  "enums": {
+   "role_type": {
+    "system": "Sistem",
+    "service": "Hizmet",
+    "technical": "Teknik"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "archived": "Arşivlenmiş"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "role.create",
+  "update_permission": "role.update",
+  "system_fields": [
+   "is_system_role"
+  ],
+  "immutable_fields": [
+   "role_code"
+  ],
+  "required_on_create": [
+   "role_code",
+   "role_name"
+  ],
+  "rules_tr": [
+   "role_code benzersizdir ve oluşturulduktan sonra değiştirilmemelidir (ROLE-D02).",
+   "Permission'lar role üzerinde boolean alan olarak tutulmaz; role_permissions kullanılır (ROLE-D04).",
+   "Üyelik tipleri ve club/event/organization kapsamlı roller ROLES'a eklenmez (ROLE-D05, ROLE-D06).",
+   "Kullanım geçmişi olan rol silinmez; pasif veya arşiv yapılır (ROLE-D07, ROLE-D09).",
+   "Pasif/arşiv rol yeni atamada kullanılamaz (ROLE-D08).",
+   "V1'de rol hiyerarşisi/kalıtım yoktur; rol sayısını küçük tutun."
+  ]
+ },
+ "permissions": {
+  "purpose_tr": "Bir satır = yetki kontrollü tek bir işlem (ör. event.update_pricing); \"ne yapılabilir?\" sorusunu cevaplar. Kimin yaptığı (rol) ve nerede yaptığı (scope) burada tutulmaz.",
+  "fields": {
+   "permission_code": "Backend ve frontend'in kullandığı sabit kod, resource.action biçiminde (ör. event.update_pricing). Benzersiz, değişmez.",
+   "resource": "Yetkinin ait olduğu alan/kaynak (ör. event, booking, user).",
+   "action": "Ana işlem (ör. view, update, approve).",
+   "sub_action": "Geniş bir işlemin alt boyutu (ör. event.update_pricing için pricing). İsteğe bağlı.",
+   "permission_group": "Admin ekranında gruplama (ör. Finance, User Management). Yetki hesabında kullanılmaz.",
+   "description": "Yetkinin neye izin verdiğinin açıklaması. Zorunlu (canlı dokümantasyon).",
+   "is_sensitive": "Kritik yetki mi? Rol düzenlemede uyarı, ek onay ve zorunlu audit tetikler.",
+   "is_system_permission": "Silinmeye karşı korunan çekirdek sistem yetkisi mi? Sonradan eklenenlerde false.",
+   "status": "Yaşam döngüsü. Pasif/arşiv yetki efektif yetki üretmez.",
+   "sort_order": "Admin yetki matrisindeki sıralama."
+  },
+  "enums": {
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "archived": "Arşivlenmiş"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "permission.manage",
+  "update_permission": "permission.manage",
+  "system_fields": [
+   "is_system_permission"
+  ],
+  "immutable_fields": [
+   "permission_code",
+   "resource",
+   "action",
+   "sub_action"
+  ],
+  "required_on_create": [
+   "permission_code",
+   "resource",
+   "action",
+   "description"
+  ],
+  "rules_tr": [
+   "permission_code benzersizdir, resource.action standardını izler ve sonradan değiştirilmez (PERM-D02, PERM-D03).",
+   "Scope koda gömülmez: event.update.pricing.club yanlış, event.update_pricing doğru (PERM-D04).",
+   "Kritik güncellemeler alt yetkilere bölünür (update_details, update_pricing...); workflow işlemleri CRUD'a zorlanmaz (PERM-D05, PERM-D06).",
+   "V1'de kullanıcıya doğrudan yetki ve deny (negatif) yetki yoktur (PERM-D07, PERM-D08).",
+   "Pasif/arşiv yetki efektif yetki üretmez (PERM-D09).",
+   "Yetki her zaman backend'de doğrulanır; frontend kontrolü yalnızca UX içindir (PERM-D10)."
+  ]
+ },
+ "role_permissions": {
+  "purpose_tr": "Bir satır = bir global role bir yetkinin belirli bir dönem için verilmesi (kendi tarihçesi olan atama). Scope, deny ve kullanıcıya doğrudan yetki burada tutulmaz.",
+  "fields": {
+   "id_role": "Yetkiyi alan global rol.",
+   "id_permission": "Verilen yetki.",
+   "status": "Atama yürürlükte mi? Kaldırılan yetki revoked yapılır, silinmez.",
+   "granted_at": "Yetkinin role verildiği zaman. Sistem tarafından doldurulur.",
+   "granted_by_user_id": "Yetkiyi veren kullanıcı. Sistem tarafından doldurulur.",
+   "revoked_at": "Yetkinin geri alındığı zaman. revoked durumunda zorunludur; sistem doldurur.",
+   "revoked_by_user_id": "Yetkiyi geri alan kullanıcı. Sistem tarafından doldurulur.",
+   "notes": "İç not, ör. \"Lansman dönemi için geçici verildi.\""
+  },
+  "enums": {
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "revoked": "Geri alınmış"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "role.update",
+  "update_permission": "role.update",
+  "system_fields": [
+   "granted_at",
+   "granted_by_user_id",
+   "revoked_at",
+   "revoked_by_user_id",
+   "status"
+  ],
+  "immutable_fields": [
+   "id_role",
+   "id_permission"
+  ],
+  "required_on_create": [
+   "id_role",
+   "id_permission"
+  ],
+  "status_transitions": {
+   "active": [
+    "inactive",
+    "revoked"
+   ],
+   "inactive": [
+    "active",
+    "revoked"
+   ],
+   "revoked": []
+  },
+  "rules_tr": [
+   "Aynı rol + yetki için aynı anda en fazla bir aktif atama olabilir (ROLEPERM-D02).",
+   "Yetki kaldırmak = revoke (status, revoked_at, revoked_by); kayıt silinmez (ROLEPERM-D06).",
+   "Revoke sonrası yeniden vermek için yeni satır açılır; eski satır tekrar kullanılmaz.",
+   "Değişiklik o role sahip tüm kullanıcılara anında yansır; kritik değişiklikler audit'e yazılır (ROLEPERM-D07).",
+   "Hassas yetkiler (is_sensitive) için ek onay gerekir; yalnızca TECH_ADMIN vermelidir (iş kuralı).",
+   "Yalnızca global roller için kullanılır; kullanıcıya doğrudan yetki ve deny yoktur (ROLEPERM-D05, ROLEPERM-D08)."
+  ],
+  "actions": [
+   {
+    "action": "deactivate",
+    "label_tr": "Pasifleştir",
+    "from_status": [
+     "active"
+    ],
+    "to_status": "inactive",
+    "permission": "role.update",
+    "needs_reason": false,
+    "effects_tr": "Yetki bu rolde geçici olarak kapanır; kayıt korunur."
+   },
+   {
+    "action": "activate",
+    "label_tr": "Yeniden etkinleştir",
+    "from_status": [
+     "inactive"
+    ],
+    "to_status": "active",
+    "permission": "role.update",
+    "needs_reason": false,
+    "effects_tr": "Yetki bu role yeniden verilir."
+   },
+   {
+    "action": "revoke",
+    "label_tr": "Geri al",
+    "from_status": [
+     "active",
+     "inactive"
+    ],
+    "to_status": "revoked",
+    "permission": "role.update",
+    "needs_reason": true,
+    "effects_tr": "Yetki bu rolden kalıcı olarak alınır; tekrar vermek için yeni kayıt açılır."
+   }
+  ]
+ },
+ "user_roles": {
+  "purpose_tr": "Bir satır = bir kullanıcıya bir global sistem rolünün belirli bir dönem için atanması. Üyelik (Member/Premium) ve Club/Event/Organization kapsamlı roller burada tutulmaz.",
+  "fields": {
+   "id_user": "Rolü alan kullanıcı.",
+   "id_role": "Atanan global rol. Yalnızca aktif roller atanabilir.",
+   "status": "Atamanın durumu. Kapatma revoke/expire ile yapılır, silinmez.",
+   "assigned_at": "Rolün verildiği zaman. Sistem tarafından doldurulur.",
+   "assigned_by_user_id": "Rolü atayan kullanıcı. Sistem tarafından doldurulur.",
+   "expires_at": "Geçici roller için bitiş zamanı. Boş = süresiz. Geçmişse rol yetki üretmez.",
+   "revoked_at": "Rolün geri alındığı zaman. revoked durumunda zorunludur; sistem doldurur.",
+   "revoked_by_user_id": "Rolü geri alan kullanıcı. Sistem tarafından doldurulur.",
+   "notes": "İç not, ör. \"Lansman dönemi için geçici pazarlama erişimi.\""
+  },
+  "enums": {
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "revoked": "Geri alınmış",
+    "expired": "Süresi dolmuş"
+   }
+  },
+  "write_mode": "workflow_only",
+  "create_permission": "role.assign",
+  "update_permission": "role.revoke",
+  "system_fields": [
+   "assigned_at",
+   "assigned_by_user_id",
+   "revoked_at",
+   "revoked_by_user_id"
+  ],
+  "immutable_fields": [
+   "id_user",
+   "id_role"
+  ],
+  "required_on_create": [
+   "id_user",
+   "id_role"
+  ],
+  "status_transitions": {
+   "active": [
+    "inactive",
+    "revoked",
+    "expired"
+   ],
+   "inactive": [
+    "active",
+    "revoked"
+   ],
+   "revoked": [],
+   "expired": []
+  },
+  "rules_tr": [
+   "Aynı kullanıcı + rol için aynı anda en fazla bir aktif atama olabilir (USRROLE-D02).",
+   "Atama silinmez; revoke/expire ile kapatılır, yeniden atamada yeni satır açılır (USRROLE-D03).",
+   "Yalnızca global sistem rolleri atanır; üyelik ve kapsamlı roller buraya yazılmaz (USRROLE-D04, USRROLE-D05, USRROLE-D06).",
+   "expires_at geçmişse veya atama revoked ise rol yetki üretmez (USRROLE-D07, USRROLE-D08).",
+   "Pasif/arşiv rol yeni atamada kullanılamaz (ROLE-D08).",
+   "Rol atama/geri alma audit'e yazılır; efektif yetki tüm aktif rollerin birleşimidir (USRROLE-D09)."
+  ]
+ },
+ "audit_log": {
+  "purpose_tr": "Bir satır = bir iş eyleminin değiştirilemez kaydı: kim, neyi, ne zaman, neden değiştirdi. Operasyonel verinin (para, stok hareketi) yerine geçmez; şifre/token asla yazılmaz.",
+  "fields": {
+   "occurred_at": "Eylemin gerçekleştiği zaman. Sistem tarafından yazılır.",
+   "actor_user_id": "Eylemi yapan kullanıcı. Sistem/otomatik işlemlerde boş olabilir.",
+   "actor_type": "Eylemi yapanın türü. actor_user_id boş olsa bile her zaman doludur.",
+   "action": "Yapılan işlem, ör. user.suspend, role.assign, transaction.reverse.",
+   "entity_type": "Etkilenen varlık türü, ör. user, booking, role.",
+   "entity_id": "Etkilenen kaydın kimliği; entity_type ile birlikte kaydı belirler.",
+   "change_data": "Değişen alanların özeti: {\"alan\": {\"old\": x, \"new\": y}}.",
+   "reason": "Gerekçe. transaction.reverse, booking.override_payment, stock.adjust gibi işlemlerde zorunlu olabilir.",
+   "source": "Eylemin geldiği teknik kanal (admin web, mobil uygulama, API...).",
+   "request_id": "Aynı istekten doğan audit kayıtlarını birbirine bağlayan kimlik.",
+   "metadata": "Olaya özgü ek bağlam (JSON)."
+  },
+  "enums": {
+   "actor_type": {
+    "user": "Kullanıcı",
+    "system": "Sistem",
+    "integration": "Entegrasyon",
+    "job": "Zamanlanmış iş"
+   },
+   "source": {
+    "admin_web": "Admin web",
+    "mobile_app": "Mobil uygulama",
+    "public_web": "Genel web sitesi",
+    "api": "API",
+    "system_job": "Sistem işi",
+    "integration": "Entegrasyon"
+   }
+  },
+  "write_mode": "read_only",
+  "create_permission": null,
+  "update_permission": null,
+  "system_fields": [
+   "occurred_at",
+   "actor_user_id",
+   "actor_type",
+   "action",
+   "entity_type",
+   "entity_id",
+   "change_data",
+   "reason",
+   "source",
+   "request_id",
+   "metadata"
+  ],
+  "immutable_fields": [
+   "occurred_at",
+   "actor_user_id",
+   "actor_type",
+   "action",
+   "entity_type",
+   "entity_id",
+   "change_data",
+   "reason",
+   "source",
+   "request_id",
+   "metadata"
+  ],
+  "required_on_create": [],
+  "rules_tr": [
+   "Audit kayıtları değiştirilemez ve silinemez; yalnızca sistem oluşturur (AUD-D01, AUD-D02).",
+   "Görüntüleme audit.view yetkisi gerektirir.",
+   "Sistem işlemlerinde actor_user_id boş olabilir ama actor_type mutlaka doludur (AUD-D05).",
+   "Audit log operasyonel kaydın yerine geçmez; güncel durum ana tablodadır (AUD-D06).",
+   "Şifre, token, secret gibi hassas değerler asla loglanmaz (AUD-D07).",
+   "Rol/yetki değişiklikleri, finansal iptaller ve override işlemleri yüksek öncelikli audit olaylarıdır (AUD-D09)."
+  ]
+ },
+ "skills": {
+  "purpose_tr": "Bir satır = kontrollü beceri sözlüğündeki tek bir standart beceri (ör. Python, Project Management). Hangi kullanıcının hangi beceriye sahip olduğu ve seviyesi burada değil, user_skills'tedir.",
+  "fields": {
+   "skill_code": "Kod ve entegrasyonlar için sabit BÜYÜK_HARF_ALT_ÇİZGİ kod (ör. PROJECT_MANAGEMENT). Benzersiz.",
+   "skill_name": "Arayüzde görünen ad (ör. \"Project Management\"). Benzersiz.",
+   "category": "Becerinin üst grubu; kontrollü listeden seçilir.",
+   "description": "Becerinin kapsamı; benzer becerileri ayırt etmeye yarar.",
+   "status": "Yeni seçimlere açık mı? Pasif/arşiv beceri yeni seçimde gösterilmez, mevcut ilişkiler korunur.",
+   "sort_order": "Arayüzde sıralama."
+  },
+  "enums": {
+   "category": {
+    "Technology": "Teknoloji",
+    "Business": "İş",
+    "Finance": "Finans",
+    "Creative": "Yaratıcı",
+    "Language": "Dil",
+    "Communication": "İletişim",
+    "Operations": "Operasyon",
+    "Management": "Yönetim",
+    "Data": "Veri",
+    "Marketing": "Pazarlama"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "archived": "Arşivlenmiş"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "system_settings.update",
+  "update_permission": "system_settings.update",
+  "system_fields": [],
+  "immutable_fields": [
+   "skill_code"
+  ],
+  "required_on_create": [
+   "skill_code",
+   "skill_name",
+   "category"
+  ],
+  "rules_tr": [
+   "skill_code benzersizdir ve sabit kalır (SKL-D01, SKL-D02).",
+   "Liste kontrollü sözlüktür; \"PM / Project Mgmt / Proje Yönetimi\" gibi mükerrer kayıt açmayın (SKL-D03).",
+   "Kullanıcılar doğrudan beceri oluşturamaz; öneriler admin incelemesinden sonra eklenir (SKL-D04).",
+   "Seviye (A1–C2, beginner...) burada değil user_skills'te tutulur (SKL-D06).",
+   "Skill ile Interest ve Offer ayrı kavramlardır; aynı terim (ör. Spanish) hem Skill hem Interest olabilir (SKL-D07, SKL-D08).",
+   "Kayıt silinmez; pasif/arşiv yapılır, mevcut kullanıcı ilişkileri korunur (SKL-D09)."
+  ]
+ },
+ "user_skills": {
+  "purpose_tr": "Bir satır = bir kullanıcının kontrollü sözlükten seçtiği bir beceri (isteğe bağlı seviye, öncelik ve doğrulama ile). Beceri tanımı skills'te, \"şu an ne sunabilirim\" bilgisi offers'tadır.",
+  "fields": {
+   "id_user": "Beceriye sahip kullanıcı.",
+   "id_skill": "Seçilen beceri. Yalnızca aktif beceriler yeni seçimde kullanılabilir.",
+   "skill_level": "İsteğe bağlı seviye: genel (beginner…expert) veya dil için CEFR (A1–C2, native).",
+   "priority": "Profildeki önem sırası (1 = en önemli). İsteğe bağlı; pozitif tam sayı.",
+   "is_verified": "false = kullanıcı beyanı; true = Fikirhane tarafından doğrulanmış. Doğrulama işlemiyle işaretlenir.",
+   "verified_by_user_id": "Doğrulayan kullanıcı. Doğrulama işlemi tarafından doldurulur.",
+   "verified_at": "Doğrulama zamanı. Doğrulama işlemi tarafından doldurulur.",
+   "status": "İlişki aktif mi? Kullanıcı beceriyi kaldırınca pasife alınır."
+  },
+  "enums": {
+   "skill_level": {
+    "beginner": "Başlangıç",
+    "intermediate": "Orta",
+    "advanced": "İleri",
+    "expert": "Uzman",
+    "A1": "A1",
+    "A2": "A2",
+    "B1": "B1",
+    "B2": "B2",
+    "C1": "C1",
+    "C2": "C2",
+    "native": "Anadil"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif"
+   }
+  },
+  "write_mode": "workflow_only",
+  "create_permission": null,
+  "update_permission": null,
+  "system_fields": [
+   "is_verified",
+   "verified_by_user_id",
+   "verified_at"
+  ],
+  "immutable_fields": [
+   "id_user",
+   "id_skill"
+  ],
+  "required_on_create": [
+   "id_user",
+   "id_skill"
+  ],
+  "rules_tr": [
+   "Aynı kullanıcı + beceri için en fazla bir aktif kayıt olabilir (USKL-D02).",
+   "Yalnızca aktif beceriler yeni seçimde kullanılabilir (USKL-D03).",
+   "skill_level isteğe bağlıdır; dil becerilerinde CEFR, diğerlerinde genel ölçek anlamlıdır (USKL-D04).",
+   "Kullanıcı başına aktif beceri sayısı iş kuralıyla sınırlanır (örnek 12) (USKL-D06).",
+   "Pasif beceri eşleştirmede ve profilde kullanılmaz (USKL-D07).",
+   "is_verified true ise doğrulayan ve doğrulama zamanı dolu olmalıdır (USKL-D09)."
+  ]
+ },
+ "interests": {
+  "purpose_tr": "Bir satır = kontrollü ilgi alanı sözlüğündeki tek bir standart konu (ör. Artificial Intelligence). Kullanıcı seçimleri user_interests'te tutulur; beceriler ve serbest metin ihtiyaçlar burada değildir.",
+  "fields": {
+   "interest_code": "Kod ve entegrasyonlar için sabit BÜYÜK_HARF_ALT_ÇİZGİ kod (ör. ARTIFICIAL_INTELLIGENCE). Benzersiz, değişmez.",
+   "interest_name": "Arayüzde görünen ad. Benzersiz.",
+   "category": "İlgi alanının üst grubu; kontrollü listeden seçilir.",
+   "description": "Konunun kapsamı; benzer kavramları ayırt etmeye yarar.",
+   "status": "Yeni seçimlere açık mı? Pasif/arşiv ilgi alanı yeni seçimde gösterilmez, mevcut ilişkiler korunur.",
+   "sort_order": "Arayüzde sıralama (10, 20, 30...)."
+  },
+  "enums": {
+   "category": {
+    "Technology": "Teknoloji",
+    "Business": "İş",
+    "Creative": "Yaratıcı",
+    "Finance": "Finans",
+    "Lifestyle": "Yaşam tarzı",
+    "Languages": "Diller",
+    "Science": "Bilim",
+    "Society": "Toplum",
+    "Professional": "Mesleki"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "archived": "Arşivlenmiş"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "system_settings.update",
+  "update_permission": "system_settings.update",
+  "system_fields": [],
+  "immutable_fields": [
+   "interest_code"
+  ],
+  "required_on_create": [
+   "interest_code",
+   "interest_name",
+   "category"
+  ],
+  "rules_tr": [
+   "interest_code benzersizdir ve arayüz yerelleştirilse bile değişmez (INT-D01, INT-D02).",
+   "Liste kontrollü sözlüktür; \"AI / Artificial Intelligence / Yapay Zeka\" gibi mükerrer kayıt açmayın (INT-D03).",
+   "Kullanıcı önerileri doğrudan aktif kayıt olmaz; listeyi admin düzenler (INT-D04).",
+   "Interest; Skill ve Need/Offer ile karıştırılmaz (INT-D06, INT-D07).",
+   "Kayıt silinmez; pasif/arşiv yapılır, mevcut ilişkiler korunur (INT-D08).",
+   "Sözlük orta ayrıntıda tutulur (~60–80 kayıt); çok geniş veya çok dar konu açmayın (INT-D10)."
+  ]
+ },
+ "user_interests": {
+  "purpose_tr": "Bir satır = bir kullanıcının kontrollü listeden seçtiği bir ilgi alanı (isteğe bağlı öncelikle). Seviye/yetkinlik ve görünürlük ayarı burada tutulmaz.",
+  "fields": {
+   "id_user": "İlgi alanını seçen kullanıcı.",
+   "id_interest": "Seçilen ilgi alanı. Yalnızca aktif ilgi alanları yeni seçimde kullanılabilir.",
+   "priority": "Kullanıcının ilgi alanları içindeki sıra (1 = en önemli). İsteğe bağlı; pozitif tam sayı.",
+   "status": "İlişki aktif mi? Kullanıcı kaldırınca pasife alınır."
+  },
+  "enums": {
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif"
+   }
+  },
+  "write_mode": "workflow_only",
+  "create_permission": null,
+  "update_permission": null,
+  "system_fields": [],
+  "immutable_fields": [
+   "id_user",
+   "id_interest"
+  ],
+  "required_on_create": [
+   "id_user",
+   "id_interest"
+  ],
+  "rules_tr": [
+   "Aynı kullanıcı + ilgi alanı için en fazla bir aktif kayıt olabilir (UINT-D02).",
+   "Yalnızca aktif ilgi alanları yeni seçimde kullanılabilir (UINT-D03).",
+   "Kullanıcı başına aktif ilgi alanı sayısı iş kuralıyla sınırlanır (örnek 10) (UINT-D04).",
+   "Seviye/yetkinlik burada tutulmaz; o Skill kavramıdır (UINT-D05).",
+   "Kaldırılan ilgi alanı yeni eşleştirmede kullanılmaz (UINT-D06).",
+   "Kullanıcının seçimini başkası değiştiremez; yalnızca uygun yetkili admin istisnadır (UINT-D07)."
+  ]
+ },
+ "needs": {
+  "purpose_tr": "Bir satır = bir kullanıcının serbest metinle yazdığı ihtiyaç (ör. etkinlik rezervasyonunda paylaşılan). Kontrollü ilgi alanı/beceri sözlüğü değildir.",
+  "fields": {
+   "id_user": "İhtiyacı yazan kullanıcı.",
+   "need_text": "İhtiyacın serbest metni. Boş olamaz. Rezervasyonlar metnin o anki kopyasını ayrıca saklar.",
+   "status": "İhtiyacın durumu: aktif, çözüldü veya arşiv."
+  },
+  "enums": {
+   "status": {
+    "active": "Aktif",
+    "resolved": "Çözüldü",
+    "archived": "Arşivlenmiş"
+   }
+  },
+  "write_mode": "workflow_only",
+  "create_permission": null,
+  "update_permission": null,
+  "system_fields": [],
+  "immutable_fields": [
+   "id_user"
+  ],
+  "required_on_create": [
+   "id_user",
+   "need_text"
+  ],
+  "rules_tr": [
+   "Rezervasyon akışında kullanıcı tarafından oluşturulur (etkinlikte enable_need açıksa).",
+   "Metni sonradan değiştirmek geçmiş rezervasyonları etkilemez; rezervasyon need_text_snapshot tutar.",
+   "Need serbest metindir; Interest/Skill sözlüğüyle karıştırılmaz (INT-D07).",
+   "Kullanıcının networking_enabled false ise Need diğer katılımcılara gösterilmez."
+  ]
+ },
+ "offers": {
+  "purpose_tr": "Bir satır = bir kullanıcının toplulukla paylaşmak istediği serbest metin teklif/katkı. Kontrollü beceri sözlüğü (skills) değildir.",
+  "fields": {
+   "id_user": "Teklifi yazan kullanıcı.",
+   "offer_text": "Teklifin serbest metni. Boş olamaz. Rezervasyonlar metnin o anki kopyasını ayrıca saklar.",
+   "status": "Teklifin durumu: aktif veya arşiv."
+  },
+  "enums": {
+   "status": {
+    "active": "Aktif",
+    "archived": "Arşivlenmiş"
+   }
+  },
+  "write_mode": "workflow_only",
+  "create_permission": null,
+  "update_permission": null,
+  "system_fields": [],
+  "immutable_fields": [
+   "id_user"
+  ],
+  "required_on_create": [
+   "id_user",
+   "offer_text"
+  ],
+  "rules_tr": [
+   "Rezervasyon akışında kullanıcı tarafından oluşturulur (etkinlikte enable_offer açıksa).",
+   "Metni sonradan değiştirmek geçmiş rezervasyonları etkilemez; rezervasyon offer_text_snapshot tutar.",
+   "Offer serbest metindir; Skill sözlüğüyle karıştırılmaz (SKL-D08).",
+   "Kullanıcının networking_enabled false ise Offer diğer katılımcılara gösterilmez."
+  ]
+ },
+ "membership_types": {
+  "purpose_tr": "Bir satır, Fikirhane'nin bir ticari üyelik paketidir (Member, Premium) ve varsayılan haklarını tanımlar. Kimin hangi pakete sahip olduğu, etkinlik fiyatları ve Visitor burada tutulmaz.",
+  "fields": {
+   "membership_type_code": "Sabit teknik kod, büyük harf ve alt çizgi (MEMBER, PREMIUM). Benzersiz; VISITOR olamaz. Oluşturulduktan sonra değiştirilmez.",
+   "membership_type_name": "Kullanıcıya görünen paket adı (ör. Premium Member). Marka diline göre değişebilir.",
+   "description": "Paketin ne sunduğunu anlatan kısa açıklama.",
+   "discount_rate": "Varsayılan indirim yüzdesi, 0–100 (15.00 = %15). Etkinlik/mekân istisnaları Pricing Rules ile yönetilir.",
+   "reservation_window_days": "Kaç gün ileriye rezervasyon yapılabileceği (ör. Member 7).",
+   "max_active_bookings": "Aynı anda sahip olunabilecek en fazla aktif rezervasyon sayısı (ör. Member 2).",
+   "booking_priority": "Sayısal rezervasyon önceliği; yüksek değer daha öncelikli. Yalnızca bekleme listesi/öncelikli dağıtımda anlamlı.",
+   "seat_selection_enabled": "Bu paket koltuk seçebilir mi? (Member hayır, Premium evet)",
+   "priority_booking_enabled": "Öncelikli/erken rezervasyon erişimi var mı?",
+   "status": "active: yeni üyelikte kullanılabilir; inactive: yeni üyelik verilmez; archived: artık kullanılmıyor.",
+   "sort_order": "Arayüzde sıralama numarası (ör. 10, 20)."
+  },
+  "enums": {
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "archived": "Arşivlendi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "membership.update",
+  "update_permission": "membership.update",
+  "system_fields": [],
+  "immutable_fields": [
+   "membership_type_code"
+  ],
+  "required_on_create": [
+   "membership_type_code",
+   "membership_type_name",
+   "discount_rate",
+   "reservation_window_days",
+   "max_active_bookings"
+  ],
+  "rules_tr": [
+   "Visitor bir üyelik tipi değildir; aktif üyeliği olmayan kullanıcıdır (MTYPE-D03).",
+   "Etkinliğe özel fiyat burada tutulmaz; yalnızca varsayılan indirim ve haklar (MTYPE-D05, D06).",
+   "Inactive/archived tip ile yeni üyelik veya başvuru oluşturulamaz (MTYPE-D08).",
+   "Hak değişiklikleri (ör. indirim %15→%10) tüm aktif üyelere canlı yansır; geçmiş belge fiyatları değişmez (MTYPE-D09).",
+   "Üyelik tipi sistem yetkisi vermez; global rol değildir (MTYPE-D04).",
+   "Kayıt silinmez; kullanım dışı bırakmak için inactive/archived yapın."
+  ]
+ },
+ "user_memberships": {
+  "purpose_tr": "Bir satır, bir kullanıcının belirli bir üyelik tipine belirli bir tarih aralığında sahip olduğu tek bir dönemdir. Başvuru süreci, paket tanımı ve sistem rolleri burada tutulmaz; Visitor için kayıt açılmaz.",
+  "fields": {
+   "id_user": "Üyeliğin sahibi olan kullanıcı. Sonradan değiştirilemez.",
+   "id_membership_type": "Üyelik paketi (yalnızca aktif tipler). Değiştirilemez; yükseltme/düşürmede eski kayıt kapatılıp yeni kayıt açılır.",
+   "id_membership_application": "Bu üyeliği doğuran başvuru. Onay akışı doldurur; doğrudan admin tanımlamasında boş kalır.",
+   "status": "Üyeliğin yaşam döngüsü durumu. Kullanıcı başına en fazla bir active kayıt olabilir.",
+   "start_date": "Üyeliğin geçerli olduğu ilk gün.",
+   "end_date": "Üyeliğin bittiği/biteceği gün; başlangıçtan önce olamaz. Boş = süresiz (önerilmez).",
+   "approved_at": "Üyeliğin onaylandığı an; onay akışı doldurur.",
+   "approved_by_user_id": "Üyeliği onaylayan kullanıcı; onay akışı doldurur.",
+   "cancelled_at": "İptal zamanı; iptal işlemi doldurur. cancelled durumunda zorunludur.",
+   "cancelled_by_user_id": "İptal eden kullanıcı (sistem iptalinde boş olabilir); iptal işlemi doldurur.",
+   "cancellation_reason": "İptal nedeni, özellikle manuel iptallerde (ör. kullanıcı talebi, kural ihlali).",
+   "source": "Üyeliğin nasıl oluştuğu: başvuru, admin tanımlaması, kampanya vb.",
+   "notes": "Yalnızca iç kullanım için not."
+  },
+  "enums": {
+   "status": {
+    "pending": "Beklemede",
+    "active": "Aktif",
+    "expired": "Süresi doldu",
+    "cancelled": "İptal edildi",
+    "suspended": "Askıya alındı",
+    "ended": "Sonlandırıldı (yükseltme/düşürme)"
+   },
+   "source": {
+    "admin_grant": "Admin tanımlaması",
+    "application": "Başvuru",
+    "campaign": "Kampanya",
+    "conversion": "Dönüşüm",
+    "manual": "Manuel",
+    "system": "Sistem"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "membership.create",
+  "update_permission": "membership.update",
+  "system_fields": [
+   "id_membership_application",
+   "approved_at",
+   "approved_by_user_id",
+   "cancelled_at",
+   "cancelled_by_user_id"
+  ],
+  "immutable_fields": [
+   "id_user",
+   "id_membership_type",
+   "id_membership_application",
+   "source"
+  ],
+  "required_on_create": [
+   "id_user",
+   "id_membership_type",
+   "start_date"
+  ],
+  "status_transitions": {
+   "pending": [
+    "active",
+    "cancelled"
+   ],
+   "active": [
+    "suspended",
+    "expired",
+    "cancelled",
+    "ended"
+   ],
+   "suspended": [
+    "active",
+    "cancelled",
+    "ended"
+   ],
+   "expired": [],
+   "cancelled": [],
+   "ended": []
+  },
+  "rules_tr": [
+   "Bir kullanıcının aynı anda en fazla bir aktif üyeliği olabilir (UMEM-D02).",
+   "Yükseltme/düşürmede tip değiştirilmez: eski kayıt ended + end_date ile kapatılır, yeni kayıt açılır (UMEM-D05).",
+   "Yenilemede kayıt uzatılmaz; her dönem için yeni kayıt açılır.",
+   "Yalnızca aktif üyelik tipiyle yeni kayıt açılabilir (UMEM-D06); Visitor için kayıt açılmaz (UMEM-D03).",
+   "İptal membership.cancel ile yapılır; cancelled_at ve neden kaydedilir. Kayıt asla silinmez (UMEM-D04).",
+   "Üyelik durumu hesap durumundan bağımsızdır; her değişiklik audit'e yazılır (UMEM-D08, D10)."
+  ]
+ },
+ "membership_applications": {
+  "purpose_tr": "Bir satır, bir kullanıcının bir üyelik tipi için yaptığı tek başvuru ve onun değerlendirme/karar sürecidir. Başvuru üyeliğin kendisi değildir; onaylanınca ayrı bir user_memberships kaydı açılır.",
+  "fields": {
+   "id_user": "Başvuran kullanıcı. Değiştirilemez.",
+   "id_membership_type": "Başvurulan üyelik tipi (yalnızca aktif tipler). Değiştirilemez.",
+   "status": "Başvurunun durumu; kararlar yalnızca başvuru değerlendirme ekranından verilir.",
+   "motivation_text": "Kullanıcının neden üye olmak istediği. Gönderim anındaki anlık kopya; admin düzenlemez.",
+   "offer_text": "Kullanıcının topluluğa ne katabileceği. Gönderim anındaki anlık kopya; admin düzenlemez.",
+   "need_text": "Kullanıcının topluluktan beklentisi. Gönderim anındaki anlık kopya; admin düzenlemez.",
+   "submitted_at": "Başvurunun gönderildiği an; draft dışındaki her durumda zorunlu, akış doldurur.",
+   "reviewed_at": "Karar zamanı; değerlendirme akışı doldurur.",
+   "reviewed_by_user_id": "Kararı veren kullanıcı (genelde Fikirhane admin); akış doldurur.",
+   "decision_note": "Karara dair iç not; kullanıcıya gösterilmesi gerekmez.",
+   "decision_reason": "Yapılandırılmış karar nedeni kodu; raporlama için.",
+   "waitlist_until": "Bekleme listesindeki başvurunun yeniden değerlendirileceği tarih (isteğe bağlı)."
+  },
+  "enums": {
+   "status": {
+    "draft": "Taslak",
+    "submitted": "Gönderildi",
+    "under_review": "Değerlendiriliyor",
+    "approved": "Onaylandı",
+    "waitlisted": "Bekleme listesinde",
+    "declined": "Reddedildi",
+    "withdrawn": "Geri çekildi",
+    "expired": "Geçersiz"
+   },
+   "decision_reason": {
+    "approved_profile_fit": "Onay: profil uyumu",
+    "approved_active_participation": "Onay: aktif katılım",
+    "waitlist_capacity": "Bekleme: kapasite",
+    "declined_incomplete_profile": "Red: eksik profil",
+    "declined_policy": "Red: politika",
+    "other": "Diğer"
+   }
+  },
+  "write_mode": "workflow_only",
+  "create_permission": null,
+  "update_permission": "membership.approve",
+  "system_fields": [
+   "status",
+   "motivation_text",
+   "offer_text",
+   "need_text",
+   "submitted_at",
+   "reviewed_at",
+   "reviewed_by_user_id"
+  ],
+  "immutable_fields": [
+   "id_user",
+   "id_membership_type"
+  ],
+  "required_on_create": [
+   "id_user",
+   "id_membership_type"
+  ],
+  "status_transitions": {
+   "draft": [
+    "submitted",
+    "withdrawn",
+    "expired"
+   ],
+   "submitted": [
+    "under_review",
+    "approved",
+    "waitlisted",
+    "declined",
+    "withdrawn",
+    "expired"
+   ],
+   "under_review": [
+    "approved",
+    "waitlisted",
+    "declined",
+    "withdrawn"
+   ],
+   "waitlisted": [
+    "under_review",
+    "approved",
+    "declined",
+    "withdrawn",
+    "expired"
+   ],
+   "approved": [],
+   "declined": [],
+   "withdrawn": [],
+   "expired": []
+  },
+  "rules_tr": [
+   "Onay ayrı bir user_memberships kaydı açar; başvuru üyeliğe dönüştürülmez (MAPP-D04, D05).",
+   "Aynı kullanıcı + tip için tek açık başvuru olabilir (draft/submitted/under_review/waitlisted) (MAPP-D03).",
+   "Aynı tipte aktif üyeliği olan kullanıcı tekrar başvuramaz; Premium'a yükseltme başvurusu ayrıdır (MAPP-D09).",
+   "Onay membership.approve, red membership.reject ister; her karar audit'e yazılır (MAPP-D08).",
+   "Karar kullanıcı/kulüp rolü üretmez, yalnızca üyelik yaşam döngüsünü etkiler (MAPP-D10).",
+   "Reddedilen/geri çekilen başvuru silinmez; otomatik skor kullanılmaz, karar açıklanabilir kriterlerle verilir (MAPP-D06)."
+  ]
+ },
+ "clubs": {
+  "purpose_tr": "Bir satır, Fikirhane'nin kalıcı bir topluluğudur (ör. English Club, AI Club). Yöneticiler/üyeler, etkinlikler, sponsorlar ve üye sayısı gibi türetilmiş değerler burada tutulmaz.",
+  "fields": {
+   "club_code": "Sabit teknik kod, büyük harf/rakam/alt çizgi (ör. ENGLISH, AI). Benzersiz; oluşturulduktan sonra değiştirilemez.",
+   "club_name": "Arayüzde görünen kulüp adı (ör. English Club). Değişebilir.",
+   "club_description": "Kulübün amacı ve kapsamı; herkese açık kulüp sayfasında gösterilir.",
+   "club_type": "Üst düzey kategori (ör. English Club → language, AI Club → technology).",
+   "cover_image": "Kulüp detay sayfası kapak görseli; dosya referansı/URL, binary değil.",
+   "logo": "İsteğe bağlı logo/ikon; dosya referansı/URL.",
+   "id_financial_center": "Kulübün tek finans merkezi. Zorunlu ve benzersiz; iki kulüp aynı merkezi paylaşamaz.",
+   "status": "draft: hazırlanıyor, herkese açık değil; active: faal; inactive: geçici olarak faal değil; archived: kullanım dışı.",
+   "sort_order": "Arayüzde sıralama numarası (ör. 10, 20, 30)."
+  },
+  "enums": {
+   "club_type": {
+    "workspace": "Çalışma alanı",
+    "language": "Dil",
+    "technology": "Teknoloji",
+    "education": "Eğitim",
+    "professional": "Profesyonel",
+    "social": "Sosyal",
+    "creative": "Yaratıcı"
+   },
+   "status": {
+    "draft": "Taslak",
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "archived": "Arşivlendi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "club.create",
+  "update_permission": "club.update",
+  "system_fields": [],
+  "immutable_fields": [
+   "club_code",
+   "id_financial_center"
+  ],
+  "required_on_create": [
+   "club_code",
+   "club_name",
+   "id_financial_center"
+  ],
+  "status_transitions": {
+   "draft": [
+    "active",
+    "archived"
+   ],
+   "active": [
+    "inactive",
+    "archived"
+   ],
+   "inactive": [
+    "active",
+    "archived"
+   ],
+   "archived": []
+  },
+  "rules_tr": [
+   "Her kulüp tam olarak bir finans merkezine bağlıdır; bu merkez başka kulüple paylaşılamaz (CLUB-D03, D04).",
+   "Kulüp yöneticileri burada değil, club_users üzerinden tanımlanır (CLUB-D05).",
+   "Etkinlik ve sponsor bilgisi kulübe yazılmaz; event_clubs ve club_sponsorships kullanılır (CLUB-D06, D07).",
+   "Arşivlenmiş kulübe yeni etkinlik/üye bağlanamaz (CLUB-D09); arşivleme club.archive ister.",
+   "Geçmişi olan kulüp silinmez; status = archived yapılır (CLUB-D10).",
+   "Kulüp üyeliği Fikirhane üyeliğinden bağımsızdır (CLUB-D08)."
+  ]
+ },
+ "club_users": {
+  "purpose_tr": "Bir satır, bir kullanıcının bir kulüple olan tek bir ilişki dönemi ve o kulüpteki rolüdür. Etkinlik katılımı, Fikirhane üyeliği ve global sistem rolleri burada tutulmaz.",
+  "fields": {
+   "id_club": "İlişkinin kulübü (yalnızca active veya draft kulüp). Değiştirilemez.",
+   "id_user": "İlişkideki kullanıcı. Değiştirilemez.",
+   "id_club_member_role": "Kullanıcının bu kulüpteki rolü (ör. Member, Club Lead). Yalnızca aktif roller atanabilir.",
+   "club_level": "Kulüpteki katılım seviyesi; rolden ayrıdır, yetki vermez. Başlangıçta manuel girilir.",
+   "status": "İlişkinin durumu. Aynı kullanıcı + kulüp için tek active kayıt olabilir.",
+   "start_date": "İlişkinin başladığı gün.",
+   "end_date": "İlişkinin bittiği gün; aktif kayıtta boş olmalı, başlangıçtan önce olamaz.",
+   "joined_source": "Kullanıcının kulübe nasıl katıldığı (isteğe bağlı).",
+   "notes": "İç operasyon notu; herkese açık profilde asla gösterilmez."
+  },
+  "enums": {
+   "club_level": {
+    "new": "Yeni",
+    "regular": "Düzenli",
+    "active": "Aktif",
+    "core": "Çekirdek"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "suspended": "Askıya alındı",
+    "ended": "Sona erdi"
+   },
+   "joined_source": {
+    "self_join": "Kendisi katıldı",
+    "admin_added": "Admin ekledi",
+    "invitation": "Davet",
+    "event_conversion": "Etkinlikten dönüşüm",
+    "sponsor_nomination": "Sponsor aday gösterdi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "club_members.manage",
+  "update_permission": "club_members.manage",
+  "system_fields": [],
+  "immutable_fields": [
+   "id_club",
+   "id_user"
+  ],
+  "required_on_create": [
+   "id_club",
+   "id_user",
+   "id_club_member_role"
+  ],
+  "status_transitions": {
+   "active": [
+    "inactive",
+    "suspended",
+    "ended"
+   ],
+   "inactive": [
+    "active",
+    "ended"
+   ],
+   "suspended": [
+    "active",
+    "ended"
+   ],
+   "ended": []
+  },
+  "rules_tr": [
+   "Aynı kullanıcı + kulüp için aynı anda tek aktif ilişki ve tek rol olur (CLU-D02).",
+   "İlişki bitince silinmez; status = ended ve end_date ile kapatılır. Lider değişiminde eski kayıt kapatılır, yeni kayıt açılır (CLU-D06).",
+   "Kulüp rolü yalnızca o kulüpte geçerlidir; club lead global USER_ROLES'a yazılmaz (CLU-D03, D08).",
+   "Etkinliğe katılım otomatik kulüp üyeliği oluşturmaz (CLU-D05).",
+   "Arşivlenmiş/pasif kulübe yeni ilişki eklenmez (CLU-D10); pasif/arşiv rol atanamaz.",
+   "club_level ile rol ayrı kavramlardır (CLU-D09)."
+  ]
+ },
+ "club_member_roles": {
+  "purpose_tr": "Bir satır, tüm kulüplerde geçerli bir kulüp içi rol tanımıdır (ör. Member, Moderator, Club Lead). Kimin hangi rolde olduğu, global sistem rolleri ve organizasyon rolleri burada tutulmaz.",
+  "fields": {
+   "role_code": "Sabit teknik kod, büyük harf ve alt çizgi (ör. CLUB_LEAD). Benzersiz; oluşturulduktan sonra değiştirilmez.",
+   "role_name": "Arayüzde görünen rol adı (ör. Club Lead).",
+   "description": "Rolün ne yaptığını anlatan açıklama.",
+   "role_rank": "Basit hiyerarşi/sıra numarası (Club Lead 40 > Co-Lead 30). Yetki kaynağı değildir.",
+   "is_management_role": "Rol yönetim işlevi taşıyor mu? Arayüz ve filtreleme içindir.",
+   "status": "active: atanabilir; inactive/archived: yeni kulüp kullanıcısına atanamaz, geçmiş korunur.",
+   "sort_order": "Arayüzde sıralama numarası."
+  },
+  "enums": {
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "archived": "Arşivlendi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "club_members.manage",
+  "update_permission": "club_members.manage",
+  "system_fields": [],
+  "immutable_fields": [
+   "role_code"
+  ],
+  "required_on_create": [
+   "role_code",
+   "role_name"
+  ],
+  "rules_tr": [
+   "role_code benzersizdir ve sabit kalmalıdır (CMR-D02).",
+   "Pasif/arşivlenmiş rol yeni kulüp kullanıcısına atanamaz (CMR-D03).",
+   "role_rank tek başına yetki kaynağı olamaz (CMR-D07).",
+   "Global sistem rolleri ve organizasyon rolleri burada tanımlanmaz (CMR-D05, D06).",
+   "\"Kulüp başına en fazla 1 Club Lead\" kuralı burada değil, club_users üzerinde kontrol edilir.",
+   "Kayıt silinmez; kullanım dışı bırakmak için inactive/archived yapın."
+  ]
+ },
+ "organizations": {
+  "purpose_tr": "Bir satır, gerçek bir kurumdur (şirket, üniversite, STK...) ve kimlik bilgilerini tutar. Tedarikçi/sponsor/müşteri rolleri, kişiler, iletişim bilgileri ve sponsorluklar burada tutulmaz.",
+  "fields": {
+   "organization_name": "Arayüzde görünen kısa/ticari ad (ör. ABC Teknoloji).",
+   "legal_name": "Resmi unvan (ör. ABC Teknoloji San. ve Tic. A.Ş.). Kurum finansal belgelerde kullanılacaksa zorunlu.",
+   "organization_type": "Kurumun yapısal türü. Tedarikçi/sponsor/müşteri burada değil, organizasyon rollerinde tutulur.",
+   "tax_number": "Vergi numarası; fatura/muhasebe için. Zorunlu değil, girilirse benzersiz olmalı.",
+   "tax_office": "Vergi dairesi (ör. Maslak).",
+   "registration_number": "Ticaret sicil veya benzeri resmi kayıt numarası.",
+   "website": "Kurumun ana web sitesi.",
+   "logo": "Logo için dosya referansı/URL; binary değil.",
+   "description": "Kurumun kısa tanıtımı; varsa herkese açık profilde kullanılır.",
+   "status": "Kaydın sistemde kullanılabilirliği; ticari rollerden bağımsızdır."
+  },
+  "enums": {
+   "organization_type": {
+    "company": "Şirket",
+    "university": "Üniversite",
+    "ngo": "STK",
+    "community": "Topluluk",
+    "government": "Kamu kurumu",
+    "agency": "Ajans",
+    "other": "Diğer"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "suspended": "Askıya alındı",
+    "archived": "Arşivlendi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "organization.create",
+  "update_permission": "organization.update",
+  "system_fields": [],
+  "immutable_fields": [],
+  "required_on_create": [
+   "organization_name",
+   "organization_type"
+  ],
+  "rules_tr": [
+   "Aynı gerçek kurum için tek kayıt açılır; vergi numarası tekrar edemez (ORG-D02).",
+   "Tedarikçi/sponsor/müşteri temel tür değildir; organization_roles ile tanımlanır (ORG-D03, D04).",
+   "Kişiler ve yetkileri organization_users ile; e-posta/telefon/adres ayrı tablolarda tutulur (ORG-D05, D06).",
+   "Geçmiş işlemi olan kurum silinmez; arşivlenir (organization.archive) (ORG-D07).",
+   "Resmi bilgi değişikliği geçmiş belgeleri etkilemez; belgeler anlık kopya tutar (ORG-D08).",
+   "Finansal belgede kullanılacak kurumun legal_name alanı dolu olmalıdır."
+  ]
+ },
+ "organization_users": {
+  "purpose_tr": "Bir satır, bir kullanıcının bir kurumla olan tek bir ilişki dönemi ve o kurumdaki rolüdür. Kişi/kurum bilgileri, üyelik, global sistem rolleri ve kulüp rolleri burada tutulmaz.",
+  "fields": {
+   "id_organization": "İlişkinin kurumu. Değiştirilemez.",
+   "id_user": "İlişkideki kullanıcı. Değiştirilemez.",
+   "organization_role": "Kullanıcının yalnızca bu kurumdaki rolü; kurum kapsamlı yetkileri belirler.",
+   "status": "İlişkinin durumu. Aynı kullanıcı + kurum için tek active kayıt olabilir.",
+   "start_date": "İlişkinin başladığı gün (varsayılan bugün).",
+   "end_date": "İlişkinin bittiği gün; doluysa durum active olamaz.",
+   "is_primary": "Birden fazla kurumu varsa kullanıcının ana kurumu mu? (isteğe bağlı)"
+  },
+  "enums": {
+   "organization_role": {
+    "admin": "Kurum yöneticisi",
+    "manager": "Müdür",
+    "member": "Çalışan/üye",
+    "representative": "Temsilci",
+    "billing_contact": "Fatura sorumlusu"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "suspended": "Askıya alındı",
+    "ended": "Sona erdi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "organization_users.manage",
+  "update_permission": "organization_users.manage",
+  "system_fields": [],
+  "immutable_fields": [
+   "id_organization",
+   "id_user"
+  ],
+  "required_on_create": [
+   "id_organization",
+   "id_user",
+   "organization_role"
+  ],
+  "status_transitions": {
+   "active": [
+    "inactive",
+    "suspended",
+    "ended"
+   ],
+   "inactive": [
+    "active",
+    "ended"
+   ],
+   "suspended": [
+    "active",
+    "ended"
+   ],
+   "ended": []
+  },
+  "rules_tr": [
+   "Aynı kullanıcı + kurum için aynı anda tek aktif ilişki ve tek rol olur (ORGU-D02).",
+   "end_date doluysa ilişki active olamaz (ORGU-D05).",
+   "Kullanıcı ayrılınca kayıt silinmez; status = ended ve end_date = bugün yapılır (ORGU-D04).",
+   "Kurum rolü yalnızca o kurumda geçerlidir; bir kurumun admin'i başka kurumu yönetemez (ORGU-D03, D06).",
+   "Global sistem rolleri ve üyelik burada tutulmaz (ORGU-D07, D08).",
+   "Tercih edilen akış davettir: davet kabul edilince kayıt oluşur."
+  ]
+ },
+ "organization_roles": {
+  "purpose_tr": "Bir satır, bir kurumun Fikirhane karşısındaki bir işlevsel/ticari rol dönemidir (ör. ABC → sponsor). Sponsorluk sözleşmesi, etkinlik bağlantısı, kişi yetkileri ve alış/satış geçmişi burada tutulmaz.",
+  "fields": {
+   "id_organization": "Rolün ait olduğu kurum. Değiştirilemez.",
+   "role_type": "Kurumun Fikirhane için rolü (tedarikçi, müşteri, sponsor...). Değiştirilemez; farklı rol için yeni kayıt açılır.",
+   "status": "Rol durumu. Aynı kurum + rol türü için tek active kayıt olabilir.",
+   "start_date": "Rolün başladığı gün (isteğe bağlı; tarihçe önemliyse doldurun).",
+   "end_date": "Rolün bittiği gün; başlangıçtan önce olamaz. Aktif rolde boş bırakılır.",
+   "notes": "İç operasyon notu (ör. Tercih edilen kahve tedarikçisi); kullanıcılara gösterilmez."
+  },
+  "enums": {
+   "role_type": {
+    "supplier": "Tedarikçi",
+    "customer": "Kurumsal müşteri",
+    "sponsor": "Sponsor",
+    "partner": "Partner",
+    "club_partner": "Kulüp partneri",
+    "event_partner": "Etkinlik partneri"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "ended": "Sona erdi"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "organization.update",
+  "update_permission": "organization.update",
+  "system_fields": [],
+  "immutable_fields": [
+   "id_organization",
+   "role_type"
+  ],
+  "required_on_create": [
+   "id_organization",
+   "role_type"
+  ],
+  "status_transitions": {
+   "active": [
+    "inactive",
+    "ended"
+   ],
+   "inactive": [
+    "active",
+    "ended"
+   ],
+   "ended": []
+  },
+  "rules_tr": [
+   "Bir kurumun birden fazla farklı rolü olabilir; aynı rol türünden tek aktif kayıt olur (ORGR-D03, D04).",
+   "Kurum rolü kullanıcıya yetki vermez; yetkiler organization_users ile gelir (ORGR-D05).",
+   "Sponsor rolü sponsorluk sözleşmesinin yerini tutmaz; sözleşme club_sponsorships'te tutulur (ORGR-D06).",
+   "Tedarikçi/müşteri rolü alış/satış belgelerinin yerini tutmaz (ORGR-D07, D08).",
+   "Rol silinmez; status/end_date ile kapatılır, yeni dönem için yeni kayıt açılır (ORGR-D09).",
+   "Alış belgesinde karşı taraf olarak aktif supplier rolü olan kurumlar seçilebilir."
+  ]
+ },
+ "items": {
+  "purpose_tr": "Bir satır = satılan, satın alınan veya stokta takip edilen bir ürün/hizmet tanımı (master katalog). Gerçek satış/alış satırları DOCUMENT_ITEMS'ta, fiziksel stok hareketleri STOCK_MOVEMENTS'ta tutulur; kişiler, sponsorluklar, üyelik hakları ve etkinlik fiyatları buraya ait değildir.",
+  "fields": {
+   "item_code": "Sabit teknik kod (örn. WATER_500ML). Sadece A-Z, 0-9, _; benzersiz. Oluşturulduktan sonra değiştirilemez; barkod değildir.",
+   "item_name": "Ekranda görünen ad. Değiştirilebilir; geçmiş belgeler eski adı kendi açıklamasında saklar.",
+   "item_type": "Sistemin kalemi nasıl işlediği: stoklu ürün, stoksuz ürün veya hizmet. Hizmet stok takibine giremez.",
+   "item_category": "Ürün/hizmet grubu (kontrollü liste). V1'de ayrı kategori tablosu yok.",
+   "unit": "Temel ölçü birimi (adet, kg, litre, seans...). Stok hareketleri bu birimle girilir.",
+   "stock_behavior": "Fiziksel operasyonel rol: yeniden satış, malzeme, sarf, hazırlanmış ürün. Hizmetlerde boş bırakılmalı.",
+   "is_sellable": "Müşteriye satılabilir mi?",
+   "is_purchasable": "Tedarikçiden satın alınabilir mi?",
+   "is_stock_tracked": "Stok ledger'ında (STOCK_MOVEMENTS) takip edilir mi? Kapalıysa stok hareketi girilemez. Hizmetlerde her zaman kapalı.",
+   "default_selling_price": "Varsayılan satış fiyatı; yeni belge satırına kopyalanır. Değişmesi geçmiş satışları etkilemez. Etkinlik/rezervasyon hizmetlerinde boş.",
+   "currency_code": "Varsayılan satış para birimi (3 harf, örn. TRY).",
+   "default_tax_rate": "Varsayılan KDV oranı (%, 0–100). Satır oluşturulurken DOCUMENT_ITEMS.tax_rate'e kopyalanır.",
+   "default_financial_center_id": "Varsayılan finans merkezi (örn. Kafeterya). Kulüp/etkinlik hizmetlerinde boş bırakın; merkez etkinliğin ana kulübünden gelir.",
+   "default_revenue_category_id": "Satıldığında kullanılacak varsayılan gelir kategorisi (örn. Kafeterya Satışları).",
+   "default_expense_category_id": "Satın alındığında kullanılacak varsayılan gider kategorisi (örn. Gıda & İçecek Alımları).",
+   "current_stock": "Önbellek: stok hareketleri toplamı. Sistem hareket eklenirken günceller; elle girilmez.",
+   "reorder_level": "Stok bu seviyenin altına düşünce yeniden sipariş uyarısı verilir.",
+   "target_stock": "Sipariş sonrası ulaşılmak istenen seviye; sipariş önerisi ≈ hedef − mevcut.",
+   "storage_area": "Serbest metin fiziksel yer (örn. Mutfak Buzdolabı). Sadece bilgi amaçlı; depo/lokasyon değildir.",
+   "status": "Aktif: yeni işlemlerde kullanılır. Pasif: yeni işlemde kullanılmaz. Arşiv: katalogdan kalkar. Silme yok.",
+   "sort_order": "Listelerde gösterim sırası."
+  },
+  "enums": {
+   "item_type": {
+    "stock_item": "Stoklu ürün",
+    "nonstock_item": "Stoksuz ürün",
+    "service": "Hizmet"
+   },
+   "item_category": {
+    "beverage": "İçecek",
+    "food": "Yiyecek",
+    "ingredient": "Malzeme",
+    "consumable": "Sarf malzemesi",
+    "workspace_service": "Çalışma alanı hizmeti",
+    "event_service": "Etkinlik hizmeti",
+    "membership": "Üyelik",
+    "sponsorship": "Sponsorluk",
+    "administrative": "İdari"
+   },
+   "unit": {
+    "piece": "Adet",
+    "kg": "Kilogram",
+    "gram": "Gram",
+    "liter": "Litre",
+    "ml": "Mililitre",
+    "pack": "Paket",
+    "session": "Seans",
+    "hour": "Saat",
+    "month": "Ay",
+    "year": "Yıl"
+   },
+   "stock_behavior": {
+    "resale": "Yeniden satış",
+    "ingredient": "Malzeme",
+    "consumable": "Sarf (iç kullanım)",
+    "prepared": "Hazırlanmış ürün"
+   },
+   "status": {
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "archived": "Arşivlenmiş"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "item.create",
+  "update_permission": "item.update",
+  "actions": [
+   {
+    "action": "deactivate",
+    "from_status": [
+     "active"
+    ],
+    "to_status": "inactive",
+    "permission": "item.update",
+    "needs_reason": false,
+    "label_tr": "Pasife al",
+    "effects_tr": "Kalem yeni işlemlerde seçilemez; geçmiş belge ve stok hareketleri korunur."
+   },
+   {
+    "action": "activate",
+    "from_status": [
+     "inactive"
+    ],
+    "to_status": "active",
+    "permission": "item.update",
+    "needs_reason": false,
+    "label_tr": "Aktifleştir",
+    "effects_tr": "Kalem yeniden yeni işlemlerde kullanılabilir."
+   },
+   {
+    "action": "archive",
+    "from_status": [
+     "active",
+     "inactive"
+    ],
+    "to_status": "archived",
+    "permission": "item.archive",
+    "needs_reason": false,
+    "label_tr": "Arşivle",
+    "effects_tr": "Kalem katalogdan kalkar; geçmiş DOCUMENT_ITEMS ve STOCK_MOVEMENTS kayıtları silinmez (ITEM-D10)."
+   },
+   {
+    "action": "unarchive",
+    "from_status": [
+     "archived"
+    ],
+    "to_status": "inactive",
+    "permission": "item.archive",
+    "needs_reason": false,
+    "label_tr": "Arşivden çıkar",
+    "effects_tr": "Kalem pasif olarak kataloğa döner; aktifleştirmek ayrı bir adımdır."
+   }
+  ],
+  "system_fields": [
+   "current_stock"
+  ],
+  "immutable_fields": [
+   "item_code"
+  ],
+  "required_on_create": [
+   "item_code",
+   "item_name",
+   "item_type",
+   "unit"
+  ],
+  "status_transitions": {
+   "active": [
+    "inactive",
+    "archived"
+   ],
+   "inactive": [
+    "active",
+    "archived"
+   ],
+   "archived": [
+    "inactive"
+   ]
+  },
+  "rules_tr": [
+   "item_code benzersiz ve sabittir; değiştirilemez (ITEM-D02, DB tetikleyicisi). Ad serbestçe değişebilir.",
+   "Hizmet (service) kalemlerinde is_stock_tracked kapalı ve stock_behavior boş olmalı (ITEM-D04, DB CHECK).",
+   "current_stock yalnızca önbellektir; gerçek stok = STOCK_MOVEMENTS toplamı. Düzeltme için stok hareketi girin (ITEM-D08/D09).",
+   "Fiyat, KDV, varsayılan merkez/kategori değişikliği geçmiş belge satırlarını etkilemez; sadece yeni satırlara kopyalanır (ITEM-D06/D07).",
+   "Kalem silinmez; pasif veya arşiv kullanın. Arşivlenen kalem geçmiş kayıtlardan kalkmaz (ITEM-D10).",
+   "Etkinlik/rezervasyon fiyatları burada tutulmaz (EVENTS.base_price + EVENT_OPTIONS); bu hizmetlerde varsayılan fiyat ve merkez boş kalabilir.",
+   "V1'de reçete/BOM yok: hazırlanmış ürün satışı malzeme düşmez; malzeme/sarf tüketimi periyodik sayımla bulunur.",
+   "Tek stok lokasyonu var; storage_area sadece bilgi amaçlı serbest metindir."
+  ]
+ },
+ "stock_movements": {
+  "purpose_tr": "Bir satır = stok takibi yapılan bir kalemin fiziksel miktarındaki tek bir işaretli (+/−) artış veya azalış; değiştirilemez stok ledger'ı. Finans merkezi/kategori, depo lokasyonu, rezervasyon kapasitesi ve taslak hareketler buraya ait değildir.",
+  "fields": {
+   "id_item": "Hareketin kalemi. Sadece is_stock_tracked açık kalemler seçilebilir (SMOV-D01).",
+   "movement_at": "Hareketin fiilen gerçekleştiği an; kayıt anından farklı olabilir (örn. dünkü sayım bugün girilir).",
+   "movement_type": "Hareket türü; miktarın işaretini belirler (alım +, satış/tüketim/zayi −, düzeltmeler ±).",
+   "quantity": "İşaretli miktar, kalemin biriminde: + stok artar, − stok azalır. Sıfır olamaz.",
+   "unit_cost": "Hareket anındaki yaklaşık birim maliyet (TRY varsayılır). Alım, zayi ve sayım farkı değerlemesi için.",
+   "id_document_item": "Hareket bir alış/satış belge satırından geldiyse o satır. Belge kesinleşince sistem doldurur.",
+   "id_stock_count_item": "Hareket bir sayım farkından geldiyse sayım satırı. Sayım kesinleşince (post) sistem doldurur.",
+   "reason_code": "Zayi/düzeltme nedeni. Zayi (waste) ve manuel düzeltmede zorunlu; zayi analizinde kullanılır.",
+   "notes": "Açıklama. reason_code'u tamamlar, yerine geçmez.",
+   "reversed_movement_id": "Bu hareket bir önceki hatalı hareketi ters çeviriyorsa, ters çevrilen hareket. Ters çevirme işlemi doldurur."
+  },
+  "enums": {
+   "movement_type": {
+    "purchase_receive": "Alım girişi",
+    "sale": "Satış",
+    "consumption": "İç tüketim",
+    "waste": "Zayi / fire",
+    "count_adjustment": "Sayım farkı düzeltmesi",
+    "manual_adjustment": "Manuel düzeltme",
+    "return_in": "İade girişi",
+    "return_out": "Tedarikçiye iade",
+    "opening_balance": "Açılış bakiyesi"
+   },
+   "reason_code": {
+    "expired": "Son kullanma tarihi geçti",
+    "damaged": "Hasarlı",
+    "spillage": "Döküldü",
+    "staff_use": "Personel kullanımı",
+    "count_variance": "Sayım farkı",
+    "data_correction": "Veri düzeltme",
+    "theft_loss": "Hırsızlık / kayıp",
+    "other": "Diğer"
+   }
+  },
+  "write_mode": "append_only",
+  "create_permission": null,
+  "update_permission": null,
+  "actions": [
+   {
+    "action": "reverse",
+    "from_status": [],
+    "to_status": null,
+    "permission": "stock.adjust",
+    "needs_reason": true,
+    "label_tr": "Ters kayıt",
+    "effects_tr": "Aynı kalem ve türde, ters işaretli yeni hareket eklenir; reversed_movement_id = orijinal. Orijinal hareket değişmez, current_stock tetikleyiciyle güncellenir."
+   }
+  ],
+  "system_fields": [
+   "id_document_item",
+   "id_stock_count_item",
+   "reversed_movement_id"
+  ],
+  "immutable_fields": [
+   "id_item",
+   "movement_at",
+   "movement_type",
+   "quantity",
+   "unit_cost",
+   "id_document_item",
+   "id_stock_count_item",
+   "reason_code",
+   "notes",
+   "reversed_movement_id"
+  ],
+  "required_on_create": [
+   "id_item",
+   "movement_type",
+   "quantity"
+  ],
+  "status_transitions": {},
+  "rules_tr": [
+   "Hareketler düzenlenemez ve silinemez; hata ters/düzeltme hareketiyle giderilir (SMOV-D06/D07, DB tetikleyicisi).",
+   "Sadece stok takipli kalemlere hareket girilir; hizmet ve rezervasyonlar stok hareketi değildir (SMOV-D01).",
+   "Miktar işareti hareket türüyle uyumlu olmalı (SMOV-D03/D04/D05).",
+   "Satış ve alım hareketleri belge kesinleşince (posted) sistemce üretilir; taslak belge stok etkilemez (SMOV-D08).",
+   "Sayım farkları elle girilmez; sayım 'post' edilince count_adjustment hareketleri oluşur (SMOV-D09).",
+   "Stok normalde eksiye düşürülemez; istisna stock.override_negative yetkisi ister (DB'de değil, iş kuralı).",
+   "manual_adjustment özel yetki (stock.adjust) ister; opening_balance kurulumda bir kez kullanılır.",
+   "Finans merkezi/kategori hareket üzerinde tutulmaz; bağlı belge satırından bulunur (SMOV-D11)."
+  ],
+  "type_permissions": {
+   "column": "movement_type",
+   "map": {
+    "purchase_receive": "stock.receive",
+    "return_in": "stock.receive",
+    "consumption": "stock.consume",
+    "waste": "stock.waste",
+    "manual_adjustment": "stock.adjust",
+    "opening_balance": "stock.adjust",
+    "return_out": "stock.adjust"
+   }
+  }
+ },
+ "stock_counts": {
+  "purpose_tr": "Bir satır = belirli bir tarihte yapılan bir fiziksel stok sayımı oturumu (başlık). Sayım stoğu doğrudan değiştirmez; sadece 'post' edildiğinde fark kadar stok hareketi üretir.",
+  "fields": {
+   "count_date": "Sayımın yapıldığı gün.",
+   "status": "Sayım aşaması: taslak → sayılıyor → tamamlandı → onaylandı → kesinleşti; veya iptal. Durum aksiyonlarla değişir.",
+   "notes": "Sayımla ilgili açıklama; iptal veya yeniden açma nedeni de buraya yazılır.",
+   "approved_at": "Onay anı. Onay aksiyonu doldurur.",
+   "approved_by_user_id": "Onaylayan kullanıcı. Onay aksiyonu doldurur.",
+   "posted_at": "Kesinleştirme (post) anı; stok hareketleri bu anda oluşur. Sistem doldurur.",
+   "posted_by_user_id": "Kesinleştiren kullanıcı. Sistem doldurur."
+  },
+  "enums": {
+   "status": {
+    "draft": "Taslak",
+    "in_progress": "Sayılıyor",
+    "completed": "Tamamlandı",
+    "approved": "Onaylandı",
+    "posted": "Kesinleşti",
+    "cancelled": "İptal"
+   }
+  },
+  "write_mode": "crud",
+  "create_permission": "stock_count.create",
+  "update_permission": "stock_count.enter",
+  "actions": [
+   {
+    "action": "start",
+    "from_status": [
+     "draft"
+    ],
+    "to_status": "in_progress",
+    "permission": "stock_count.enter",
+    "needs_reason": false,
+    "label_tr": "Sayıma başla",
+    "effects_tr": "Sayılan miktarlar girilmeye başlanır."
+   },
+   {
+    "action": "complete",
+    "from_status": [
+     "in_progress"
+    ],
+    "to_status": "completed",
+    "permission": "stock_count.complete",
+    "needs_reason": false,
+    "label_tr": "Sayımı tamamla",
+    "effects_tr": "Miktar girişi kapanır; sayım onaya hazırdır."
+   },
+   {
+    "action": "reopen",
+    "from_status": [
+     "completed"
+    ],
+    "to_status": "in_progress",
+    "permission": "stock_count.approve",
+    "needs_reason": true,
+    "label_tr": "Yeniden saydır",
+    "effects_tr": "Sayım tekrar miktar girişine açılır."
+   },
+   {
+    "action": "approve",
+    "from_status": [
+     "completed"
+    ],
+    "to_status": "approved",
+    "permission": "stock_count.approve",
+    "needs_reason": false,
+    "label_tr": "Onayla",
+    "effects_tr": "approved_at/approved_by doldurulur; sayım kesinleştirilmeye hazırdır."
+   },
+   {
+    "action": "post",
+    "from_status": [
+     "approved"
+    ],
+    "to_status": "posted",
+    "permission": "stock_count.post",
+    "needs_reason": false,
+    "label_tr": "Kesinleştir (stoğa işle)",
+    "effects_tr": "Sıfır olmayan her fark için count_adjustment hareketi (reason_code=count_variance, id_stock_count_item dolu) oluşur; current_stock güncellenir; posted_at/by doldurulur."
+   },
+   {
+    "action": "cancel",
+    "from_status": [
+     "draft",
+     "in_progress",
+     "completed",
+     "approved"
+    ],
+    "to_status": "cancelled",
+    "permission": "stock_count.approve",
+    "needs_reason": true,
+    "label_tr": "İptal et",
+    "effects_tr": "Sayım kapanır, stok hareketi üretilmez. Kayıt silinmez."
+   }
+  ],
+  "system_fields": [
+   "status",
+   "approved_at",
+   "approved_by_user_id",
+   "posted_at",
+   "posted_by_user_id"
+  ],
+  "immutable_fields": [],
+  "required_on_create": [],
+  "status_transitions": {
+   "draft": [
+    "in_progress",
+    "cancelled"
+   ],
+   "in_progress": [
+    "completed",
+    "cancelled"
+   ],
+   "completed": [
+    "approved",
+    "in_progress",
+    "cancelled"
+   ],
+   "approved": [
+    "posted",
+    "cancelled"
+   ],
+   "posted": [],
+   "cancelled": []
+  },
+  "rules_tr": [
+   "Sayım stoğu doğrudan değiştirmez: sayım = tespit, stok hareketi = ledger etkisi (STOCK_MOVEMENTS §16).",
+   "Stoğa etki yalnızca 'post' ile olur; fark kadar count_adjustment hareketi üretilir (SMOV-D09).",
+   "Kesinleşmiş (posted) sayım değiştirilemez; hata yeni sayım veya ters hareketle düzeltilir.",
+   "Sayımlar silinmez; vazgeçilen sayım iptal edilir (DB tetikleyicisi).",
+   "Malzeme ve sarf tüketimi (kahve çekirdeği, peçete) her kullanımda değil periyodik sayımla bulunur."
+  ]
+ },
+ "stock_count_items": {
+  "purpose_tr": "Bir satır = bir sayımda tek bir kalem için sistem miktarı ile sayılan miktar. Stok hareketi değildir; fark yalnızca sayım kesinleşince harekete dönüşür.",
+  "fields": {
+   "id_stock_count": "Bağlı olduğu sayım oturumu.",
+   "id_item": "Sayılan kalem (stok takipli). Bir sayımda her kalem bir kez yer alır.",
+   "system_quantity": "Sayım satırı açıldığında sistemdeki stok (current_stock anlık görüntüsü). Sistem doldurur.",
+   "counted_quantity": "Fiziksel olarak sayılan miktar, kalemin biriminde. Negatif olamaz; boş = henüz sayılmadı.",
+   "variance_quantity": "Fark = sayılan − sistem. Otomatik hesaplanır; post edilince bu kadar stok hareketi oluşur.",
+   "notes": "Satıra özel açıklama (örn. kırık şişe bulundu)."
+  },
+  "enums": {},
+  "write_mode": "crud",
+  "create_permission": "stock_count.create",
+  "update_permission": "stock_count.enter",
+  "actions": [],
+  "system_fields": [
+   "system_quantity",
+   "variance_quantity"
+  ],
+  "immutable_fields": [
+   "id_stock_count",
+   "id_item",
+   "system_quantity"
+  ],
+  "required_on_create": [
+   "id_stock_count",
+   "id_item"
+  ],
+  "status_transitions": {},
+  "rules_tr": [
+   "counted_quantity yalnızca sayım taslak/sayılıyor durumundayken girilir; tamamlanınca kilitlenir.",
+   "variance_quantity = counted_quantity − system_quantity; elle girilmez (DB generated).",
+   "Örnek: sistem 40, sayılan 37 → fark −3 → post sonrası −3 hareket → yeni stok 37.",
+   "Aynı kalem bir sayımda bir kez olabilir (DB UNIQUE).",
+   "Sayılmamış (boş) satırlar post edilirken hareket üretmez."
+  ]
+ }
+}

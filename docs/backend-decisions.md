@@ -55,13 +55,10 @@ choice made to get to one consistent schema. Items marked **Confirm** are assump
 | C-05 | New accounts have `networking_enabled = false` (opt-in, privacy by default) and `profile_visibility = community`. | `users` defaults |
 | C-06 | Users may cancel until 24 h before the start; inside that window only staff with `booking.cancel` can. A timely cancellation returns a used freepass; a no-show keeps it consumed. | `CANCELLATION_LOCK_HOURS` |
 | C-07 | A user holds at most one active booking per event. `waitlisted` counts toward that rule but not toward capacity or the active-booking limit. Waitlist promotion is manual for now. | `services/bookings.ts` |
-| C-08 | ACCOUNTING does **not** get `transaction.post` / `transaction.reverse` (the doc leaves this open). | `role_permissions` |
+| C-08 | ~~ACCOUNTING does not get `transaction.post` / `transaction.reverse`.~~ Superseded by C-13. | `role_permissions` |
 | C-09 | Club leads and co-leads may create events for their own club. These events are created as `submitted` and need `event.publish` (Fikirhane admin) to go live. | `services/authz.ts` |
 | C-10 | The financial category seed is the doc's later ~20-item list (section 34). Codes and groups were assigned where the doc gave none. | `0100_reference_data.sql` |
 | C-11 | The "Working Club" and "Community Workspace" financial center are one center (`WORKING_CLUB`), as the doc recommends when they are the same service. | `seeds/demo.sql` |
 | C-12 | A `creative` club type was added for the Creative Writing Club, which the doc's type list could not express. | `0007_clubs.sql` |
-
-## Demo vs. reference data
-
-- `migrations/0100_reference_data.sql` holds data the app needs and the docs define: roles, permissions and bundles, membership types, club member roles, sponsorship plans, financial categories, General/Cafeteria centers, skills, interests, and the venue (Fikirhane 16 seats, Atölye 12 seats, meeting room).
-- `seeds/demo.sql` holds illustrative business data: the three clubs from the public site, a week of coworking sessions at 500 TRY, the 24 Oct English meetup, and zero-balance demo accounts. Replace it with real data before launch. Bank accounts and opening balances in particular are placeholders.
+| C-13 | The ROLES.md bundles left 26 permissions with no holder, so nobody could post documents or payments, define items or approve stock counts. `0102_operational_permissions.sql` gives ACCOUNTING posting/cancel/reverse and account, center and category management; KITCHEN_STAFF item definition and count completion; FIKIRHANE_ADMIN stock adjustment and count approval/posting; MARKETING acquisition correction. Overrides (negative stock, freepass/sponsorship limits), `user.view_sensitive`, `transaction.adjust` and pricing rules stay unassigned. | `role_permissions`, or the admin shell (Rol yetkileri) with `role.update` |
+| C-14 | Admin forms follow per-table rules extracted from the 48 documents (`backend/src/services/admin-meta.json`): who may create/edit, fixed and system-managed fields, lifecycle actions. Where no permission code existed the closest one was used: skills/interests → `system_settings.update`; venues, setups, tables, seats → `event.update_location`; club member roles → `club_members.manage`; membership types → `membership.update`. | `admin-meta.json` |

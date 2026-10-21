@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { ApiError, badRequest, forbidden, notFound } from '../errors.ts';
 import { body, idParam, linkBase, permissionsOf, query, requireUser, selfOrigin, type Deps, type Env } from '../http.ts';
-import { getRecord, listRows, visibleSchema } from '../services/admin-data.ts';
+import { catalog, getRecord, listRows, visibleSchema } from '../services/admin-data.ts';
+import { createRow, deleteRow, runAction, updateRow, writeInfo } from '../services/admin-write.ts';
 import { audit } from '../services/audit.ts';
 import { createResetToken, resetUrl } from '../services/password-reset.ts';
 import { hasClubPermission, hasEventPermission, requirePermission } from '../services/authz.ts';
@@ -54,7 +55,8 @@ export function adminRoutes(deps: Deps) {
   // Navigation for the admin shell: which tables (with their relations) and actions this person may use.
   app.get('/schema', async c => {
     const perms = await permissionsOf(c, deps);
-    const tables = await visibleSchema(sql, perms);
+    const cat = await catalog(sql);
+    const tables = (await visibleSchema(sql, perms)).map(t => ({ ...t, write: writeInfo(t.name, cat.tables.get(t.name)!, perms) }));
     if (!tables.length && !perms.has('membership.view') && !EVENT_LIST_PERMS.some(p => perms.has(p))) throw forbidden();
     return c.json({ permissions: [...perms].sort(), tables });
   });
@@ -89,6 +91,34 @@ export function adminRoutes(deps: Deps) {
   app.get('/data/:table/:id', async c => {
     const perms = await permissionsOf(c, deps);
     return c.json(await getRecord(sql, perms, identifier(c.req.param('table')), idParam(c, 'id')));
+  });
+
+  const Values = z.object({ values: z.record(z.string(), z.unknown()) });
+  const ActionBody = z.object({ reason: z.string().trim().max(1000).nullable().optional() });
+
+  app.post('/data/:table', async c => {
+    const actor = requireUser(c);
+    const { values } = await body(c, Values);
+    return c.json(await createRow(sql, await permissionsOf(c, deps), actor, identifier(c.req.param('table')), values), 201);
+  });
+
+  app.patch('/data/:table/:id', async c => {
+    const actor = requireUser(c);
+    const { values } = await body(c, Values);
+    return c.json(await updateRow(sql, await permissionsOf(c, deps), actor, identifier(c.req.param('table')), idParam(c, 'id'), values));
+  });
+
+  app.post('/data/:table/:id/actions/:action', async c => {
+    const actor = requireUser(c);
+    const { reason } = await body(c, ActionBody);
+    return c.json(await runAction(sql, await permissionsOf(c, deps), actor, identifier(c.req.param('table')), idParam(c, 'id'),
+      identifier(c.req.param('action')), reason ?? null));
+  });
+
+  app.delete('/data/:table/:id', async c => {
+    const actor = requireUser(c);
+    await deleteRow(sql, await permissionsOf(c, deps), actor, identifier(c.req.param('table')), idParam(c, 'id'));
+    return c.body(null, 204);
   });
 
   app.get('/events', async c => {

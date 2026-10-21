@@ -57,7 +57,7 @@ const dateTime = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul',
 const dateOnly = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' });
 const when = v => v ? dateTime.format(new Date(v)) : '—';
 const money = (amount, currency) => amount == null ? '—' : Number(amount) === 0 ? 'Ücretsiz' : new Intl.NumberFormat('tr-TR', { style: 'currency', currency: currency || 'TRY', maximumFractionDigits: 2 }).format(Number(amount));
-const badge = (s, column = 'status') => `<span class="admin-status" data-status="${esc(s)}">${esc(STATUS[s] ?? valueLabel(column, s) ?? s)}</span>`;
+const badge = (s, column = 'status', table = null) => `<span class="admin-status" data-status="${esc(s)}">${esc((table && tableOf(table)?.write?.enums?.[column]?.[s]) ?? STATUS[s] ?? valueLabel(column, s) ?? s)}</span>`;
 
 function route() {
   const [path, search = ''] = location.hash.slice(1).split('?');
@@ -92,8 +92,8 @@ function cell(table, col, value, labels, { full = false } = {}) {
   }
   if (col.name === tableOf(table)?.pk) return `<code>${esc(String(value).slice(0, 8))}</code>`;
   if (typeof value === 'boolean') return value ? 'Evet' : 'Hayır';
-  if (col.name === 'status' || col.name.endsWith('_status')) return badge(String(value), col.name);
-  const coded = valueLabel(col.name, value);
+  if (col.name === 'status' || col.name.endsWith('_status')) return badge(String(value), col.name, table);
+  const coded = (typeof value === 'string' && tableOf(table)?.write?.enums?.[col.name]?.[value]) || valueLabel(col.name, value);
   if (coded) return `<span title="${esc(value)}">${esc(coded)}</span>`;
   if (col.type.startsWith('timestamp')) return esc(when(value));
   if (col.type === 'date') return esc(dateOnly.format(new Date(value)));
@@ -223,8 +223,10 @@ async function dataTable(name, params) {
   const link = changes => { const p = new URLSearchParams(params); for (const [k, v] of Object.entries(changes)) v == null ? p.delete(k) : p.set(k, v); const s = p.toString(); return `#veri/${name}${s ? '?' + s : ''}`; };
   const filterLabel = (k, v) => { const col = meta.columns.find(c => c.name === k); const ref = col?.ref ? data.labels?.[col.ref.table]?.[v] : null; return `${esc(columnLabel(k, k === meta.pk))}: ${esc(ref ?? valueLabel(k, v) ?? STATUS[v] ?? (v === '' ? 'boş' : v.length > 12 ? v.slice(0, 8) + '…' : v))}`; };
   const pages = Math.ceil(data.total / limit);
+  const prefill = new URLSearchParams(filters.filter(([k]) => meta.write?.create_columns.includes(k)));
   return heading(esc(GROUPS[meta.group] ?? '').toLocaleUpperCase('tr'), esc(label(name)), `<code>${esc(name)}</code> · ${data.total} kayıt`)
-    + `<div class="admin-toolbar"><form id="data-search" class="admin-search" role="search"><label class="visually-hidden" for="data-q">Ara</label><input id="data-q" name="q" value="${esc(params.get('q') ?? '')}" placeholder="Metin alanlarında ara"><button class="shell-secondary" type="submit">Ara</button></form><a class="admin-chip" aria-pressed="${all}" href="${link({ tum: all ? null : '1', sayfa: null })}">${all ? 'Özet sütunlar' : 'Tüm sütunlar'}</a><a class="text-link" href="#veri">Tablolar ↗</a></div>`
+    + aboutTable(meta)
+    + `<div class="admin-toolbar"><form id="data-search" class="admin-search" role="search"><label class="visually-hidden" for="data-q">Ara</label><input id="data-q" name="q" value="${esc(params.get('q') ?? '')}" placeholder="Metin alanlarında ara"><button class="shell-secondary" type="submit">Ara</button></form><a class="admin-chip" aria-pressed="${all}" href="${link({ tum: all ? null : '1', sayfa: null })}">${all ? 'Özet sütunlar' : 'Tüm sütunlar'}</a><a class="text-link" href="#veri">Tablolar ↗</a>${meta.write?.can_create ? `<a class="shell-primary admin-new" href="#yeni/${name}${prefill.size ? '?' + prefill : ''}">Yeni kayıt <span>+</span></a>` : ''}</div>`
     + (filters.length ? `<div class="admin-filters">${filters.map(([k, v]) => `<a class="admin-chip" aria-pressed="true" href="${link({ [k]: null, sayfa: null })}" aria-label="Filtreyi kaldır: ${esc(columnLabel(k))}">${filterLabel(k, v)} ✕</a>`).join('')}</div>` : '')
     + (data.items.length ? rowsTable(name, data.items, data.labels, columns) : empty('Kayıt bulunamadı.'))
     + (pages > 1 ? `<nav class="admin-pager" aria-label="Sayfalar">${page > 0 ? `<a class="shell-secondary" href="${link({ sayfa: page - 1 || null })}">← Önceki</a>` : ''}<span>${page + 1} / ${pages}</span>${page + 1 < pages ? `<a class="shell-secondary" href="${link({ sayfa: page + 1 })}">Sonraki →</a>` : ''}</nav>` : '')
@@ -246,16 +248,145 @@ async function record(name, id) {
   const meta = tableOf(name);
   if (!meta) return empty('Bu tabloyu görme yetkin yok ya da tablo yok.');
   const data = await api(`/admin/data/${name}/${encodeURIComponent(id)}`);
-  const refTitle = meta.columns.filter(c => c.ref && !['created_by_user_id', 'updated_by_user_id'].includes(c.name)).map(c => data.labels?.[c.ref.table]?.[data.row[c.name]]).filter(Boolean).slice(0, 2).join(' · ');
+  const refTitle = meta.columns.filter(c => c.ref && !c.name.endsWith('_by_user_id')).map(c => data.labels?.[c.ref.table]?.[data.row[c.name]]).filter(Boolean).slice(0, 2).join(' · ');
   const title = meta.label.map(c => data.row[c]).filter(Boolean).join(' ') || refTitle || `${label(name)} kaydı`;
   const related = data.related.filter(r => r.total > 0);
   const emptyRelated = data.related.filter(r => r.total === 0);
   return heading(esc(label(name)).toLocaleUpperCase('tr'), esc(title), `<code>${esc(name)}</code> · <code>${esc(id)}</code>`)
+    + recordBar(meta, data.row, id)
     + (name === 'events' ? `<div class="admin-actions admin-actions-top"><a class="shell-secondary" href="#etkinlik/${esc(id)}">Katılımcılar ve işlemler ↗</a></div>` : '')
     + (name === 'users' ? await rolePanel(id, data) + resetPanel(id) : '')
     + `<section class="admin-section"><dl class="admin-fields">${meta.columns.map(c => `<div><dt><b>${esc(columnLabel(c.name, c.name === meta.pk))}</b> <code>${esc(c.name)}</code>${c.ref ? ` <small>→ ${esc(label(c.ref.table))}${refRole(c.name, tableOf(c.ref.table)?.pk) ? ` (${esc(refRole(c.name, tableOf(c.ref.table)?.pk))})` : ''}</small>` : ''}</dt><dd>${cell(name, c, data.row[c.name], data.labels, { full: true })}</dd></div>`).join('')}</dl></section>`
-    + related.map(r => { const src = tableOf(r.table); return `<section class="admin-section"><div class="member-section-top"><h2 class="admin-h2">${esc(label(r.table))} <small>${refRole(r.column, meta.pk) ? `· ${esc(refRole(r.column, meta.pk))} olarak ` : ''}(${r.total})</small></h2>${r.total > r.items.length ? `<a class="text-link" href="#veri/${r.table}?${encodeURIComponent(r.column)}=${encodeURIComponent(id)}">Tümünü gör ↗</a>` : ''}</div>${rowsTable(r.table, r.items, r.labels, summaryColumns(src, 5))}</section>`; }).join('')
-    + (emptyRelated.length ? `<p class="admin-muted admin-empty-rel">Bağlı kaydı olmayanlar: ${[...new Set(emptyRelated.map(r => r.table))].map(t => esc(label(t))).join(', ')}</p>` : '');
+    + related.map(r => { const src = tableOf(r.table); return `<section class="admin-section"><div class="member-section-top"><h2 class="admin-h2">${esc(label(r.table))} <small>${refRole(r.column, meta.pk) ? `· ${esc(refRole(r.column, meta.pk))} olarak ` : ''}(${r.total})</small></h2><span class="admin-related-links">${src.write?.can_create && src.write.create_columns.includes(r.column) ? `<a class="text-link" href="#yeni/${r.table}?${encodeURIComponent(r.column)}=${encodeURIComponent(id)}">Ekle +</a>` : ''}${r.total > r.items.length ? `<a class="text-link" href="#veri/${r.table}?${encodeURIComponent(r.column)}=${encodeURIComponent(id)}">Tümünü gör ↗</a>` : ''}</span></div>${rowsTable(r.table, r.items, r.labels, summaryColumns(src, 5))}</section>`; }).join('')
+    + (emptyRelated.length ? `<p class="admin-muted admin-empty-rel">Bağlı kaydı olmayanlar: ${[...new Set(emptyRelated.map(r => r.table))].map(t => { const w = tableOf(t)?.write; const col = emptyRelated.find(r => r.table === t && w?.create_columns.includes(r.column))?.column; return esc(label(t)) + (w?.can_create && col ? ` <a class="text-link" href="#yeni/${t}?${encodeURIComponent(col)}=${encodeURIComponent(id)}">ekle +</a>` : ''); }).join(', ')}</p>` : '');
+}
+
+// ---------- forms (create / edit) from the table documents ----------
+
+function aboutTable(meta) {
+  const w = meta.write;
+  if (!w?.purpose && !w?.rules.length) return '';
+  const mode = { crud: '', append_only: 'Bu tabloya yalnızca yeni kayıt eklenir; kayıtlar değiştirilmez.', read_only: 'Bu tablo yalnızca görüntülenir.', workflow_only: 'Bu kayıtlar kendi akışlarıyla oluşur (ör. üye işlemleri); buradan elle girilmez.' }[w.mode] ?? '';
+  return `<details class="admin-about"><summary>Bu tablo hakkında</summary>${w.purpose ? `<p>${esc(w.purpose)}</p>` : ''}${mode ? `<p class="admin-muted">${esc(mode)}</p>` : ''}${w.rules.length ? `<ul>${w.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}</details>`;
+}
+
+const optionLabel = (meta, col, v) => meta.write?.enums?.[col]?.[v] ?? STATUS[v] ?? valueLabel(col, v) ?? v;
+const LONG_TEXT = /(description|notes|bio|_text|address|motivation|purpose|reason|note|content|message|body)/;
+
+function recordBar(meta, row, id) {
+  const w = meta.write;
+  if (!w) return '';
+  const actions = w.actions.filter(a => !a.from.length || a.from.includes(String(row[a.column] ?? '')));
+  const deletable = w.deletable_when && (w.deletable_when.column === '*' || w.deletable_when.values.includes(String(row[w.deletable_when.column])));
+  if (!w.update_columns.length && !actions.length && !deletable) return '';
+  return `<div class="admin-actions admin-actions-top">${w.update_columns.length ? `<a class="shell-primary" href="#duzenle/${meta.name}/${esc(id)}">Düzenle</a>` : ''}`
+    + actions.map(a => `<button class="shell-secondary${/cancel|reverse|reject|decline|revoke|suspend|archive/.test(a.action) ? ' admin-danger' : ''}" data-row-action="${esc(a.action)}" data-table="${meta.name}" data-id="${esc(id)}">${esc(a.label)}</button>`).join('')
+    + (deletable ? `<button class="shell-secondary admin-danger" data-row-delete data-table="${meta.name}" data-id="${esc(id)}">Sil</button>` : '') + '</div>';
+}
+
+async function refChoices(table) {
+  const meta = tableOf(table);
+  if (!meta) return null;
+  const res = await api(`/admin/data/${table}?limit=200`);
+  const show = summaryColumns(meta, 3);
+  return res.items.map(r => {
+    const text = meta.label.map(c => r[c]).filter(Boolean).join(' ')
+      || show.map(c => c.ref ? res.labels?.[c.ref.table]?.[r[c.name]] : r[c.name]).filter(v => v != null && v !== '').map(String).join(' · ')
+      || String(r[meta.pk]).slice(0, 8);
+    return { id: String(r[meta.pk]), text: text + (r.status && r.status !== 'active' ? ` (${optionLabel(meta, 'status', r.status)})` : '') };
+  });
+}
+
+const localDateTime = v => { if (!v) return ''; const d = new Date(v); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+
+function inputFor(meta, col, value, choices, { locked = false, required = false, allowed = null } = {}) {
+  const id = `f-${col.name}`, attrs = `id="${id}" name="${esc(col.name)}"${required ? ' required' : ''}${locked ? ' disabled' : ''}`;
+  const v = value == null ? '' : value;
+  if (col.options) {
+    const opts = allowed ? col.options.filter(o => allowed.includes(o)) : col.options;
+    return `<select ${attrs}>${col.nullable || !required ? '<option value="">— seçilmedi —</option>' : ''}${opts.map(o => `<option value="${esc(o)}"${String(v) === o ? ' selected' : ''}>${esc(optionLabel(meta, col.name, o))}</option>`).join('')}</select>`;
+  }
+  if (col.ref && choices) {
+    const known = choices.some(c => c.id === String(v));
+    return `<select ${attrs}><option value="">${required ? '— seç —' : '— seçilmedi —'}</option>${!known && v ? `<option value="${esc(v)}" selected>${esc(String(v).slice(0, 8))}</option>` : ''}${choices.map(c => `<option value="${esc(c.id)}"${String(v) === c.id ? ' selected' : ''}>${esc(c.text)}</option>`).join('')}</select>`;
+  }
+  if (col.type === 'boolean') {
+    return col.nullable
+      ? `<select ${attrs}><option value="">—</option><option value="true"${v === true ? ' selected' : ''}>Evet</option><option value="false"${v === false ? ' selected' : ''}>Hayır</option></select>`
+      : `<label class="admin-check"><input type="checkbox" ${attrs}${v === true ? ' checked' : ''}> Evet</label>`;
+  }
+  if (col.type === 'date') return `<input type="date" ${attrs} value="${esc(String(v).slice(0, 10))}">`;
+  if (col.type.startsWith('timestamp')) return `<input type="datetime-local" ${attrs} value="${esc(localDateTime(v))}">`;
+  if (['integer', 'smallint', 'bigint'].includes(col.type)) return `<input type="number" step="1" ${attrs} value="${esc(v)}">`;
+  if (['numeric', 'double precision', 'real'].includes(col.type)) return `<input inputmode="decimal" ${attrs} value="${esc(v)}" placeholder="0,00">`;
+  if (col.type === 'jsonb' || col.type === 'json') return `<textarea rows="4" ${attrs}>${esc(v === '' ? '' : JSON.stringify(v, null, 2))}</textarea>`;
+  if (col.ref) return `<input ${attrs} value="${esc(v)}" placeholder="kayıt numarası">`;
+  if (LONG_TEXT.test(col.name)) return `<textarea rows="3" ${attrs}>${esc(v)}</textarea>`;
+  return `<input ${attrs} value="${esc(v)}"${col.pattern ? ` data-pattern="${esc(col.pattern)}"` : ''}>`;
+}
+
+async function formView(table, id, params) {
+  const meta = tableOf(table);
+  if (!meta?.write) return empty('Bu tabloyu görme yetkin yok ya da tablo yok.');
+  const w = meta.write, editing = !!id;
+  const names = editing ? w.update_columns : w.create_columns;
+  if (!names.length) return empty(editing ? 'Bu kaydı düzenleme yetkin yok.' : 'Bu tabloya kayıt ekleme yetkin yok.', esc(aboutTable(meta) ? '' : ''));
+  const record = editing ? await api(`/admin/data/${table}/${encodeURIComponent(id)}`) : null;
+  const row = record?.row ?? Object.fromEntries([...params]);
+  const shown = meta.columns.filter(c => names.includes(c.name) || (editing && c.name !== meta.pk && !['created_at', 'created_by_user_id', 'updated_at', 'updated_by_user_id'].includes(c.name)));
+  const refs = [...new Set(shown.filter(c => c.ref && names.includes(c.name)).map(c => c.ref.table))];
+  const choices = Object.fromEntries(await Promise.all(refs.map(async t => [t, await refChoices(t).catch(() => null)])));
+  const required = c => !c.nullable && !c.hasDefault || w.required.includes(c.name);
+  const field = c => {
+    const locked = !names.includes(c.name);
+    const help = w.help?.[c.name];
+    const allowed = w.type_permissions?.column === c.name ? w.type_permissions.allowed : null;
+    return `<div class="admin-field${locked ? ' admin-field-locked' : ''}"><label for="f-${esc(c.name)}">${esc(columnLabel(c.name))}${required(c) && !locked ? ' <span class="admin-req" aria-label="zorunlu">*</span>' : ''}${locked ? ' <span class="admin-muted">(değiştirilemez)</span>' : ''}</label>`
+      + (locked ? `<div class="admin-locked-value">${cell(table, c, row[c.name], record?.labels, { full: true })}</div>` : inputFor(meta, c, row[c.name], c.ref ? choices[c.ref.table] : null, { required: required(c), allowed }))
+      + (help ? `<small class="admin-help">${esc(help)}</small>` : '') + (w.derived?.[c.name] ? `<small class="admin-help">Hesaplama: ${esc(w.derived[c.name])}</small>` : '')
+      + `<small class="admin-field-error" data-error-for="${esc(c.name)}" hidden></small></div>`;
+  };
+  const editable = shown.filter(c => names.includes(c.name)), fixed = shown.filter(c => !names.includes(c.name));
+  return heading(esc(label(table)).toLocaleUpperCase('tr'), editing ? `${esc(meta.label.map(c => row[c]).filter(Boolean).join(' ') || label(table))} <em>düzenle.</em>` : `Yeni <em>kayıt.</em>`, `<code>${esc(table)}</code>`)
+    + aboutTable(meta)
+    + `<form id="record-form" class="admin-form admin-record-form" data-table="${table}" data-id="${esc(id ?? '')}" novalidate><div class="admin-form-grid">${editable.map(field).join('')}</div>`
+    + `<p class="form-error" id="record-error" role="alert" hidden></p><div class="admin-actions"><button class="shell-primary" type="submit">${editing ? 'Değişiklikleri kaydet' : 'Kaydet'} <span>↗</span></button><a class="shell-secondary" href="${editing ? `#kayit/${table}/${esc(id)}` : `#veri/${table}`}">Vazgeç</a></div>`
+    + (fixed.length ? `<details class="admin-about"><summary>Değiştirilemeyen alanlar (${fixed.length})</summary><div class="admin-form-grid">${fixed.map(field).join('')}</div></details>` : '')
+    + '</form>';
+}
+
+function formValues(form, meta, editing, original) {
+  const values = {};
+  for (const el of form.querySelectorAll('input[name], select[name], textarea[name]')) {
+    if (el.disabled) continue;
+    const col = meta.columns.find(c => c.name === el.name);
+    if (!col) continue;
+    let v = el.type === 'checkbox' ? el.checked : el.value.trim();
+    if (v !== true && v !== false && v !== '' && col.type.startsWith('timestamp')) v = new Date(v).toISOString();
+    if (col.type === 'jsonb' || col.type === 'json') { if (v) { try { v = JSON.parse(v); } catch { throw Object.assign(new Error(`${columnLabel(col.name)}: geçerli JSON değil.`), { field: col.name }); } } }
+    if (col.type === 'boolean' && el.tagName === 'SELECT') v = v === '' ? null : v === 'true';
+    if (v === '') v = null;
+    if (editing) {
+      const before = original[col.name];
+      const same = before == null ? v == null : col.type.startsWith('timestamp') ? v != null && new Date(before).getTime() === new Date(v).getTime()
+        : typeof before === 'object' ? JSON.stringify(before) === JSON.stringify(v) : String(before) === String(v);
+      if (same) continue;
+    } else if (v === null) continue;
+    values[col.name] = v;
+  }
+  return values;
+}
+
+function showFieldErrors(form, details) {
+  form.querySelectorAll('[data-error-for]').forEach(e => { e.hidden = true; e.textContent = ''; });
+  let first = null;
+  for (const d of details ?? []) {
+    const el = form.querySelector(`[data-error-for="${CSS.escape(d.path)}"]`);
+    if (!el) continue;
+    el.textContent = d.message.replace(/^[a-z_]+: /, ''); el.hidden = false; first ??= el;
+  }
+  first?.closest('.admin-field')?.querySelector('input,select,textarea')?.focus();
+  return !!first;
 }
 
 function resetPanel(userId) {
@@ -286,7 +417,7 @@ function navigation() {
 async function render() {
   const id = ++renderId;
   const { view, a, b, params } = route();
-  const nav = { etkinlik: 'etkinlikler', 'yeni-etkinlik': 'etkinlikler', kayit: 'veri' }[view] ?? view;
+  const nav = { etkinlik: 'etkinlikler', 'yeni-etkinlik': 'etkinlikler', kayit: 'veri', yeni: 'veri', duzenle: 'veri' }[view] ?? view;
   document.querySelectorAll('[data-view]').forEach(l => l.dataset.view === nav ? l.setAttribute('aria-current', 'page') : l.removeAttribute('aria-current'));
   content.setAttribute('aria-busy', 'true');
   try {
@@ -297,6 +428,8 @@ async function render() {
       : view === 'veri' && a ? await dataTable(a, params)
       : view === 'veri' ? dataIndex()
       : view === 'kayit' && a && b ? await record(a, b)
+      : view === 'yeni' && a ? await formView(a, null, params)
+      : view === 'duzenle' && a && b ? await formView(a, b, params)
       : await overview();
     if (id !== renderId) return;
     content.innerHTML = html;
@@ -351,12 +484,46 @@ document.addEventListener('click', async event => {
     const input = content.querySelector(t.dataset.copy);
     try { await navigator.clipboard.writeText(input.value); flash('Kopyalandı.'); } catch { input.select(); flash('Seçildi; Ctrl+C ile kopyala.'); }
   }
+  if (t.dataset.rowAction) {
+    const meta = tableOf(t.dataset.table), action = meta?.write?.actions.find(a => a.action === t.dataset.rowAction);
+    if (!action) return;
+    const reason = await ask({ title: action.label, copy: action.effects ?? 'Bu işlem kaydın durumunu değiştirir ve denetim kaydına yazılır.', input: action.needs_reason ? 'Gerekçe (en az 3 karakter)' : null, ok: action.label, required: action.needs_reason });
+    if (reason === null) return;
+    run(() => api(`/admin/data/${t.dataset.table}/${t.dataset.id}/actions/${action.action}`, { method: 'POST', body: { reason: reason || null } }), 'İşlem tamamlandı.');
+  }
+  if (t.hasAttribute('data-row-delete')) {
+    if (await ask({ title: 'Kaydı sil', copy: 'Bu kayıt kalıcı olarak silinecek. Silme işlemi denetim kaydına yazılır.', ok: 'Sil' }) === null) return;
+    const table = t.dataset.table;
+    run(async () => { await api(`/admin/data/${table}/${t.dataset.id}`, { method: 'DELETE' }); location.hash = `veri/${table}`; }, 'Kayıt silindi.');
+  }
   if (t.dataset.checkin) run(() => api(`/admin/bookings/${t.dataset.checkin}/checkin`, { method: 'POST', body: {} }), 'Giriş kaydedildi.');
   if (t.dataset.revoke) {
     if (await ask({ title: 'Rolü geri al', copy: `${t.dataset.revoke} rolü bu kullanıcıdan geri alınacak.`, ok: 'Geri al' }) === null) return;
     run(() => api(`/admin/users/${t.dataset.user}/roles/${t.dataset.revoke}`, { method: 'DELETE' }), 'Rol geri alındı.');
   }
 });
+
+async function saveRecord(form) {
+  if (busy) return;
+  const table = form.dataset.table, id = form.dataset.id || null, meta = tableOf(table);
+  const error = form.querySelector('#record-error'); error.hidden = true;
+  let values;
+  try {
+    const original = id ? (await api(`/admin/data/${table}/${encodeURIComponent(id)}`)).row : {};
+    values = formValues(form, meta, !!id, original);
+  } catch (err) { showFieldErrors(form, err.field ? [{ path: err.field, message: err.message }] : []); error.textContent = err.message; error.hidden = false; return; }
+  if (id && !Object.keys(values).length) { flash('Değişiklik yok.'); location.hash = `kayit/${table}/${id}`; return; }
+  busy = true; form.querySelector('[type=submit]').disabled = true;
+  try {
+    const res = await api(`/admin/data/${table}${id ? '/' + encodeURIComponent(id) : ''}`, { method: id ? 'PATCH' : 'POST', body: { values } });
+    flash(id ? 'Değişiklikler kaydedildi.' : 'Kayıt oluşturuldu.');
+    location.hash = `kayit/${table}/${res.id}`;
+  } catch (err) {
+    if (err?.status === 401) { location.replace(siteUrl('uyelik/?view=yonetim&giris')); return; }
+    showFieldErrors(form, err.details);
+    error.textContent = err.message; error.hidden = false;
+  } finally { busy = false; form.querySelector('[type=submit]') && (form.querySelector('[type=submit]').disabled = false); }
+}
 
 content.addEventListener('submit', event => {
   const form = event.target; event.preventDefault();
@@ -365,6 +532,7 @@ content.addEventListener('submit', event => {
     q ? params.set('q', q) : params.delete('q'); params.delete('sayfa');
     location.hash = `veri/${a}${params.size ? '?' + params : ''}`;
   }
+  if (form.id === 'record-form') { saveRecord(form); return; }
   if (form.id === 'role-form') {
     const code = new FormData(form).get('role_code');
     if (code) run(() => api(`/admin/users/${form.dataset.user}/roles`, { method: 'POST', body: { role_code: code } }), 'Rol verildi.');

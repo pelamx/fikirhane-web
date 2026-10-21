@@ -150,3 +150,27 @@ body[data-shell=admin] .member-menu{display:none}
 .admin-stats strong{font-size:34px}
 .admin-new{width:100%!important}
 }
+/* Admin record forms */
+.admin-about{border:1px solid var(--line);padding:12px 16px;margin:-6px 0 22px;font-size:12px;line-height:1.7}
+.admin-about summary{cursor:pointer;color:var(--copper);font-size:11px}
+.admin-about p{margin-top:10px}
+.admin-about ul{margin:10px 0 0 18px}
+.admin-about li{margin-bottom:4px}
+.admin-record-form{max-width:980px!important}
+.admin-record-form .admin-form-grid{gap:18px 22px}
+.admin-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.admin-field label{font-size:11px;color:var(--ink);display:block}
+.admin-field input,.admin-field select,.admin-field textarea{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:0;padding:10px 12px;font:13px 'DM Sans',sans-serif;min-height:40px;width:100%;min-width:0}
+.admin-field textarea{resize:vertical}
+.admin-field input:focus,.admin-field select:focus,.admin-field textarea:focus{outline:1px solid var(--copper)}
+.admin-help{font-size:10.5px;line-height:1.5;color:var(--muted)}
+.admin-req{color:var(--copper)}
+.admin-check{display:flex!important;gap:8px;align-items:center;font-size:12px!important;min-height:40px}
+.admin-check input{width:auto!important;min-height:0!important}
+.admin-field-error{color:#b3261e;font-size:11px}
+html[data-theme=dark] .admin-field-error{color:#f2a49c}
+.admin-locked-value{font-size:13px;padding:10px 0;border-bottom:1px dashed var(--line)}
+.admin-record-form .admin-about{margin-top:20px}
+.admin-related-links{display:flex;gap:16px}
+#record-error{margin:14px 0 0}
+@media(max-width:650px){.admin-field input,.admin-field select,.admin-field textarea{font-size:16px}}

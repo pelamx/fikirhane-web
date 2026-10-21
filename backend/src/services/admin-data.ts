@@ -74,14 +74,28 @@ export const TABLES: Record<string, TableDef> = {
 const AUDIT_COLUMNS = new Set(['created_by_user_id', 'updated_by_user_id']);
 const REDACTED = '•••';
 
-export interface Column { name: string; type: string; nullable: boolean; ref: { table: string; column: string } | null; contact: boolean }
-interface TableMeta { name: string; pk: string; columns: Column[]; label: string[] }
-interface Catalog { tables: Map<string, TableMeta>; incoming: Map<string, { table: string; column: string }[]> }
+export interface Column {
+  name: string; type: string; nullable: boolean; ref: { table: string; column: string } | null; contact: boolean;
+  /** Allowed values from a single-column CHECK (col = ANY (ARRAY[...])). */
+  options: string[] | null;
+  /** Regex from a single-column CHECK (col ~ '...'). */
+  pattern: string | null;
+  hasDefault: boolean;
+  generated: boolean;
+}
+export interface CatalogTable { name: string; pk: string; columns: Column[]; label: string[] }
+interface Catalog { tables: Map<string, CatalogTable>; incoming: Map<string, { table: string; column: string }[]> }
 
 const catalogs = new WeakMap<Sql, Promise<Catalog>>();
 
+// Tables whose name-like column is not the best label (e.g. a document is known by its number, not its billing name).
+const LABELS: Record<string, string[]> = {
+  users: ['first_name', 'last_name'], documents: ['document_number'], document_items: ['description'], invitations: ['invitation_code'],
+  freepasses: ['freepass_code'], transactions: ['reference_number'], stock_counts: ['count_date'], audit_log: ['action'],
+};
+
 function labelColumns(table: string, names: string[]): string[] {
-  if (table === 'users') return ['first_name', 'last_name'];
+  if (LABELS[table]) return LABELS[table].filter(c => names.includes(c));
   for (const re of [/_title$/, /_name$/, /_code$/, /^email$/, /^action$/]) {
     const hit = names.find(n => re.test(n) && !n.startsWith('guest_') && n !== 'currency_code');
     if (hit) return [hit];
@@ -91,9 +105,9 @@ function labelColumns(table: string, names: string[]): string[] {
 
 async function loadCatalog(sql: Sql): Promise<Catalog> {
   const names = Object.keys(TABLES);
-  const [cols, pks, fks] = await Promise.all([
-    sql<{ table_name: string; column_name: string; data_type: string; is_nullable: string }[]>`
-      select table_name, column_name, data_type, is_nullable from information_schema.columns
+  const [cols, pks, fks, checks] = await Promise.all([
+    sql<{ table_name: string; column_name: string; data_type: string; is_nullable: string; column_default: string | null; is_generated: string }[]>`
+      select table_name, column_name, data_type, is_nullable, column_default, is_generated from information_schema.columns
       where table_schema = 'public' and table_name = any(${names}) order by table_name, ordinal_position`,
     sql<{ table_name: string; column_name: string }[]>`
       select tc.table_name, kcu.column_name from information_schema.table_constraints tc
@@ -107,7 +121,22 @@ async function loadCatalog(sql: Sql): Promise<Catalog> {
       join pg_attribute a on a.attrelid = con.conrelid and a.attnum = con.conkey[1]
       join pg_attribute ra on ra.attrelid = con.confrelid and ra.attnum = con.confkey[1]
       where con.contype = 'f' and n.nspname = 'public' and cardinality(con.conkey) = 1`,
+    sql<{ table_name: string; column_name: string; def: string }[]>`
+      select cl.relname as table_name, a.attname as column_name, pg_get_constraintdef(con.oid) as def
+      from pg_constraint con
+      join pg_class cl on cl.oid = con.conrelid join pg_namespace n on n.oid = cl.relnamespace
+      join pg_attribute a on a.attrelid = con.conrelid and a.attnum = con.conkey[1]
+      where con.contype = 'c' and n.nspname = 'public' and cardinality(con.conkey) = 1`,
   ]);
+  const optionsOf = new Map<string, string[]>();
+  const patternOf = new Map<string, string>();
+  for (const c of checks) {
+    const key = `${c.table_name}.${c.column_name}`;
+    const list = /^CHECK \(\(\w+ = ANY \(ARRAY\[(.*)\]\)\)\)$/.exec(c.def);
+    if (list) { optionsOf.set(key, [...list[1].matchAll(/'((?:[^']|'')*)'::/g)].map(m => m[1].replace(/''/g, "'"))); continue; }
+    const re = /^CHECK \(\(\w+ ~ '((?:[^']|'')*)'::text\)\)$/.exec(c.def);
+    if (re) patternOf.set(key, re[1].replace(/''/g, "'"));
+  }
   const pkOf = new Map(pks.map(p => [p.table_name, p.column_name]));
   const refOf = new Map(fks.filter(f => TABLES[f.ref_table]).map(f => [`${f.table_name}.${f.column_name}`, { table: f.ref_table, column: f.ref_column }]));
   // Columns covered only by a composite key (e.g. bookings.id_event via (id_event_option, id_event)) follow the
@@ -118,7 +147,7 @@ async function loadCatalog(sql: Sql): Promise<Catalog> {
     const key = `${c.table_name}.${c.column_name}`;
     if (owner && owner !== c.table_name && !refOf.has(key)) refOf.set(key, { table: owner, column: c.column_name });
   }
-  const tables = new Map<string, TableMeta>();
+  const tables = new Map<string, CatalogTable>();
   for (const name of names) {
     const own = cols.filter(c => c.table_name === name);
     const pk = pkOf.get(name);
@@ -127,7 +156,9 @@ async function loadCatalog(sql: Sql): Promise<Catalog> {
     tables.set(name, {
       name, pk, label: labelColumns(name, own.map(c => c.column_name)),
       columns: own.map(c => ({ name: c.column_name, type: c.data_type, nullable: c.is_nullable === 'YES',
-        ref: refOf.get(`${name}.${c.column_name}`) ?? null, contact: contact.has(c.column_name) })),
+        ref: refOf.get(`${name}.${c.column_name}`) ?? null, contact: contact.has(c.column_name),
+        options: optionsOf.get(`${name}.${c.column_name}`) ?? null, pattern: patternOf.get(`${name}.${c.column_name}`) ?? null,
+        hasDefault: c.column_default !== null, generated: c.is_generated === 'ALWAYS' })),
     });
   }
   const incoming = new Map<string, { table: string; column: string }[]>();
@@ -140,7 +171,7 @@ async function loadCatalog(sql: Sql): Promise<Catalog> {
   return { tables, incoming };
 }
 
-function catalog(sql: Sql): Promise<Catalog> {
+export function catalog(sql: Sql): Promise<Catalog> {
   let p = catalogs.get(sql);
   if (!p) { p = loadCatalog(sql); p.catch(() => catalogs.delete(sql)); catalogs.set(sql, p); }
   return p;
@@ -151,9 +182,9 @@ function joined(sql: Sql, columns: string[]) {
   return columns.map(c => sql`coalesce(${sql(c)}::text, '')`).reduce((a, b) => sql`${a} || ' ' || ${b}`);
 }
 
-const canSee = (perms: Set<string>, table: string) => !!TABLES[table]?.perms.some(p => perms.has(p));
+export const canSee = (perms: Set<string>, table: string) => !!TABLES[table]?.perms.some(p => perms.has(p));
 
-async function visibleTable(sql: Sql, perms: Set<string>, table: string): Promise<{ cat: Catalog; meta: TableMeta }> {
+export async function visibleTable(sql: Sql, perms: Set<string>, table: string): Promise<{ cat: Catalog; meta: CatalogTable }> {
   const cat = await catalog(sql);
   const meta = cat.tables.get(table);
   if (!meta) throw notFound('Table');
@@ -162,7 +193,7 @@ async function visibleTable(sql: Sql, perms: Set<string>, table: string): Promis
 }
 
 /** JSON-safe row with contact columns masked for viewers without user.view_contact. */
-function present(meta: TableMeta, row: Record<string, unknown>, perms: Set<string>): Record<string, unknown> {
+export function present(meta: CatalogTable, row: Record<string, unknown>, perms: Set<string>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const masked = !perms.has('user.view_contact');
   for (const c of meta.columns) {
@@ -175,7 +206,7 @@ function present(meta: TableMeta, row: Record<string, unknown>, perms: Set<strin
 export type Labels = Record<string, Record<string, string>>;
 
 /** Display labels for the foreign keys in `rows`, only for referenced tables the viewer may open. */
-async function labelsFor(sql: Sql, cat: Catalog, meta: TableMeta, rows: Record<string, unknown>[], perms: Set<string>): Promise<Labels> {
+async function labelsFor(sql: Sql, cat: Catalog, meta: CatalogTable, rows: Record<string, unknown>[], perms: Set<string>): Promise<Labels> {
   const wanted = new Map<string, Set<string>>();
   for (const c of meta.columns) {
     if (!c.ref || !canSee(perms, c.ref.table)) continue;

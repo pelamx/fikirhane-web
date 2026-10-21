@@ -21,7 +21,8 @@
 - `/admin/#genel`: overview counts for the signed-in staff member's permissions.
 - `/admin/#basvurular`: membership applications; approve, review, waitlist, decline.
 - `/admin/#etkinlikler`, `#etkinlik/<id>`, `#yeni-etkinlik`: events incl. drafts; create, publish, cancel, participants, check-in.
-- `/admin/#veri`, `#veri/<table>?<column>=<value>`, `#kayit/<table>/<id>`: read-only data browser over the documented tables. A record shows its outgoing references and every table that points at it.
+- `/admin/#veri`, `#veri/<table>?<column>=<value>`, `#kayit/<table>/<id>`: every documented table with its relations. A record shows its outgoing references, every table that points at it, and the edit / lifecycle buttons its document allows.
+- `/admin/#yeni/<table>?<column>=<value>`, `#duzenle/<table>/<id>`: create and edit forms generated from the schema and the table document (value lists, references, help texts, fixed fields).
 
 Relative URLs work under the GitHub Pages project prefix. A guest visiting a member route is directed to onboarding; the intended club/view is restored after entry. An active preview can return to the public area and enter member again. This client-side navigation gate is UX, not an access-control boundary.
 
@@ -44,4 +45,4 @@ The admin shell is linked from the member sidebar only for accounts with a role 
 
 The backend in [`backend/`](../backend/README.md) provides email + password sign-up and login (httpOnly cookie sessions; email verification is not built yet), server-side authorization (global roles, plus club/event-scoped roles), and persistent clubs, events and bookings. Public registration only ever creates a `USER`; admin roles are granted by `npm run create-admin` or by an admin holding `role.assign`. Client-side routing remains UX only: every API endpoint re-checks identity, permission and ownership.
 
-The host interface is still deferred. Finance, stock, campaign, invitation and sponsorship records are visible in the admin data browser but cannot be edited there yet; their write endpoints are the next phase.
+The host interface is still deferred. Records that only change through their own flows (bookings, membership applications, invitations, redemptions, user profiles) are shown read-only in the data browser.
