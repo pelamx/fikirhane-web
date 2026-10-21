@@ -18,7 +18,8 @@
 - `/member/#kuluplerim`: followed clubs, including empty state.
 - `/member/#bulusmalar`: sourced program, personal plan, cancel/save.
 - `/member/#profil`: name/bio editing, session exit, delete preview.
-- `/admin/#genel`: overview counts for the signed-in staff member's permissions.
+- `/admin/#genel`: overview counts and the business areas the signed-in staff member can use.
+- `/admin/#m/<area>`: business areas in the top menu — Üyeler, Kulüpler, Etkinlikler, Mekânlar, Kurumlar ve sponsorluk, Büyüme, Finans, Stok, Sistem. Each area has a tab per screen/table (e.g. Finans: Belgeler, Belge satırları, Para hareketleri, Ödeme eşleştirmeleri, Hesaplar, Finans merkezleri, Finans kategorileri); a tab opens `#veri/<table>`.
 - `/admin/#basvurular`: membership applications; approve, review, waitlist, decline.
 - `/admin/#etkinlikler`, `#etkinlik/<id>`, `#yeni-etkinlik`: events incl. drafts; create, publish, cancel, participants, check-in.
 - `/admin/#veri`, `#veri/<table>?<column>=<value>`, `#kayit/<table>/<id>`: every documented table with its relations. A record shows its outgoing references, every table that points at it, and the edit / lifecycle buttons its document allows.

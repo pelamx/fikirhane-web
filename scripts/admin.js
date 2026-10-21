@@ -10,6 +10,52 @@ const menu = document.querySelector('.member-menu');
 const sidebar = document.querySelector('.member-sidebar');
 
 const GROUPS = { identity: 'Kimlik ve erişim', profile: 'Profil', membership: 'Üyelik', clubs: 'Kulüpler ve kurumlar', growth: 'Büyüme ve sponsorluk', events: 'Etkinlik ve mekân', finance: 'Finans ve stok' };
+// The back office is organised by business area; each area has tabs for its own screens and tables.
+const MODULES = [
+  { key: 'uyeler', icon: '◯', title: 'Üyeler', copy: 'Kişiler, üyelikler, başvurular ve kişilerin profil bilgileri.',
+    views: [{ tab: 'basvurular', label: 'Başvurular', href: '#basvurular', show: () => can('membership.view') }],
+    tables: ['users', 'user_memberships', 'membership_applications', 'user_roles', 'user_emails', 'user_skills', 'user_interests', 'needs', 'offers'] },
+  { key: 'kulupler', icon: '◎', title: 'Kulüpler', copy: 'Kalıcı topluluklar, üyeleri ve kulüp içi roller.',
+    tables: ['clubs', 'club_users', 'club_member_roles'] },
+  { key: 'etkinlikler', icon: '▦', title: 'Etkinlikler', copy: 'Program, etkinlik seçenekleri, görevliler ve rezervasyonlar.',
+    views: [{ tab: 'program', label: 'Program', href: '#etkinlikler', show: () => EVENT_PERMS.some(can) }],
+    tables: ['events', 'event_series', 'event_options', 'event_clubs', 'event_organizations', 'event_users', 'bookings'] },
+  { key: 'mekan', icon: '⌗', title: 'Mekânlar', copy: 'Alanlar, yerleşim düzenleri, masalar ve koltuklar.',
+    tables: ['locations', 'space_setups', 'tables', 'seats'] },
+  { key: 'kurumlar', icon: '◇', title: 'Kurumlar ve sponsorluk', copy: 'Şirketler, üniversiteler, partnerler ve kulüp sponsorlukları.',
+    tables: ['organizations', 'organization_users', 'organization_roles', 'sponsorship_plans', 'club_sponsorships', 'sponsorship_usage'] },
+  { key: 'buyume', icon: '↗', title: 'Büyüme', copy: 'Kampanyalar, davetler, freepass’ler ve üyelerin nereden geldiği.',
+    tables: ['campaigns', 'invitations', 'freepasses', 'freepass_redemptions', 'user_acquisitions'] },
+  { key: 'finans', icon: '₺', title: 'Finans', copy: 'Satış ve alış belgeleri, para hareketleri, ödeme eşleştirmeleri ve hesaplar.',
+    tables: ['documents', 'document_items', 'transactions', 'transaction_allocations', 'accounts', 'financial_centers', 'financial_categories'] },
+  { key: 'stok', icon: '▤', title: 'Stok', copy: 'Ürün ve hizmet kataloğu, stok hareketleri ve sayımlar.',
+    tables: ['items', 'stock_movements', 'stock_counts', 'stock_count_items'] },
+  { key: 'sistem', icon: '⚙', title: 'Sistem', copy: 'Roller ve yetkiler, üyelik tipleri, beceri ve ilgi listeleri, denetim kaydı.',
+    views: [{ tab: 'harita', label: 'Tüm tablolar', href: '#veri', show: () => tables.length > 0, last: true }],
+    tables: ['roles', 'role_permissions', 'permissions', 'membership_types', 'skills', 'interests', 'audit_log'] },
+];
+const moduleOfTable = name => MODULES.find(m => m.tables.includes(name));
+const moduleTabs = m => [...(m.views ?? []).filter(v => !v.last && v.show()).map(v => ({ tab: v.tab, label: v.label, href: v.href })),
+  ...m.tables.filter(t => tableOf(t)).map(t => ({ tab: t, label: label(t), href: `#veri/${t}` })),
+  ...(m.views ?? []).filter(v => v.last && v.show()).map(v => ({ tab: v.tab, label: v.label, href: v.href }))];
+const visibleModules = () => MODULES.filter(m => moduleTabs(m).length);
+
+/** Which area and tab a route belongs to, for the menu and the tab bar. */
+function placeOf(view, a) {
+  if (view === 'basvurular') return ['uyeler', 'basvurular'];
+  if (['etkinlikler', 'etkinlik', 'yeni-etkinlik'].includes(view)) return ['etkinlikler', 'program'];
+  if (view === 'veri' && !a) return ['sistem', 'harita'];
+  if (['veri', 'kayit', 'yeni', 'duzenle'].includes(view) && a) return [moduleOfTable(a)?.key ?? 'sistem', a];
+  if (view === 'm' && a) return [a, null];
+  return ['genel', null];
+}
+
+function tabBar(moduleKey, tab) {
+  const m = MODULES.find(x => x.key === moduleKey);
+  if (!m) return '';
+  return `<nav class="admin-tabs" aria-label="${esc(m.title)}">${moduleTabs(m).map(t => `<a href="${t.href}"${t.tab === tab ? ' aria-current="page"' : ''}>${esc(t.label)}</a>`).join('')}</nav>`;
+}
+
 const TABLE_LABELS = {
   users: 'Kullanıcılar', user_emails: 'E-posta adresleri', roles: 'Roller', permissions: 'Yetkiler', role_permissions: 'Rol yetkileri', user_roles: 'Kullanıcı rolleri', audit_log: 'Denetim kaydı',
   skills: 'Beceriler', user_skills: 'Kullanıcı becerileri', interests: 'İlgi alanları', user_interests: 'Kullanıcı ilgi alanları', needs: 'İhtiyaçlar', offers: 'Katkılar',
@@ -105,7 +151,8 @@ function cell(table, col, value, labels, { full = false } = {}) {
 /** A handful of telling columns for list views: name/label, status, references, money and dates. */
 function summaryColumns(meta, max = 6) {
   const cols = meta.columns.filter(c => c.name !== meta.pk && !['created_by_user_id', 'updated_by_user_id', 'updated_at'].includes(c.name));
-  const score = c => meta.label.includes(c.name) ? 0 : c.name.endsWith('status') ? 1 : c.ref ? 2
+  const score = c => meta.label.includes(c.name) ? 0 : c.name.endsWith('status') ? 1 : c.ref && !c.name.endsWith('_by_user_id') ? 2 : c.name.endsWith('_by_user_id') ? 6
+    : /^(direction|grand_total|amount|transaction_type|movement_type|quantity|document_date|start_datetime|transaction_at)$/.test(c.name) ? 1.5
     : /(_name|_title|_code|email|amount|price|quantity|capacity|_date|_datetime)$/.test(c.name) ? 3 : c.name === 'created_at' ? 5 : 4;
   return cols.map((c, i) => [c, score(c), i]).sort((x, y) => x[1] - y[1] || x[2] - y[2]).slice(0, max).map(x => x[0]).sort((x, y) => meta.columns.indexOf(x) - meta.columns.indexOf(y));
 }
@@ -120,10 +167,10 @@ function rowsTable(table, items, labels, columns) {
 async function overview() {
   const data = await api('/admin/overview').catch(() => ({}));
   const tiles = OVERVIEW.filter(([k]) => k in data);
-  const groups = Object.entries(GROUPS).map(([g, name]) => [g, name, tables.filter(t => t.group === g)]).filter(([, , list]) => list.length);
+  const mods = visibleModules();
   return heading('YÖNETİM', `Merhaba, <em>${esc(me.user.first_name)}.</em>`, 'Fikirhane’nin üyeleri, etkinlikleri ve kayıtları burada. Gördüklerin rollerine göre belirlenir.')
     + (tiles.length ? `<div class="admin-stats">${tiles.map(([k, text, href]) => `<a href="${href}"><strong>${data[k]}</strong><span>${text} <span>↗</span></span></a>`).join('')}</div>` : '')
-    + (groups.length ? `<section class="admin-section"><div class="member-section-top"><h2>Veri ve ilişkiler</h2><a class="text-link" href="#veri">Tümünü gör ↗</a></div><div class="admin-groups">${groups.map(([g, name, list]) => `<a href="#veri/${list[0].name}" class="admin-group"><span class="section-label">${esc(name)}</span><strong>${list.length}</strong><small>${list.slice(0, 4).map(t => esc(label(t.name))).join(' · ')}${list.length > 4 ? ' …' : ''}</small></a>`).join('')}</div></section>` : '');
+    + `<section class="admin-section"><div class="member-section-top"><h2>Bölümler</h2></div><div class="admin-groups">${mods.map(m => `<a href="#m/${m.key}" class="admin-group"><span class="section-label">${m.icon} ${esc(m.title.toLocaleUpperCase('tr'))}</span><small>${esc(m.copy)}</small><small class="admin-group-tabs">${moduleTabs(m).slice(0, 4).map(t => esc(t.label)).join(' · ')}${moduleTabs(m).length > 4 ? ' …' : ''}</small></a>`).join('')}</div></section>`;
 }
 
 async function applications(params) {
@@ -206,9 +253,9 @@ async function newEvent() {
 }
 
 function dataIndex() {
-  const groups = Object.entries(GROUPS).map(([g, name]) => [name, tables.filter(t => t.group === g)]).filter(([, list]) => list.length);
-  return heading('VERİ', 'Kayıtlar ve <em>ilişkiler.</em>', 'Tablo dokümanlarındaki her tablo, alanları ve bağlantılarıyla. Bir kayda girince ona bağlı bütün kayıtları görürsün. Bu görünüm salt okunurdur.')
-    + groups.map(([name, list]) => `<section class="admin-section"><h2 class="admin-h2">${esc(name)}</h2><div class="admin-tables">${list.map(t => `<a href="#veri/${t.name}" class="admin-table-card"><strong>${esc(label(t.name))}</strong><code>${esc(t.name)}</code><small>${t.columns.length} alan · ${t.columns.filter(c => c.ref).length} bağlantı · ${t.incoming.length} bağlanan tablo</small></a>`).join('')}</div></section>`).join('');
+  const groups = MODULES.map(m => [m.title, m.tables.map(tableOf).filter(Boolean)]).filter(([, list]) => list.length);
+  return heading('SİSTEM', 'Tüm <em>tablolar.</em>', 'Veritabanındaki bütün tablolar, bölümlerine göre. Bir tabloya girince kayıtlarını görür, yetkin varsa ekler ve düzenlersin; bir kayda girince ona bağlı bütün kayıtları görürsün.')
+    + groups.map(([name, list]) => `<section class="admin-section"><h2 class="admin-h2">${esc(name)}</h2><div class="admin-tables">${list.map(t => `<a href="#veri/${t.name}" class="admin-table-card"><strong>${esc(label(t.name))}</strong><code>${esc(t.name)}</code><small>${t.columns.length} alan · ${t.write?.can_create ? 'ekleyebilirsin' : t.write?.can_update ? 'düzenleyebilirsin' : 'görüntüleme'}</small></a>`).join('')}</div></section>`).join('');
 }
 
 async function dataTable(name, params) {
@@ -224,7 +271,7 @@ async function dataTable(name, params) {
   const filterLabel = (k, v) => { const col = meta.columns.find(c => c.name === k); const ref = col?.ref ? data.labels?.[col.ref.table]?.[v] : null; return `${esc(columnLabel(k, k === meta.pk))}: ${esc(ref ?? valueLabel(k, v) ?? STATUS[v] ?? (v === '' ? 'boş' : v.length > 12 ? v.slice(0, 8) + '…' : v))}`; };
   const pages = Math.ceil(data.total / limit);
   const prefill = new URLSearchParams(filters.filter(([k]) => meta.write?.create_columns.includes(k)));
-  return heading(esc(GROUPS[meta.group] ?? '').toLocaleUpperCase('tr'), esc(label(name)), `<code>${esc(name)}</code> · ${data.total} kayıt`)
+  return heading(esc(moduleOfTable(name)?.title ?? GROUPS[meta.group] ?? '').toLocaleUpperCase('tr'), esc(label(name)), `<code>${esc(name)}</code> · ${data.total} kayıt`)
     + aboutTable(meta)
     + `<div class="admin-toolbar"><form id="data-search" class="admin-search" role="search"><label class="visually-hidden" for="data-q">Ara</label><input id="data-q" name="q" value="${esc(params.get('q') ?? '')}" placeholder="Metin alanlarında ara"><button class="shell-secondary" type="submit">Ara</button></form><a class="admin-chip" aria-pressed="${all}" href="${link({ tum: all ? null : '1', sayfa: null })}">${all ? 'Özet sütunlar' : 'Tüm sütunlar'}</a><a class="text-link" href="#veri">Tablolar ↗</a>${meta.write?.can_create ? `<a class="shell-primary admin-new" href="#yeni/${name}${prefill.size ? '?' + prefill : ''}">Yeni kayıt <span>+</span></a>` : ''}</div>`
     + (filters.length ? `<div class="admin-filters">${filters.map(([k, v]) => `<a class="admin-chip" aria-pressed="true" href="${link({ [k]: null, sayfa: null })}" aria-label="Filtreyi kaldır: ${esc(columnLabel(k))}">${filterLabel(k, v)} ✕</a>`).join('')}</div>` : '')
@@ -408,16 +455,18 @@ async function rolePanel(userId, data) {
 // ---------- shell ----------
 
 function navigation() {
-  const items = [['genel', '⌂', 'Genel bakış', true], ['basvurular', '✎', 'Başvurular', can('membership.view')],
-    ['etkinlikler', '▦', 'Etkinlikler', EVENT_PERMS.some(can)], ['veri', '◫', 'Veri ve ilişkiler', tables.length > 0]];
-  document.querySelector('#admin-nav').innerHTML = '<span class="sidebar-label">FİKİRHANE YÖNETİMİ</span>'
-    + items.filter(i => i[3]).map(([v, icon, text]) => `<a href="#${v}" data-view="${v}"><span>${icon}</span>${text}</a>`).join('');
+  document.querySelector('#admin-nav').innerHTML = '<span class="sidebar-label">FİKİRHANE YÖNETİMİ</span><a href="#genel" data-view="genel"><span>⌂</span>Genel bakış</a>'
+    + visibleModules().map(m => `<a href="#m/${m.key}" data-view="${m.key}"><span>${m.icon}</span>${esc(m.title)}</a>`).join('');
 }
 
 async function render() {
   const id = ++renderId;
   const { view, a, b, params } = route();
-  const nav = { etkinlik: 'etkinlikler', 'yeni-etkinlik': 'etkinlikler', kayit: 'veri', yeni: 'veri', duzenle: 'veri' }[view] ?? view;
+  if (view === 'm' && a) {
+    const first = moduleTabs(MODULES.find(m => m.key === a) ?? { tables: [] })[0];
+    if (first) { location.replace(first.href); return; }
+  }
+  const [nav, tab] = placeOf(view, a);
   document.querySelectorAll('[data-view]').forEach(l => l.dataset.view === nav ? l.setAttribute('aria-current', 'page') : l.removeAttribute('aria-current'));
   content.setAttribute('aria-busy', 'true');
   try {
@@ -432,7 +481,7 @@ async function render() {
       : view === 'duzenle' && a && b ? await formView(a, b, params)
       : await overview();
     if (id !== renderId) return;
-    content.innerHTML = html;
+    content.innerHTML = (nav !== 'genel' ? tabBar(nav, tab) : '') + html;
     document.title = `${content.querySelector('h1')?.textContent ?? 'Yönetim'} · Fikirhane yönetim`;
   } catch (err) {
     if (id !== renderId) return;
