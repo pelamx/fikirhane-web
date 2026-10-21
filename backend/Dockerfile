@@ -7,7 +7,7 @@ RUN cd backend && npm ci --omit=dev && npm cache clean --force
 COPY backend/src backend/src
 COPY backend/migrations backend/migrations
 COPY backend/seeds backend/seeds
-COPY backend/scripts/seed-demo.ts backend/scripts/create-admin.ts backend/scripts/run-jobs.ts backend/scripts/
+COPY backend/scripts/seed-demo.ts backend/scripts/create-admin.ts backend/scripts/reset-password.ts backend/scripts/run-jobs.ts backend/scripts/
 COPY index.html style.css shells.css app.js ./
 COPY scripts scripts
 COPY assets assets

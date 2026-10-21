@@ -11,6 +11,7 @@
     "migrate": "node src/migrate.ts",
     "seed:demo": "node scripts/seed-demo.ts",
     "create-admin": "node scripts/create-admin.ts",
+    "reset-password": "node scripts/reset-password.ts",
     "jobs": "node scripts/run-jobs.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test --test-concurrency=1 \"test/**/*.test.ts\""

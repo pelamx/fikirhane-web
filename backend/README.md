@@ -21,6 +21,12 @@ ADMIN_PASSWORD='<at least 10 chars>' DATABASE_URL=postgres://postgres:postgres@1
   npm run create-admin -- you@example.com Ad Soyad            # default role FIKIRHANE_ADMIN; pass other role codes to add more
 ```
 
+Forgotten password (there is no self-service reset yet); this also signs the account out everywhere:
+
+```sh
+NEW_PASSWORD='<at least 10 chars>' DATABASE_URL=... npm run reset-password -- you@example.com
+```
+
 Against your own database: copy `.env.example` to `.env`, export it, then run `npm run migrate`, optionally `npm run seed:demo`, and `npm start`.
 The server migrates on start unless `MIGRATE_ON_START=false`, and runs the expiry jobs every `JOB_INTERVAL_SECONDS`.
 
