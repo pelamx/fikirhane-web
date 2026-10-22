@@ -9,6 +9,12 @@ const config = loadConfig();
 const sql = createDb(config.databaseUrl);
 
 if (process.env.MIGRATE_ON_START !== 'false') await migrate(sql, console.log);
+// Clubs and rolling coworking sessions for a hosted preview; the seed is idempotent, so every restart only tops it up.
+if (process.env.SEED_DEMO === 'true') {
+  const { seedDemo } = await import('../scripts/seed-demo.ts');
+  await seedDemo(sql);
+  console.log('demo data loaded');
+}
 
 const app = createApp({ sql, config });
 const server = serve({ fetch: app.fetch, port: config.port }, info => {

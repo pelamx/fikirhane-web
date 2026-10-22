@@ -47,6 +47,35 @@ flow, admin event publish conflicts and cascade cancellation, and the expiry job
 
 ## Deploy
 
+### Render
+
+[`render.yaml`](../render.yaml) at the repository root is a Render Blueprint: a PostgreSQL 18 database (`fikirhane-db`) and a
+Docker web service (`fikirhane`) built from `backend/Dockerfile`, both in Frankfurt. The service serves the site and the API on one
+origin (`https://<service>.onrender.com`), with `TRUST_PROXY=true` and Lax, Secure cookies.
+
+1. Render dashboard → **New → Blueprint** → pick this repository → **Apply**. Leave `RESEND_API_KEY` empty unless you have one.
+2. The first deploy migrates the database and, with `SEED_DEMO=true`, loads the clubs and the next week's coworking sessions. The seed is
+   idempotent and runs on every start, so restarts keep the sessions rolling forward. Set `SEED_DEMO=false` once real events are entered.
+3. Admin account: the database only accepts Render's internal network (`ipAllowList: []`). In the database's **Networking** settings add
+   your IP, copy the **External Database URL**, then from `backend/`:
+
+   ```sh
+   ADMIN_PASSWORD='<at least 10 chars>' DATABASE_URL='<external url>?sslmode=require' npm run create-admin -- you@example.com Ad Soyad
+   ```
+
+   Remove your IP afterwards. On a paid instance you can instead run the same command in the service's **Shell** with the internal URL
+   already in `DATABASE_URL`.
+
+Deploys follow `main` after the backend workflow passes (`autoDeployTrigger: checksPass`). Both are on free plans: the free database
+expires after 30 days and the free service sleeps after 15 idle minutes (the first request then takes about a minute, and the expiry
+jobs only run while it is awake). For real use switch `plan` to `basic-256mb` (database) and `starter` (service).
+
+The GitHub Pages copy stays in browser-only preview mode. Pointing it at Render (`PAGES_API_URL`) would need cross-site cookies
+(`COOKIE_SAMESITE=None`), which Safari and other browsers that block third-party cookies refuse, so use the Render address or a custom
+domain on the Render service instead.
+
+### Other hosts
+
 Any host that runs a container and gives you PostgreSQL ≥ 13 (Render, Railway, Fly.io, a VPS with managed Postgres...):
 
 ```sh

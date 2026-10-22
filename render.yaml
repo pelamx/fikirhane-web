@@ -1,0 +1,43 @@
+# Render Blueprint: PostgreSQL + the API container, which also serves the site (one origin, Lax cookies).
+# Render dashboard → New → Blueprint → this repository. Details: backend/README.md#render
+databases:
+  - name: fikirhane-db
+    databaseName: fikirhane
+    user: fikirhane
+    plan: free              # free databases expire after 30 days; use basic-256mb or larger for real data
+    region: frankfurt
+    postgresMajorVersion: "18"
+    ipAllowList: []         # internal network only; add your IP in the dashboard to run create-admin from your machine
+
+services:
+  - type: web
+    name: fikirhane
+    runtime: docker
+    plan: free              # free instances sleep after 15 minutes idle; starter keeps them up
+    region: frankfurt
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass   # deploy main only after the backend workflow passes
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fikirhane-db
+          property: connectionString
+      - key: PORT
+        value: "8080"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: COOKIE_SAMESITE
+        value: Lax
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: PAYMENT_MODE
+        value: pay_at_venue
+      - key: SEED_DEMO
+        value: "true"
+      # Forgot-password emails through Resend; leave empty to have the team create reset links in the admin panel.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        value: Fikirhane <onboarding@resend.dev>

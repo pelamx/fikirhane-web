@@ -38,6 +38,8 @@ GitHub Pages: https://pelamx.github.io/fikirhane-web/
 
 `main` dalındaki kök klasör GitHub Pages üzerinden yayımlanır. Üyelik ve member yolları proje alt diziniyle uyumludur; özel rewrite gerekmez.
 
+Gerçek hesaplı sürüm (PostgreSQL + API + site) Render'da çalışır: kökteki [`render.yaml`](render.yaml) Blueprint'i veritabanını ve container'ı birlikte kurar. Adımlar: [backend/README.md › Render](backend/README.md#render).
+
 ## İçerik ve görseller
 
 - Kulüp metinleri, kaynak bağlantıları ve örnek program: https://www.fikirhane.co/ng/ (21 Ekim 2026).
