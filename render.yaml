@@ -41,6 +41,9 @@ services:
         sync: false
       - key: BOOTSTRAP_ADMIN_PASSWORD
         sync: false
+      # "Ad Soyad"; also replaces the placeholder name "Fikirhane Admin" on an admin created without it.
+      - key: BOOTSTRAP_ADMIN_NAME
+        sync: false
       # Forgot-password emails through Resend; leave empty to have the team create reset links in the admin panel.
       - key: RESEND_API_KEY
         sync: false

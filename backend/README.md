@@ -53,8 +53,10 @@ flow, admin event publish conflicts and cascade cancellation, and the expiry job
 Docker web service (`fikirhane`) built from `backend/Dockerfile`, both in Frankfurt. The service serves the site and the API on one
 origin (`https://<service>.onrender.com`), with `TRUST_PROXY=true` and Lax, Secure cookies.
 
-1. Render dashboard → **New → Blueprint** → pick this repository. Fill in `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`
-   (at least 10 characters) for the first admin, leave `RESEND_API_KEY` empty unless you have one, then **Apply**.
+1. Render dashboard → **New → Blueprint** → pick this repository. Fill in `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`
+   (at least 10 characters) and `BOOTSTRAP_ADMIN_NAME` ("Ad Soyad") for the first admin, leave `RESEND_API_KEY` empty unless you
+   have one, then **Apply**. An admin created before the name was set is called "Fikirhane Admin"; setting `BOOTSTRAP_ADMIN_NAME`
+   later renames it on the next start.
 2. The first deploy migrates the database and, with `SEED_DEMO=true`, loads the clubs and the next week's coworking sessions. The seed is
    idempotent and runs on every start, so restarts keep the sessions rolling forward. Set `SEED_DEMO=false` once real events are entered.
 3. Admin account: created on start from `BOOTSTRAP_ADMIN_EMAIL` if it does not exist (an existing account keeps its password and only

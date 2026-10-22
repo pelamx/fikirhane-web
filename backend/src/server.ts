@@ -17,8 +17,10 @@ if (process.env.SEED_DEMO === 'true') {
 }
 // First admin for hosts without a shell (Render's free plan); an existing account is only given the role.
 if (process.env.BOOTSTRAP_ADMIN_EMAIL) {
-  const { ensureStaffAccount } = await import('./services/bootstrap.ts');
-  await ensureStaffAccount(sql, { email: process.env.BOOTSTRAP_ADMIN_EMAIL, password: process.env.BOOTSTRAP_ADMIN_PASSWORD },
+  const { ensureStaffAccount, splitFullName } = await import('./services/bootstrap.ts');
+  const name = splitFullName(process.env.BOOTSTRAP_ADMIN_NAME);
+  if (!name) console.log('BOOTSTRAP_ADMIN_NAME is not "First Last"; a new admin is named "Fikirhane Admin" until it is set');
+  await ensureStaffAccount(sql, { email: process.env.BOOTSTRAP_ADMIN_EMAIL, password: process.env.BOOTSTRAP_ADMIN_PASSWORD, ...name },
     'BOOTSTRAP_ADMIN_EMAIL', console.log);
 }
 

@@ -3,7 +3,7 @@
 import { createDb } from '../src/db.ts';
 import { ensureStaffAccount } from '../src/services/bootstrap.ts';
 
-const [emailArg, first = 'Fikirhane', last = 'Admin', ...roleArgs] = process.argv.slice(2);
+const [emailArg, first, last, ...roleArgs] = process.argv.slice(2);
 if (!emailArg) {
   console.error('Usage: ADMIN_PASSWORD=... npm run create-admin -- <email> [first] [last] [ROLE ...]');
   process.exit(1);
