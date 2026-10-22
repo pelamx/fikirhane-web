@@ -7,7 +7,7 @@ databases:
     plan: free              # free databases expire after 30 days; use basic-256mb or larger for real data
     region: frankfurt
     postgresMajorVersion: "18"
-    ipAllowList: []         # internal network only; add your IP in the dashboard to run create-admin from your machine
+    ipAllowList: []         # internal network only; the first admin comes from BOOTSTRAP_ADMIN_EMAIL on the service
 
 services:
   - type: web
@@ -36,6 +36,11 @@ services:
         value: pay_at_venue
       - key: SEED_DEMO
         value: "true"
+      # First admin, created on start if the account does not exist (the free plan has no shell for create-admin).
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
       # Forgot-password emails through Resend; leave empty to have the team create reset links in the admin panel.
       - key: RESEND_API_KEY
         sync: false

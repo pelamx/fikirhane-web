@@ -15,6 +15,12 @@ if (process.env.SEED_DEMO === 'true') {
   await seedDemo(sql);
   console.log('demo data loaded');
 }
+// First admin for hosts without a shell (Render's free plan); an existing account is only given the role.
+if (process.env.BOOTSTRAP_ADMIN_EMAIL) {
+  const { ensureStaffAccount } = await import('./services/bootstrap.ts');
+  await ensureStaffAccount(sql, { email: process.env.BOOTSTRAP_ADMIN_EMAIL, password: process.env.BOOTSTRAP_ADMIN_PASSWORD },
+    'BOOTSTRAP_ADMIN_EMAIL', console.log);
+}
 
 const app = createApp({ sql, config });
 const server = serve({ fetch: app.fetch, port: config.port }, info => {

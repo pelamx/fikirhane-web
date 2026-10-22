@@ -53,11 +53,14 @@ flow, admin event publish conflicts and cascade cancellation, and the expiry job
 Docker web service (`fikirhane`) built from `backend/Dockerfile`, both in Frankfurt. The service serves the site and the API on one
 origin (`https://<service>.onrender.com`), with `TRUST_PROXY=true` and Lax, Secure cookies.
 
-1. Render dashboard → **New → Blueprint** → pick this repository → **Apply**. Leave `RESEND_API_KEY` empty unless you have one.
+1. Render dashboard → **New → Blueprint** → pick this repository. Fill in `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`
+   (at least 10 characters) for the first admin, leave `RESEND_API_KEY` empty unless you have one, then **Apply**.
 2. The first deploy migrates the database and, with `SEED_DEMO=true`, loads the clubs and the next week's coworking sessions. The seed is
    idempotent and runs on every start, so restarts keep the sessions rolling forward. Set `SEED_DEMO=false` once real events are entered.
-3. Admin account: the database only accepts Render's internal network (`ipAllowList: []`). In the database's **Networking** settings add
-   your IP, copy the **External Database URL**, then from `backend/`:
+3. Admin account: created on start from `BOOTSTRAP_ADMIN_EMAIL` if it does not exist (an existing account keeps its password and only
+   gets `FIKIRHANE_ADMIN`). Once you have signed in you can delete `BOOTSTRAP_ADMIN_PASSWORD` from the service's environment.
+   To add more staff without a shell, the database only accepts Render's internal network (`ipAllowList: []`): in the database's
+   **Networking** settings add your IP, copy the **External Database URL**, then from `backend/`:
 
    ```sh
    ADMIN_PASSWORD='<at least 10 chars>' DATABASE_URL='<external url>?sslmode=require' npm run create-admin -- you@example.com Ad Soyad
