@@ -173,6 +173,7 @@ body[data-shell=admin] .member-menu{display:none}
 html[data-theme=dark] .admin-field-error{color:#f2a49c}
 .admin-locked-value{font-size:13px;padding:10px 0;border-bottom:1px dashed var(--line)}
 .admin-record-form .admin-about{margin-top:20px}
+.admin-mode-note{font-size:12px;margin:0 0 16px}
 .admin-related-links{display:flex;gap:16px}
 #record-error{margin:14px 0 0}
 @media(max-width:650px){.admin-field input,.admin-field select,.admin-field textarea{font-size:16px}}

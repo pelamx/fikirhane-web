@@ -311,11 +311,11 @@ async function record(name, id) {
 
 // ---------- forms (create / edit) from the table documents ----------
 
+// The table documents' purpose and rules were the build spec; the database and server enforce them, so staff only
+// see how records of this table come about when it is not a plain form.
 function aboutTable(meta) {
-  const w = meta.write;
-  if (!w?.purpose && !w?.rules.length) return '';
-  const mode = { crud: '', append_only: 'Bu tabloya yalnızca yeni kayıt eklenir; kayıtlar değiştirilmez.', read_only: 'Bu tablo yalnızca görüntülenir.', workflow_only: 'Bu kayıtlar kendi akışlarıyla oluşur (ör. üye işlemleri); buradan elle girilmez.' }[w.mode] ?? '';
-  return `<details class="admin-about"><summary>Bu tablo hakkında</summary>${w.purpose ? `<p>${esc(w.purpose)}</p>` : ''}${mode ? `<p class="admin-muted">${esc(mode)}</p>` : ''}${w.rules.length ? `<ul>${w.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}</details>`;
+  const mode = { append_only: 'Bu tabloya yalnızca yeni kayıt eklenir; kayıtlar değiştirilmez.', read_only: 'Bu tablo yalnızca görüntülenir.', workflow_only: 'Bu kayıtlar kendi akışlarıyla oluşur (ör. üye işlemleri); buradan elle girilmez.' }[meta.write?.mode] ?? '';
+  return mode ? `<p class="admin-muted admin-mode-note">${esc(mode)}</p>` : '';
 }
 
 const optionLabel = (meta, col, v) => meta.write?.enums?.[col]?.[v] ?? STATUS[v] ?? valueLabel(col, v) ?? v;
