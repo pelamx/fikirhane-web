@@ -160,7 +160,7 @@ function summaryColumns(meta, max = 6) {
 
 function rowsTable(table, items, labels, columns) {
   const meta = tableOf(table);
-  return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr>${columns.map(c => `<th scope="col" title="${esc(c.name)}">${esc(columnLabel(c.name, c.name === meta.pk))}</th>`).join('')}<th scope="col"><span class="visually-hidden">Kayıt</span></th></tr></thead><tbody>${items.map(r => `<tr>${columns.map(c => `<td>${cell(table, c, r[c.name], labels)}</td>`).join('')}<td><a class="admin-open" href="#kayit/${esc(table)}/${esc(r[meta.pk])}" aria-label="Kaydı aç">↗</a></td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr>${columns.map(c => `<th scope="col">${esc(columnLabel(c.name, c.name === meta.pk))}</th>`).join('')}<th scope="col"><span class="visually-hidden">Kayıt</span></th></tr></thead><tbody>${items.map(r => `<tr>${columns.map(c => `<td>${cell(table, c, r[c.name], labels)}</td>`).join('')}<td><a class="admin-open" href="#kayit/${esc(table)}/${esc(r[meta.pk])}" aria-label="Kaydı aç">↗</a></td></tr>`).join('')}</tbody></table></div>`;
 }
 
 // ---------- views ----------
@@ -255,8 +255,8 @@ async function newEvent() {
 
 function dataIndex() {
   const groups = MODULES.map(m => [m.title, m.tables.map(tableOf).filter(Boolean)]).filter(([, list]) => list.length);
-  return heading('SİSTEM', 'Tüm <em>tablolar.</em>', 'Veritabanındaki bütün tablolar, bölümlerine göre. Bir tabloya girince kayıtlarını görür, yetkin varsa ekler ve düzenlersin; bir kayda girince ona bağlı bütün kayıtları görürsün.')
-    + groups.map(([name, list]) => `<section class="admin-section"><h2 class="admin-h2">${esc(name)}</h2><div class="admin-tables">${list.map(t => `<a href="#veri/${t.name}" class="admin-table-card"><strong>${esc(label(t.name))}</strong><code>${esc(t.name)}</code><small>${t.columns.length} alan · ${t.write?.can_create ? 'ekleyebilirsin' : t.write?.can_update ? 'düzenleyebilirsin' : 'görüntüleme'}</small></a>`).join('')}</div></section>`).join('');
+  return heading('SİSTEM', 'Tüm <em>tablolar.</em>', 'Bütün kayıt türleri, bölümlerine göre. Birine girince kayıtlarını görür, yetkin varsa ekler ve düzenlersin; bir kayda girince ona bağlı bütün kayıtları görürsün.')
+    + groups.map(([name, list]) => `<section class="admin-section"><h2 class="admin-h2">${esc(name)}</h2><div class="admin-tables">${list.map(t => `<a href="#veri/${t.name}" class="admin-table-card"><strong>${esc(label(t.name))}</strong><small>${t.columns.length} alan · ${t.write?.can_create ? 'ekleyebilirsin' : t.write?.can_update ? 'düzenleyebilirsin' : 'görüntüleme'}</small></a>`).join('')}</div></section>`).join('');
 }
 
 async function dataTable(name, params) {
@@ -272,24 +272,13 @@ async function dataTable(name, params) {
   const filterLabel = (k, v) => { const col = meta.columns.find(c => c.name === k); const ref = col?.ref ? data.labels?.[col.ref.table]?.[v] : null; return `${esc(columnLabel(k, k === meta.pk))}: ${esc(ref ?? valueLabel(k, v) ?? STATUS[v] ?? (v === '' ? 'boş' : v.length > 12 ? v.slice(0, 8) + '…' : v))}`; };
   const pages = Math.ceil(data.total / limit);
   const prefill = new URLSearchParams(filters.filter(([k]) => meta.write?.create_columns.includes(k)));
-  return heading(esc(moduleOfTable(name)?.title ?? GROUPS[meta.group] ?? '').toLocaleUpperCase('tr'), esc(label(name)), `<code>${esc(name)}</code> · ${data.total} kayıt`)
+  return heading(esc(moduleOfTable(name)?.title ?? GROUPS[meta.group] ?? '').toLocaleUpperCase('tr'), esc(label(name)), `${data.total} kayıt`)
     + aboutTable(meta)
     + `<div class="admin-toolbar"><form id="data-search" class="admin-search" role="search"><label class="visually-hidden" for="data-q">Ara</label><input id="data-q" name="q" value="${esc(params.get('q') ?? '')}" placeholder="Metin alanlarında ara"><button class="shell-secondary" type="submit">Ara</button></form><a class="admin-chip" aria-pressed="${all}" href="${link({ tum: all ? null : '1', sayfa: null })}">${all ? 'Özet sütunlar' : 'Tüm sütunlar'}</a><a class="text-link" href="#veri">Tablolar ↗</a>${meta.write?.can_create ? `<a class="shell-primary admin-new" href="#yeni/${name}${prefill.size ? '?' + prefill : ''}">Yeni kayıt <span>+</span></a>` : ''}</div>`
     + (filters.length ? `<div class="admin-filters">${filters.map(([k, v]) => `<a class="admin-chip" aria-pressed="true" href="${link({ [k]: null, sayfa: null })}" aria-label="Filtreyi kaldır: ${esc(columnLabel(k))}">${filterLabel(k, v)} ✕</a>`).join('')}</div>` : '')
     + (data.items.length ? rowsTable(name, data.items, data.labels, columns) : empty('Kayıt bulunamadı.'))
     + (pages > 1 ? `<nav class="admin-pager" aria-label="Sayfalar">${page > 0 ? `<a class="shell-secondary" href="${link({ sayfa: page - 1 || null })}">← Önceki</a>` : ''}<span>${page + 1} / ${pages}</span>${page + 1 < pages ? `<a class="shell-secondary" href="${link({ sayfa: page + 1 })}">Sonraki →</a>` : ''}</nav>` : '')
-    + relationMap(meta);
-}
-
-function relationMap(meta) {
-  const out = meta.columns.filter(c => c.ref && !AUDIT_REFS.includes(c.name));
-  const incoming = new Map();
-  for (const r of meta.incoming) incoming.set(r.table, [...incoming.get(r.table) ?? [], refRole(r.column, meta.pk)]);
-  if (!out.length && !incoming.size) return '';
-  const roles = list => list.filter(Boolean).length ? ` <span class="admin-muted">${list.filter(Boolean).map(esc).join(' · ')}</span>` : '';
-  const outList = out.length ? `<div><span class="section-label">${esc(label(meta.name).toLocaleUpperCase('tr'))} ŞUNLARA BAĞLI</span><ul>${out.map(c => `<li><a href="#veri/${c.ref.table}">${esc(label(c.ref.table))}</a>${roles([refRole(c.name, tableOf(c.ref.table)?.pk)])}</li>`).join('')}</ul></div>` : '';
-  const inList = incoming.size ? `<div><span class="section-label">BUNLAR ${esc(label(meta.name).toLocaleUpperCase('tr'))} TABLOSUNA BAĞLI</span><ul>${[...incoming].map(([t, list]) => `<li><a href="#veri/${t}">${esc(label(t))}</a>${roles(list)}</li>`).join('')}</ul></div>` : '';
-  return `<section class="admin-section admin-relations"><h2 class="admin-h2">İlişkiler</h2><p class="admin-muted admin-relations-help">Bir kayda girdiğinde, bu tablolardaki ona bağlı kayıtları da görürsün.</p><div class="admin-relation-grid${outList && inList ? '' : ' admin-relation-single'}">${outList}${inList}</div></section>`;
+;
 }
 
 async function record(name, id) {
@@ -300,11 +289,11 @@ async function record(name, id) {
   const title = meta.label.map(c => data.row[c]).filter(Boolean).join(' ') || refTitle || `${label(name)} kaydı`;
   const related = data.related.filter(r => r.total > 0);
   const emptyRelated = data.related.filter(r => r.total === 0);
-  return heading(esc(label(name)).toLocaleUpperCase('tr'), esc(title), `<code>${esc(name)}</code> · <code>${esc(id)}</code>`)
+  return heading(esc(label(name)).toLocaleUpperCase('tr'), esc(title))
     + recordBar(meta, data.row, id)
     + (name === 'events' ? `<div class="admin-actions admin-actions-top"><a class="shell-secondary" href="#etkinlik/${esc(id)}">Katılımcılar ve işlemler ↗</a></div>` : '')
     + (name === 'users' ? await rolePanel(id, data) + resetPanel(id) : '')
-    + `<section class="admin-section"><dl class="admin-fields">${meta.columns.map(c => `<div><dt><b>${esc(columnLabel(c.name, c.name === meta.pk))}</b> <code>${esc(c.name)}</code>${c.ref ? ` <small>→ ${esc(label(c.ref.table))}${refRole(c.name, tableOf(c.ref.table)?.pk) ? ` (${esc(refRole(c.name, tableOf(c.ref.table)?.pk))})` : ''}</small>` : ''}</dt><dd>${cell(name, c, data.row[c.name], data.labels, { full: true })}</dd></div>`).join('')}</dl></section>`
+    + `<section class="admin-section"><dl class="admin-fields">${meta.columns.map(c => `<div><dt><b>${esc(columnLabel(c.name, c.name === meta.pk))}</b></dt><dd>${cell(name, c, data.row[c.name], data.labels, { full: true })}</dd></div>`).join('')}</dl></section>`
     + related.map(r => { const src = tableOf(r.table); return `<section class="admin-section"><div class="member-section-top"><h2 class="admin-h2">${esc(label(r.table))} <small>${refRole(r.column, meta.pk) ? `· ${esc(refRole(r.column, meta.pk))} olarak ` : ''}(${r.total})</small></h2><span class="admin-related-links">${src.write?.can_create && src.write.create_columns.includes(r.column) ? `<a class="text-link" href="#yeni/${r.table}?${encodeURIComponent(r.column)}=${encodeURIComponent(id)}">Ekle +</a>` : ''}${r.total > r.items.length ? `<a class="text-link" href="#veri/${r.table}?${encodeURIComponent(r.column)}=${encodeURIComponent(id)}">Tümünü gör ↗</a>` : ''}</span></div>${rowsTable(r.table, r.items, r.labels, summaryColumns(src, 5))}</section>`; }).join('')
     + (emptyRelated.length ? `<p class="admin-muted admin-empty-rel">Bağlı kaydı olmayanlar: ${[...new Set(emptyRelated.map(r => r.table))].map(t => { const w = tableOf(t)?.write; const col = emptyRelated.find(r => r.table === t && w?.create_columns.includes(r.column))?.column; return esc(label(t)) + (w?.can_create && col ? ` <a class="text-link" href="#yeni/${t}?${encodeURIComponent(col)}=${encodeURIComponent(id)}">ekle +</a>` : ''); }).join(', ')}</p>` : '');
 }
@@ -416,7 +405,7 @@ async function formView(table, id, params) {
       + `<small class="admin-field-error" data-error-for="${esc(c.name)}" hidden></small></div>`;
   };
   const editable = shown.filter(c => names.includes(c.name)), fixed = shown.filter(c => !names.includes(c.name));
-  return heading(esc(label(table)).toLocaleUpperCase('tr'), editing ? `${esc(meta.label.map(c => row[c]).filter(Boolean).join(' ') || label(table))} <em>düzenle.</em>` : `Yeni <em>kayıt.</em>`, `<code>${esc(table)}</code>`)
+  return heading(esc(label(table)).toLocaleUpperCase('tr'), editing ? `${esc(meta.label.map(c => row[c]).filter(Boolean).join(' ') || label(table))} <em>düzenle.</em>` : `Yeni <em>kayıt.</em>`)
     + aboutTable(meta)
     + `<form id="record-form" class="admin-form admin-record-form" data-table="${table}" data-id="${esc(id ?? '')}" novalidate><div class="admin-form-grid">${editable.map(field).join('')}</div>`
     + `<p class="form-error" id="record-error" role="alert" hidden></p><div class="admin-actions"><button class="shell-primary" type="submit">${editing ? 'Değişiklikleri kaydet' : 'Kaydet'} <span>↗</span></button><a class="shell-secondary" href="${editing ? `#kayit/${table}/${esc(id)}` : `#veri/${table}`}">Vazgeç</a></div>`

@@ -35,7 +35,7 @@
 .admin-group strong{font:34px/1 var(--serif);color:var(--copper)}
 .admin-group small,.admin-table-card small{font-size:10px;line-height:1.6;color:var(--muted)}
 .admin-table-card strong{font-size:14px}
-.admin-table-card code,.admin-fields code,.admin-relations code,.admin-table th,.member-heading code{font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);overflow-wrap:anywhere}
+.admin-table-card code,.admin-fields code,.admin-table th,.member-heading code{font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);overflow-wrap:anywhere}
 .admin-toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:18px}
 .admin-filter{gap:6px}
 .admin-chip{display:inline-flex;align-items:center;border:1px solid var(--line);padding:9px 12px;font-size:10px;min-height:38px}
@@ -84,9 +84,6 @@ html[data-theme=dark] .admin-status:is([data-status=cancelled],[data-status=decl
 .admin-fields dt small{font-size:10px;color:var(--muted)}
 .admin-fields dd{font-size:13px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-line}
 .admin-fields a{color:var(--copper)}
-.admin-relation-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
-.admin-relations ul{list-style:none;margin-top:10px;display:grid;gap:7px;font-size:12px}
-.admin-relations a{color:var(--copper)}
 .admin-empty{border:1px dashed var(--line);padding:32px;text-align:center;margin:10px 0 30px}
 .admin-empty h2{font:22px var(--serif)}
 .admin-empty p{font-size:12px;color:var(--muted);margin-top:8px}
@@ -104,7 +101,7 @@ html[data-theme=dark] .admin-status:is([data-status=cancelled],[data-status=decl
 #admin-dialog .dialog-actions{display:flex;gap:12px;justify-content:end}
 #admin-dialog .dialog-actions button{width:auto}
 [aria-busy=true]{opacity:.55;transition:opacity .2s}
-@media(max-width:900px){.admin-stats{grid-template-columns:1fr 1fr}.admin-stats>a:nth-child(3n){border-right:1px solid var(--line)}.admin-stats>a:nth-child(2n){border-right:0}.admin-relation-grid,.admin-form-grid{grid-template-columns:1fr}.admin-new{margin-left:0}}
+@media(max-width:900px){.admin-stats{grid-template-columns:1fr 1fr}.admin-stats>a:nth-child(3n){border-right:1px solid var(--line)}.admin-stats>a:nth-child(2n){border-right:0}.admin-form-grid{grid-template-columns:1fr}.admin-new{margin-left:0}}
 @media(max-width:650px){.admin-stats{grid-template-columns:1fr}.admin-stats>a{border-right:0!important;padding-inline:0}.admin-card-top{flex-direction:column}.admin-search input{width:100%}.admin-search{width:100%}.admin-form input,.admin-form select,.admin-search input{font-size:16px}}
 .admin-roles{display:block;margin-bottom:18px;line-height:1.7;color:var(--muted)}
 /* Admin: the menu sits in a bar under the header instead of a left column (phones keep the ☰ menu) */
@@ -133,11 +130,6 @@ body[data-shell=admin] .member-menu{display:none}
 #confirm-done .shell-primary{width:auto;margin-top:14px}
 #request-sent .text-link,#request-again{display:inline-block;margin-top:12px}
 .admin-reset-link input{flex:1;min-width:200px;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
-.admin-relations-help{margin:-8px 0 16px}
-.admin-relation-single{grid-template-columns:1fr}
-.admin-relations li{line-height:1.6}
-.admin-relations ul{padding:0}
-.admin-relation-single ul{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));column-gap:24px}
 .admin-table th{font:11px 'DM Sans',sans-serif;color:var(--muted);letter-spacing:.2px}
 .admin-fields dt b{font-weight:500;font-size:12px;margin-right:4px}
 .admin-fields dt code{font-size:9px}
