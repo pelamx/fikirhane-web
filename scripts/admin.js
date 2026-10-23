@@ -151,7 +151,10 @@ function cell(table, col, value, labels, { full = false } = {}) {
 
 /** A handful of telling columns for list views: name/label, status, references, money and dates. */
 function summaryColumns(meta, max = 6) {
-  const cols = meta.columns.filter(c => c.name !== meta.pk && !['created_by_user_id', 'updated_by_user_id', 'updated_at'].includes(c.name));
+  // Fixed record codes (CASH_TRY …) stay on the record page; lists hide them when every record has a name to show instead.
+  const named = meta.label.length > 0 && meta.label.every(n => meta.columns.find(c => c.name === n)?.nullable === false);
+  const cols = meta.columns.filter(c => c.name !== meta.pk && !['created_by_user_id', 'updated_by_user_id', 'updated_at'].includes(c.name)
+    && !(named && c.name.endsWith('_code') && c.name !== 'currency_code' && !meta.label.includes(c.name)));
   const score = c => meta.label.includes(c.name) ? 0 : c.name.endsWith('status') ? 1 : c.ref && !c.name.endsWith('_by_user_id') ? 2 : c.name.endsWith('_by_user_id') ? 6
     : /^(direction|grand_total|amount|transaction_type|movement_type|quantity|document_date|start_datetime|transaction_at)$/.test(c.name) ? 1.5
     : /(_name|_title|_code|email|amount|price|quantity|capacity|_date|_datetime)$/.test(c.name) ? 3 : c.name === 'created_at' ? 5 : 4;
