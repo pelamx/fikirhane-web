@@ -74,6 +74,17 @@ header .topnav{display:flex;align-items:center;gap:2px;flex:1;min-width:0;font-s
 @keyframes sketch-ferry{to{transform:translateX(-1460px)}}
 @keyframes sketch-glide{to{transform:translate(50px,-8px)}}
 @keyframes sketch-flap{to{transform:scaleY(.4)}}
+html[data-theme=dark] .hero-sketch .sun .cu,html[data-theme=dark] .hero-sketch .glint{stroke:var(--ink)}
+html[data-theme=dark] .hero-sketch .sun .wash{fill:var(--ink);opacity:.45}
+html[data-theme=dark] .hero-sketch .sun{filter:drop-shadow(0 0 12px color-mix(in srgb,var(--ink) 35%,transparent))}
+html[data-theme=dark] .hero-sketch .sun .stripe{display:none}
+.hero-sketch .moonpath{display:none}
+html[data-theme=dark] .hero-sketch .moonpath{display:inline}
+html[data-theme=dark] .hero-sketch .glint{display:none}
+.hero-sketch .moonglow{fill:var(--ink);stroke:none;opacity:0;filter:blur(14px);animation:sketch-moonglow 1.2s ease forwards calc(var(--d) + .6s)}
+.hero-sketch .moonline{stroke:var(--ink);stroke-width:1.6}
+.hero-sketch .moonline.m1{animation-duration:1.2s,3.2s}.hero-sketch .moonline.m2{animation-duration:1.2s,2s}
+@keyframes sketch-moonglow{to{opacity:.12}}
 .hero-drawing .photo-caption{position:static;padding:10px 4px 2px;color:var(--muted);text-shadow:none;background:none}
 @media(max-width:760px){.hero-sketch{height:200px;aspect-ratio:auto}}
-@media(prefers-reduced-motion:reduce){.hero-sketch *{animation:none!important;stroke-dashoffset:0!important;fill-opacity:1!important}.hero-sketch .ferry{transform:translateX(-700px)}}
+@media(prefers-reduced-motion:reduce){.hero-sketch *{animation:none!important;stroke-dashoffset:0!important;fill-opacity:1!important}.hero-sketch .ferry{transform:translateX(-700px)}.hero-sketch .moonglow{opacity:.12}}
