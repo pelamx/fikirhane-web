@@ -21,8 +21,12 @@ ADMIN_PASSWORD='<at least 10 chars>' DATABASE_URL=postgres://postgres:postgres@1
   npm run create-admin -- you@example.com Ad Soyad            # default role FIKIRHANE_ADMIN; pass other role codes to add more
 ```
 
-Forgot password: `/uyelik/sifre/` emails a one-time link (60 minutes) through [Resend](https://resend.com) when
-`RESEND_API_KEY` and `MAIL_FROM` are set; in development the email is printed to the server log instead. Staff with
+Forgot password: `/uyelik/sifre/` emails a one-time link (60 minutes) when a mail provider is set; in development the email is
+printed to the server log instead, and the deploy log says at start whether reset emails are on.
+- [Brevo](https://www.brevo.com) (`BREVO_API_KEY`): sends to anyone from a single sender address you verify in Brevo
+  (Senders → add, click the confirmation email); no domain needed. Set `MAIL_FROM` to that address, e.g. `Fikirhane <you@gmail.com>`.
+- [Resend](https://resend.com) (`RESEND_API_KEY`): until a domain is verified in Resend it only delivers to the Resend account's own
+  address. Set `MAIL_FROM` to an address on the verified domain. Staff with
 `user.reset_password` can also create a 24-hour link on a user's page in the admin panel and hand it over themselves
 (never for accounts that hold a staff role). From a terminal, this sets a password directly and signs the account out everywhere:
 
@@ -54,9 +58,9 @@ Docker web service (`fikirhane`) built from `backend/Dockerfile`, both in Frankf
 origin (`https://<service>.onrender.com`), with `TRUST_PROXY=true` and Lax, Secure cookies.
 
 1. Render dashboard → **New → Blueprint** → pick this repository. Fill in `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`
-   (at least 10 characters) and `BOOTSTRAP_ADMIN_NAME` ("Ad Soyad") for the first admin, leave `RESEND_API_KEY` empty unless you
-   have one, then **Apply**. An admin created before the name was set is called "Fikirhane Admin"; setting `BOOTSTRAP_ADMIN_NAME`
-   later renames it on the next start.
+   (at least 10 characters) and `BOOTSTRAP_ADMIN_NAME` ("Ad Soyad") for the first admin, set `BREVO_API_KEY` and `MAIL_FROM` for
+   forgot-password emails (see above) or leave them empty, then **Apply**. An admin created before the name was set is called
+   "Fikirhane Admin"; setting `BOOTSTRAP_ADMIN_NAME` later renames it on the next start.
 2. The first deploy migrates the database and, with `SEED_DEMO=true`, loads the clubs and the next week's coworking sessions. The seed is
    idempotent and runs on every start, so restarts keep the sessions rolling forward. Set `SEED_DEMO=false` once real events are entered.
 3. Admin account: created on start from `BOOTSTRAP_ADMIN_EMAIL` if it does not exist (an existing account keeps its password and only

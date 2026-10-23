@@ -44,8 +44,12 @@ services:
       # "Ad Soyad"; also replaces the placeholder name "Fikirhane Admin" on an admin created without it.
       - key: BOOTSTRAP_ADMIN_NAME
         sync: false
-      # Forgot-password emails through Resend; leave empty to have the team create reset links in the admin panel.
+      # Forgot-password emails. Brevo sends to anyone from one verified address (no domain needed); Resend needs a verified
+      # domain to reach anyone but its own account. Set one key; leave both empty to have the team create reset links instead.
+      - key: BREVO_API_KEY
+        sync: false
       - key: RESEND_API_KEY
         sync: false
+      # The sender: "Fikirhane <address>". With Brevo it must be the sender address verified there.
       - key: MAIL_FROM
-        value: Fikirhane <onboarding@resend.dev>
+        sync: false

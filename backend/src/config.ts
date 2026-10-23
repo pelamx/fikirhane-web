@@ -35,6 +35,7 @@ export interface Config {
   /** Public address of the site, used in emailed links. Render sets RENDER_EXTERNAL_URL automatically. */
   publicSiteUrl: string | null;
   resendApiKey: string | null;
+  brevoApiKey: string | null;
   mailFrom: string;
   passwordResetMinutes: number;
   /** Whether people without a membership may pick their own seat (true: everyone can, as on fikirhane.co). */
@@ -70,6 +71,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     signupsPerHour: int('SIGNUPS_PER_HOUR', 5),
     publicSiteUrl: (process.env.PUBLIC_SITE_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '') || null,
     resendApiKey: process.env.RESEND_API_KEY || null,
+    brevoApiKey: process.env.BREVO_API_KEY || null,
     mailFrom: process.env.MAIL_FROM || 'Fikirhane <onboarding@resend.dev>',
     passwordResetMinutes: int('PASSWORD_RESET_MINUTES', 60),
     visitorSeatSelection: (process.env.VISITOR_SEAT_SELECTION ?? 'true') !== 'false',

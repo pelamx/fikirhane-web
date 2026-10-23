@@ -4,6 +4,7 @@ import { loadConfig } from './config.ts';
 import { createDb } from './db.ts';
 import { migrate } from './migrate.ts';
 import { runJobs } from './services/jobs.ts';
+import { mailChannel } from './services/mail.ts';
 
 const config = loadConfig();
 const sql = createDb(config.databaseUrl);
@@ -23,6 +24,11 @@ if (process.env.BOOTSTRAP_ADMIN_EMAIL) {
   await ensureStaffAccount(sql, { email: process.env.BOOTSTRAP_ADMIN_EMAIL, password: process.env.BOOTSTRAP_ADMIN_PASSWORD, ...name },
     'BOOTSTRAP_ADMIN_EMAIL', console.log);
 }
+
+// Say once whether "forgot password" can email a link, so a missing key is visible in the deploy log.
+const channel = mailChannel(config);
+if (channel) console.log(`password reset emails via ${channel} from ${config.mailFrom}`);
+else if (process.env.NODE_ENV === 'production') console.log('password reset emails are OFF: set BREVO_API_KEY or RESEND_API_KEY (and MAIL_FROM)');
 
 const app = createApp({ sql, config });
 const server = serve({ fetch: app.fetch, port: config.port }, info => {

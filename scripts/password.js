@@ -24,6 +24,7 @@ async function requestPanel() {
     try {
       await api('/auth/password-reset/request', { method: 'POST', body: { email: $('#request-email').value.trim() } });
       form.hidden = true; $('#request-sent').hidden = false;
+      $('#request-panel h2').textContent = 'Bağlantı gönderildi.';
     } catch (err) { fail('#request-error', err.message); }
     finally { busy(form, false); }
   });
