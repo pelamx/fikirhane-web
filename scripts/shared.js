@@ -1,7 +1,11 @@
 export function initTheme() {
   const root = document.documentElement;
   function refresh() { const dark = root.dataset.theme === 'dark'; document.querySelectorAll('.theme-toggle').forEach(button => button.setAttribute('aria-label', dark ? 'Açık temaya geç' : 'Koyu temaya geç')); const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = dark ? '#191a17' : '#fbf8f2'; }
-  document.querySelectorAll('.theme-toggle').forEach(button => button.addEventListener('click', () => { root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark'; try { localStorage.setItem('fikirhane-theme', root.dataset.theme); } catch {} refresh(); }));
+  // theme.js picks light or dark by daylight in Istanbul; the button overrides it until the next sunrise or sunset.
+  const sky = window.fikirhaneTheme;
+  document.querySelectorAll('.theme-toggle').forEach(button => button.addEventListener('click', () => { root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark'; sky?.choose(root.dataset.theme); refresh(); }));
+  // Follow the sky while the page stays open.
+  if (sky) setInterval(() => { const theme = sky.current(); if (theme !== root.dataset.theme) { root.dataset.theme = theme; refresh(); } }, 60_000);
   refresh();
 }
 export function initMenu() {
