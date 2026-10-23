@@ -51,7 +51,7 @@ header .topnav{display:flex;align-items:center;gap:2px;flex:1;min-width:0;font-s
 .hero-sketch .far{stroke:var(--muted);stroke-width:1.4}
 .hero-sketch .cu{stroke:var(--copper)}
 .hero-sketch .hatch{stroke:var(--muted);stroke-width:.9;opacity:.8;animation-duration:1.8s;animation-delay:calc(var(--d,0s) + .5s)}
-.hero-sketch .hatch.dark{stroke:var(--ink);stroke-width:1}
+.hero-sketch .hatch.dark{stroke:var(--ink);stroke-width:1}.hero-sketch .hatch.cu-hatch{stroke:var(--copper);opacity:.8}
 .hero-sketch .far-hatch{opacity:.4}.hero-sketch .water{opacity:.55}
 .hero-sketch .nostroke{stroke:none}
 .hero-sketch .paper{fill:var(--surface)}.hero-sketch .cu-fill{fill:color-mix(in srgb,var(--copper) 35%,var(--surface))}
