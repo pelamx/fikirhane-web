@@ -1,5 +1,6 @@
 import { initTheme, escapeHTML as esc } from './shared.js';
 import { passCard } from './pass.js';
+import { api } from './api.js';
 import './topnav.js';
 import { ready, mode, getCatalog, getSession, saveProfile, toggleClub, toggleEvent, bookEvent, cancelBooking, signOut, clearPreview, siteUrl } from './session.js';
 initTheme();
@@ -89,7 +90,32 @@ function profile(session) {
   const settings = live()
     ? `<section class="preview-settings"><h2>Hesap</h2><p>${esc(session.profile.email ?? '')}</p><div><button class="shell-secondary" data-signout>Çıkış yap ↗</button></div></section>`
     : `<section class="preview-settings"><h2>Önizleme tercihleri</h2><p>Çıkış yaparsan seçimlerin korunur. Önizlemeyi silersen bu tarayıcıdaki profilin ve seçimlerin kaldırılır.</p><div><button class="shell-secondary" data-signout>Çıkış yap ↗</button><button class="text-danger" data-action="reset">Önizlemeyi sil</button></div></section>`;
-  return heading('PROFİLİM', 'Biraz da <em>senden.</em>', 'Bir sonraki sohbet, ortak bir merakla başlayabilir.') + `<div class="profile-layout"><form id="profile-form" class="profile-form"><label for="profile-name">Adın</label><input id="profile-name" name="name" maxlength="50" required autocomplete="given-name" value="${esc(session.profile.name)}"><label for="profile-bio">Nelerle ilgileniyorsun?</label><textarea id="profile-bio" name="bio" maxlength="240" rows="4" placeholder="Kısaca kendinden ve merak ettiklerinden bahset.">${esc(session.profile.bio)}</textarea><p class="entry-footnote">${foot}</p><button class="shell-primary" type="submit">Değişiklikleri kaydet <span>↗</span></button></form><aside class="profile-summary"><div class="profile-avatar">${esc(session.profile.name[0].toLocaleUpperCase('tr'))}</div><h2>${esc(session.profile.name)}</h2><p>${session.clubIds.length} kulüp · ${session.eventIds.length} ${live() ? 'rezervasyon' : 'buluşma'}</p><span class="preview-badge">${badge}</span>${live() ? '' : '<a class="text-link" href="https://www.fikirhane.co/ng/uyelik" target="_blank" rel="noopener">Gerçek Fikirhane üyeliği ↗</a>'}</aside></div>${settings}`;
+  return heading('PROFİLİM', 'Biraz da <em>senden.</em>', 'Bir sonraki sohbet, ortak bir merakla başlayabilir.') + `<div class="profile-layout"><form id="profile-form" class="profile-form"><label for="profile-name">Adın</label><input id="profile-name" name="name" maxlength="50" required autocomplete="given-name" value="${esc(session.profile.name)}"><label for="profile-bio">Nelerle ilgileniyorsun?</label><textarea id="profile-bio" name="bio" maxlength="240" rows="4" placeholder="Kısaca kendinden ve merak ettiklerinden bahset.">${esc(session.profile.bio)}</textarea><p class="entry-footnote">${foot}</p><button class="shell-primary" type="submit">Değişiklikleri kaydet <span>↗</span></button></form><aside class="profile-summary"><div class="profile-avatar">${esc(session.profile.name[0].toLocaleUpperCase('tr'))}</div><h2>${esc(session.profile.name)}</h2><p>${session.clubIds.length} kulüp · ${session.eventIds.length} ${live() ? 'rezervasyon' : 'buluşma'}</p><span class="preview-badge">${badge}</span>${live() ? '' : '<a class="text-link" href="https://www.fikirhane.co/ng/uyelik" target="_blank" rel="noopener">Gerçek Fikirhane üyeliği ↗</a>'}</aside></div>${live() ? '<section class="preview-settings profile-tags" id="profile-tags" aria-busy="true"><h2>İlgi alanların ve becerilerin</h2><p>Yükleniyor…</p></section>' : ''}${settings}`;
+}
+
+// Interests and skills are the member's own: chosen here from Fikirhane's lists, shown to others only per profile settings.
+const TAG_LIMITS = { interest: 10, skill: 12 };
+let savedSkills = [];
+async function loadTags() {
+  const box = content.querySelector('#profile-tags'); if (!box) return;
+  try {
+    const [interests, skills, mine, mySkills] = await Promise.all([api('/interests'), api('/skills'), api('/me/interests'), api('/me/skills')]);
+    savedSkills = mySkills.items;
+    const chosen = { interest: new Set(mine.items.map(i => i.code)), skill: new Set(mySkills.items.map(i => i.code)) };
+    const group = (kind, title, hint, list) => `<fieldset class="interest-options" data-kind="${kind}"><legend>${title} <span>${hint} En fazla ${TAG_LIMITS[kind]} tane.</span></legend>${list.map(i => `<label><input type="checkbox" name="${kind}" value="${esc(i.code)}"${chosen[kind].has(i.code) ? ' checked' : ''}><span>${esc(i.name)}</span></label>`).join('')}</fieldset>`;
+    box.innerHTML = `<h2>İlgi alanların ve becerilerin</h2><p>Ortak meraklarla tanışmak ve kulüp önerileri için. İstediğin zaman değiştirebilirsin.</p><form id="tags-form">`
+      + group('interest', 'Neler ilgini çekiyor?', 'Konuşmaktan ve öğrenmekten keyif aldıkların.', interests.items)
+      + group('skill', 'Nelerde iyisin?', 'Başkalarıyla paylaşabileceğin beceriler.', skills.items)
+      + '<button class="shell-primary" type="submit">Seçimleri kaydet <span>↗</span></button></form>';
+  } catch { box.innerHTML = '<h2>İlgi alanların ve becerilerin</h2><p>Şu anda yüklenemedi. Biraz sonra tekrar dener misin?</p>'; }
+  box.removeAttribute('aria-busy');
+}
+async function saveTags(form) {
+  const codes = kind => [...form.querySelectorAll(`input[name=${kind}]:checked`)].map(i => i.value);
+  const level = Object.fromEntries(savedSkills.map(s => [s.code, s.level ?? null]));
+  await api('/me/interests', { method: 'PUT', body: { items: codes('interest').map((code, i) => ({ code, priority: i + 1 })) } });
+  await api('/me/skills', { method: 'PUT', body: { items: codes('skill').map((code, i) => ({ code, level: level[code] ?? null, priority: i + 1 })) } });
+  savedSkills = codes('skill').map(code => ({ code, level: level[code] ?? null }));
 }
 function render() {
   const session = requireSession(); if (!session) return;
@@ -105,6 +131,7 @@ function render() {
   if (view==='bulusmalar' && id==='tumu') eventFilter='all';
   content.innerHTML = view==='anasayfa' ? home(session) : view==='kesfet' ? discover() : view==='kuluplerim' ? myClubs(session) : view==='kulup' ? clubDetail(id,session) : view==='bulusmalar' ? gatherings(session) : profile(session);
   if (view==='kesfet') renderResults(session);
+  if (view==='profil' && live()) loadTags();
 }
 async function exit() { try { await signOut(); location.assign(siteUrl('')); } catch { flash('Çıkış kaydedilemedi. Tarayıcı depolama iznini kontrol et.'); } }
 async function run(task, success) {
@@ -136,9 +163,20 @@ document.addEventListener('click', event => {
   if (action==='reset-search') {query='';category='all';render();document.querySelector('#club-search').focus();}
   if (action==='reset') document.querySelector('#reset-dialog').showModal();
 });
+content.addEventListener('change', event => {
+  const box = event.target.closest('#tags-form fieldset'); if (!box || !event.target.checked) return;
+  const kind = box.dataset.kind;
+  if (box.querySelectorAll('input:checked').length > TAG_LIMITS[kind]) { event.target.checked = false; flash(`En fazla ${TAG_LIMITS[kind]} ${kind === 'skill' ? 'beceri' : 'ilgi alanı'} seçebilirsin.`); }
+});
 content.addEventListener('input', event => { if(event.target.id==='club-search'){query=event.target.value;renderResults(getSession());} if(event.target.id==='profile-name')event.target.setCustomValidity(''); });
 content.addEventListener('submit', event => {
   event.preventDefault();
+  if (event.target.id==='tags-form') {
+    if (busy) return; busy = true; const button = event.target.querySelector('[type=submit]'); button.disabled = true;
+    saveTags(event.target).then(() => flash('Seçimlerin kaydedildi.'), err => flash(err?.message || 'Seçimler kaydedilemedi.'))
+      .finally(() => { busy = false; button.disabled = false; });
+    return;
+  }
   if (event.target.id!=='profile-form') return;
   const name=document.querySelector('#profile-name').value.trim();
   if(!name){document.querySelector('#profile-name').setCustomValidity('Adını yazabilir misin?');document.querySelector('#profile-name').reportValidity();return;}

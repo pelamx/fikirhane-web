@@ -11,9 +11,9 @@ const content = document.querySelector('#admin-content');
 const GROUPS = { identity: 'Kimlik ve erişim', profile: 'Profil', membership: 'Üyelik', clubs: 'Kulüpler ve kurumlar', growth: 'Büyüme ve sponsorluk', events: 'Etkinlik ve mekân', finance: 'Finans ve stok' };
 // The back office is organised by business area; each area has tabs for its own screens and tables.
 const MODULES = [
-  { key: 'uyeler', icon: '◯', title: 'Üyeler', copy: 'Kişiler, üyelikler, başvurular ve kişilerin profil bilgileri.',
+  { key: 'uyeler', icon: '◯', title: 'Üyeler', copy: 'Kişiler, üyelikler ve başvurular.',
     views: [{ tab: 'basvurular', label: 'Başvurular', href: '#basvurular', show: () => can('membership.view') }],
-    tables: ['users', 'user_memberships', 'membership_applications', 'user_roles', 'user_emails', 'user_skills', 'user_interests', 'needs', 'offers'] },
+    tables: ['users', 'user_memberships', 'membership_applications', 'user_roles', 'user_emails', 'needs', 'offers'] },
   { key: 'kulupler', icon: '◎', title: 'Kulüpler', copy: 'Kalıcı topluluklar, üyeleri ve kulüp içi roller.',
     tables: ['clubs', 'club_users', 'club_member_roles'] },
   { key: 'etkinlikler', icon: '▦', title: 'Etkinlikler', copy: 'Program, etkinlik seçenekleri, görevliler ve rezervasyonlar.',
@@ -30,9 +30,9 @@ const MODULES = [
     tables: ['documents', 'document_items', 'transactions', 'transaction_allocations', 'accounts', 'financial_centers', 'financial_categories'] },
   { key: 'stok', icon: '▤', title: 'Stok', copy: 'Ürün ve hizmet kataloğu, stok hareketleri ve sayımlar.',
     tables: ['items', 'stock_movements', 'stock_counts', 'stock_count_items'] },
-  { key: 'sistem', icon: '⚙', title: 'Sistem', copy: 'Roller ve yetkiler, üyelik tipleri, beceri ve ilgi listeleri, denetim kaydı.',
+  { key: 'sistem', icon: '⚙', title: 'Sistem', copy: 'Roller ve yetkiler, üyelik tipleri, denetim kaydı.',
     views: [{ tab: 'harita', label: 'Tüm tablolar', href: '#veri', show: () => tables.length > 0, last: true }],
-    tables: ['roles', 'role_permissions', 'permissions', 'membership_types', 'skills', 'interests', 'audit_log'] },
+    tables: ['roles', 'role_permissions', 'permissions', 'membership_types', 'audit_log'] },
 ];
 const moduleOfTable = name => MODULES.find(m => m.tables.includes(name));
 const moduleTabs = m => [...(m.views ?? []).filter(v => !v.last && v.show()).map(v => ({ tab: v.tab, label: v.label, href: v.href })),
