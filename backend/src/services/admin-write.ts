@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Sql, Tx } from '../db.ts';
@@ -33,6 +34,10 @@ export interface TableWriteMeta {
   derived?: Record<string, string>;
   rules_tr?: string[];
   deletable_when?: { column: string; values: string[] } | null;
+  /** Allowed values of one column depend on another (financial_categories: the group follows income / expense). */
+  dependent_options?: Record<string, { on: string; options: Record<string, string[]> }>;
+  /** Fields that are hidden or required depending on one column's value (transactions: accounts follow the type). */
+  conditional?: { on: string; cases: Record<string, { hide?: string[]; require?: string[] }> };
 }
 
 export const META: Record<string, TableWriteMeta> =
@@ -73,7 +78,8 @@ function coerce(col: Column, raw: unknown): unknown {
   switch (col.type) {
     case 'text': case 'character varying': case 'character': {
       if (typeof raw !== 'string' && typeof raw !== 'number') throw bad('metin olmalı');
-      const v = String(raw).trim();
+      let v = String(raw).trim();
+      if (/(^|_)email$/.test(col.name)) v = v.toLowerCase();
       if (v.length > 20_000) throw bad('çok uzun');
       if (col.options && !col.options.includes(v)) throw bad(`izin verilen değerlerden biri olmalı (${col.options.join(', ')})`);
       if (col.pattern && !new RegExp(col.pattern).test(v)) throw bad('biçimi geçersiz');
@@ -112,6 +118,8 @@ function coerce(col: Column, raw: unknown): unknown {
   }
 }
 
+type Row = Record<string, unknown>;
+
 function pick(meta: CatalogTable, table: string, mode: 'create' | 'update', values: Record<string, unknown>) {
   if (!values || typeof values !== 'object' || Array.isArray(values)) throw badRequest('validation_failed', 'values must be an object.');
   const allowed = new Map(writableColumns(meta, table, mode).map(c => [c.name, c]));
@@ -127,6 +135,32 @@ function pick(meta: CatalogTable, table: string, mode: 'create' | 'update', valu
   return out;
 }
 
+/** The document rules that tie one field to another, checked on the merged row so the form can point at the field. */
+function crossFieldRules(table: string, row: Row) {
+  const m = META[table];
+  const errors: { path: string; message: string }[] = [];
+  for (const [column, dep] of Object.entries(m?.dependent_options ?? {})) {
+    const allowed = dep.options[String(row[dep.on] ?? '')];
+    if (row[column] != null && allowed && !allowed.includes(String(row[column]))) {
+      errors.push({ path: column, message: `${column}: seçilen ${dep.on} için geçerli değil (${allowed.join(', ')})` });
+    }
+  }
+  const rule = m?.conditional?.cases[String(row[m.conditional.on] ?? '')];
+  for (const c of rule?.require ?? []) if (row[c] == null || row[c] === '') errors.push({ path: c, message: `${c}: bu türde zorunlu` });
+  for (const c of rule?.hide ?? []) if (row[c] != null && row[c] !== false) errors.push({ path: c, message: `${c}: bu türde boş bırakılmalı` });
+  if (errors.length) throw badRequest('validation_failed', 'Bazı alanlar seçilen türle uyuşmuyor.', errors);
+}
+
+// Unguessable codes for freepasses and invitations (FP-D02, INV-D02): no 0/O or 1/I, so they read well on a card.
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+export async function uniqueCode(tx: Tx, table: string, column: string, length = 10) {
+  for (;;) {
+    const code = Array.from({ length }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('');
+    const [taken] = await tx`select 1 from ${tx(table)} where ${tx(column)} = ${code}`;
+    if (!taken) return code;
+  }
+}
+
 const json = (v: unknown) => (v instanceof Date ? v.toISOString() : typeof v === 'bigint' ? v.toString() : v);
 
 async function load(tx: Tx, meta: CatalogTable, table: string, id: string, lock = true) {
@@ -139,7 +173,6 @@ async function load(tx: Tx, meta: CatalogTable, table: string, id: string, lock 
 
 // ---------- table-specific steps the documents require beyond plain field edits ----------
 
-type Row = Record<string, unknown>;
 interface Hooks {
   /** Fill computed fields / validate; `row` is what will be written, `before` the stored row on update. */
   beforeWrite?: (tx: Tx, row: Row, before: Row | null, actor: string) => Promise<void>;
@@ -274,6 +307,17 @@ const HOOKS: Record<string, Hooks> = {
       }
     },
   },
+  freepasses: {
+    async beforeWrite(tx, row, before) { if (!before) row.freepass_code = await uniqueCode(tx, 'freepasses', 'freepass_code'); },
+  },
+  invitations: {
+    async beforeWrite(tx, row, before, actor) {
+      if (before) return;
+      row.invitation_code = await uniqueCode(tx, 'invitations', 'invitation_code');
+      // INV: someone has to stand behind an invitation; staff issuing one without a campaign or organization are the inviter.
+      if (row.invited_by_user_id == null && row.invited_by_organization_id == null && row.id_campaign == null) row.invited_by_user_id = actor;
+    },
+  },
   users: {
     async afterAction(tx, action, before) {
       if (action === 'suspend') await revokeAllSessions(tx, String(before.id_user));
@@ -300,6 +344,7 @@ export async function createRow(sql: Sql, perms: Set<string>, actor: string, tab
     // Required per the documents, checked after the table's own defaults (e.g. a line takes its category from the item).
     const missing = (m.required_on_create ?? []).filter(c => row[c] == null && writableColumns(meta, table, 'create').some(w => w.name === c));
     if (missing.length) throw badRequest('validation_failed', 'Zorunlu alanlar boş.', missing.map(c => ({ path: c, message: `${c}: zorunlu` })));
+    crossFieldRules(table, row);
     const [created] = await tx`insert into ${tx(table)} ${tx(row)} returning *`;
     const id = String(created[meta.pk]);
     await HOOKS[table]?.afterWrite?.(tx, created, null, actor);
@@ -329,6 +374,12 @@ export async function updateRow(sql: Sql, perms: Set<string>, actor: string, tab
       if (allowed && !allowed.includes(to)) throw new ApiError(409, 'invalid_transition', `Durum ${from} → ${to} değiştirilemez.`);
     }
     await HOOKS[table]?.beforeWrite?.(tx, changed, before, actor);
+    crossFieldRules(table, { ...before, ...changed });
+    // A status set by hand still stamps its time when the table records one (invitations: accepted → accepted_at).
+    if ('status' in changed) {
+      const stamp = `${STAMPS[String(changed.status)] ?? changed.status}_at`;
+      if (meta.columns.some(c => c.name === stamp) && before[stamp] == null && !(stamp in changed)) changed[stamp] = new Date().toISOString();
+    }
     if (meta.columns.some(c => c.name === 'updated_by_user_id')) changed.updated_by_user_id = actor;
     const [after] = await tx`update ${tx(table)} set ${tx(changed)} where ${tx(meta.pk)}::text = ${id} returning *`;
     await HOOKS[table]?.afterWrite?.(tx, after, before, actor);
@@ -340,7 +391,7 @@ export async function updateRow(sql: Sql, perms: Set<string>, actor: string, tab
 
 // past participle → the stamp columns an action fills when the table has them (posted_at, posted_by_user_id ...)
 const STAMPS: Record<string, string> = {
-  post: 'posted', cancel: 'cancelled', reverse: 'reversed', approve: 'approved', complete: 'completed', close: 'closed', verify: 'verified',
+  post: 'posted', send: 'sent', cancel: 'cancelled', reverse: 'reversed', approve: 'approved', complete: 'completed', close: 'closed', verify: 'verified',
   submit: 'submitted', archive: 'archived', revoke: 'revoked', confirm: 'confirmed', decline: 'declined', reject: 'declined', start: 'started',
 };
 const REASONS = ['reversal_reason', 'cancellation_reason_text', 'cancel_reason', 'cancellation_note', 'reason', 'notes'];
@@ -412,6 +463,8 @@ export function writeInfo(table: string, meta: CatalogTable, perms: Set<string>)
     type_permissions: m?.type_permissions ? { column: m.type_permissions.column, allowed: Object.entries(m.type_permissions.map).filter(([, p]) => perms.has(p)).map(([v]) => v) } : null,
     actions: (m?.actions ?? []).filter(a => perms.has(a.permission)).map(a => ({ action: a.action, label: a.label_tr, from: a.from_status, column: a.status_column ?? 'status', needs_reason: !!a.needs_reason, effects: a.effects_tr ?? null })),
     deletable_when: m?.deletable_when && canUpdate(table, perms) ? m.deletable_when : null,
+    dependent_options: m?.dependent_options ?? {},
+    conditional: m?.conditional ?? null,
   };
 }
 

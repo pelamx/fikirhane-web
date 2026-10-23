@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
+import { RULES } from '../src/errors.ts';
 import { migrate } from '../src/migrate.ts';
 import { quote } from '../src/services/pricing.ts';
 import { setup, type TestEnv } from './helpers.ts';
@@ -35,6 +36,13 @@ describe('migrations', () => {
     assert.equal(n, 16);
     const missing = await env.sql`select r.role_code from roles r where not exists (select 1 from role_permissions rp where rp.id_role = r.id_role)`;
     assert.equal(missing.length, 0, 'every role has permissions');
+  });
+
+  test('every rule that ties columns together has a field and a Turkish message', async () => {
+    const rules = (await env.sql<{ name: string }[]>`select conname as name from pg_constraint
+      where connamespace = 'public'::regnamespace and (contype = 'x' or (contype = 'c' and cardinality(conkey) > 1))`).map(r => r.name);
+    assert.deepEqual(rules.filter(r => !RULES[r]).sort(), [], 'add these to RULES in src/errors.ts');
+    assert.deepEqual(Object.keys(RULES).filter(r => !rules.includes(r)).sort(), [], 'RULES names a rule the database does not have');
   });
 });
 

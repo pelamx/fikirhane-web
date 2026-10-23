@@ -28,6 +28,28 @@ select 'WORKSPACE_SESSION', 'Community Workspace Session', 'service', 'workspace
   (select id_financial_category from financial_categories where category_code = 'WORKSPACE_REVENUE'), 10
 on conflict (item_code) do nothing;
 
+-- Café stock, so stock movements and counts can be tried: tracked items with an opening balance on first load only.
+with added as (
+  insert into items (item_code, item_name, item_type, item_category, unit, stock_behavior, is_sellable, is_purchasable, is_stock_tracked,
+    default_selling_price, currency_code, default_tax_rate, default_financial_center_id, default_revenue_category_id,
+    default_expense_category_id, reorder_level, target_stock, storage_area, sort_order)
+  select v.code, v.name, 'stock_item', v.category, v.unit, v.behavior, v.sellable, true, true, v.price, 'TRY', 10,
+    (select id_financial_center from financial_centers where center_code = 'CAFETERIA'),
+    (select id_financial_category from financial_categories where category_code = 'CAFETERIA_SALES'),
+    (select id_financial_category from financial_categories where category_code = 'FOOD_BEVERAGE_PURCHASES'),
+    v.reorder, v.target, 'Kafe deposu', v.sort
+  from (values
+    ('WATER_500ML', 'Su 500 ml', 'beverage', 'piece', 'resale', true, 20.00, 24, 96, 20, 48),
+    ('COFFEE_BEANS', 'Kahve çekirdeği', 'ingredient', 'kg', 'ingredient', false, null, 2, 6, 21, 4),
+    ('PAPER_CUP', 'Karton bardak', 'consumable', 'piece', 'consumable', false, null, 100, 500, 22, 300)
+  ) as v(code, name, category, unit, behavior, sellable, price, reorder, target, sort, opening)
+  on conflict (item_code) do nothing
+  returning id_item, item_code
+)
+insert into stock_movements (id_item, movement_type, quantity, reason_code, notes)
+select a.id_item, 'opening_balance', o.qty, null, 'Demo açılış stoku'
+from added a join (values ('WATER_500ML', 48), ('COFFEE_BEANS', 4), ('PAPER_CUP', 300)) as o(code, qty) on o.code = a.item_code;
+
 -- Coworking sessions for the next 7 weekdays (morning 10-14, afternoon 14-18), two options each.
 with days as (
   select d::date as day from generate_series(current_date, current_date + 9, interval '1 day') d

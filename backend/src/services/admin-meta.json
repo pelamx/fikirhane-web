@@ -1113,7 +1113,30 @@
    "FCAT-D08: Transfer, iade, ödeme yöntemi, vergi, indirim ve freepass kategori olarak açılmaz.",
    "Kategorileri üst seviyede tutun (~15-20); 'Diğer'i sınırlı kullanın, büyüyorsa yeni kategori gerekir.",
    "FCAT-D09/D10: Silme yok, archived yapılır; gelir/gider toplamları burada tutulmaz."
-  ]
+  ],
+  "dependent_options": {
+   "category_group": {
+    "on": "direction",
+    "options": {
+     "income": [
+      "operating_revenue",
+      "sponsorship",
+      "membership",
+      "cafeteria",
+      "other_income"
+     ],
+     "expense": [
+      "people",
+      "marketing",
+      "facilities",
+      "technology",
+      "cafeteria_cost",
+      "administrative",
+      "other_expense"
+     ]
+    }
+   }
+  }
  },
  "documents": {
   "purpose_tr": "Bir ticari belgenin başlığı: satış veya alış (fatura, fiş, iç belge); giderler de alış belgesidir. Satır detayı, merkez/kategori (DOCUMENT_ITEMS), gerçek para hareketi (TRANSACTIONS) ve ödeme durumu burada tutulmaz.",
@@ -1437,6 +1460,46 @@
    "values": [
     "pending"
    ]
+  },
+  "conditional": {
+   "on": "transaction_type",
+   "cases": {
+    "collection": {
+     "hide": [
+      "from_account_id"
+     ],
+     "require": [
+      "to_account_id"
+     ]
+    },
+    "expense_payment": {
+     "hide": [
+      "to_account_id"
+     ],
+     "require": [
+      "from_account_id"
+     ]
+    },
+    "refund": {
+     "hide": [
+      "to_account_id"
+     ],
+     "require": [
+      "from_account_id"
+     ]
+    },
+    "transfer": {
+     "require": [
+      "from_account_id",
+      "to_account_id"
+     ]
+    },
+    "adjustment": {
+     "require": [
+      "description"
+     ]
+    }
+   }
   }
  },
  "transaction_allocations": {
@@ -1661,9 +1724,9 @@
     "declined": "Reddedildi"
    }
   },
-  "write_mode": "workflow_only",
+  "write_mode": "crud",
   "create_permission": "invitation.create",
-  "update_permission": null,
+  "update_permission": "invitation.create",
   "system_fields": [
    "invitation_code",
    "sent_at",
@@ -1687,22 +1750,18 @@
   ],
   "status_transitions": {
    "draft": [
-    "sent",
-    "cancelled",
     "expired"
    ],
    "sent": [
     "opened",
     "accepted",
     "declined",
-    "expired",
-    "cancelled"
+    "expired"
    ],
    "opened": [
     "accepted",
     "declined",
-    "expired",
-    "cancelled"
+    "expired"
    ],
    "accepted": [],
    "declined": [],
@@ -1716,6 +1775,32 @@
    "INV-D07: Süresi dolmuş/iptal edilmiş davet yeni claim veya booking için kullanılamaz. Süre dolumu job ile işlenir.",
    "Claim edilmemiş davet iptal edilebilir; bağlı freepass varsa onun durumu ayrıca değerlendirilir, sessizce iptal edilmez.",
    "INV-D06/D09: Davet booking/freepass yerine geçmez ve silinmez; kullanım hakkı FREEPASSES'tadır."
+  ],
+  "actions": [
+   {
+    "action": "send",
+    "label_tr": "Gönderildi işaretle",
+    "from_status": [
+     "draft"
+    ],
+    "to_status": "sent",
+    "permission": "invitation.create",
+    "needs_reason": false,
+    "effects_tr": "sent_at yazılır; davet kodu davetliyle paylaşılabilir."
+   },
+   {
+    "action": "cancel",
+    "label_tr": "Daveti iptal et",
+    "from_status": [
+     "draft",
+     "sent",
+     "opened"
+    ],
+    "to_status": "cancelled",
+    "permission": "invitation.create",
+    "needs_reason": true,
+    "effects_tr": "Davet artık kabul edilemez; bağlı freepass varsa ayrıca değerlendirilir."
+   }
   ]
  },
  "freepasses": {
@@ -3587,7 +3672,18 @@
    "Etkinlik/rezervasyon fiyatları burada tutulmaz (EVENTS.base_price + EVENT_OPTIONS); bu hizmetlerde varsayılan fiyat ve merkez boş kalabilir.",
    "V1'de reçete/BOM yok: hazırlanmış ürün satışı malzeme düşmez; malzeme/sarf tüketimi periyodik sayımla bulunur.",
    "Tek stok lokasyonu var; storage_area sadece bilgi amaçlı serbest metindir."
-  ]
+  ],
+  "conditional": {
+   "on": "item_type",
+   "cases": {
+    "service": {
+     "hide": [
+      "is_stock_tracked",
+      "stock_behavior"
+     ]
+    }
+   }
+  }
  },
  "stock_movements": {
   "purpose_tr": "Bir satır = stok takibi yapılan bir kalemin fiziksel miktarındaki tek bir işaretli (+/−) artış veya azalış; değiştirilemez stok ledger'ı. Finans merkezi/kategori, depo lokasyonu, rezervasyon kapasitesi ve taslak hareketler buraya ait değildir.",
@@ -3683,6 +3779,21 @@
     "manual_adjustment": "stock.adjust",
     "opening_balance": "stock.adjust",
     "return_out": "stock.adjust"
+   }
+  },
+  "conditional": {
+   "on": "movement_type",
+   "cases": {
+    "waste": {
+     "require": [
+      "reason_code"
+     ]
+    },
+    "manual_adjustment": {
+     "require": [
+      "reason_code"
+     ]
+    }
    }
   }
  },

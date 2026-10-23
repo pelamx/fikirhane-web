@@ -332,31 +332,50 @@ function recordBar(meta, row, id) {
     + (deletable ? `<button class="shell-secondary admin-danger" data-row-delete data-table="${meta.name}" data-id="${esc(id)}">Sil</button>` : '') + '</div>';
 }
 
-async function refChoices(table) {
+const REF_LIMIT = 200;
+/** Options for a reference field; past REF_LIMIT rows the form adds a search box that asks the server (?q=). */
+async function refChoices(table, q = '') {
   const meta = tableOf(table);
   if (!meta) return null;
-  const res = await api(`/admin/data/${table}?limit=200`);
+  const res = await api(`/admin/data/${table}?limit=${q ? 50 : REF_LIMIT}${q ? `&q=${encodeURIComponent(q)}` : ''}`);
   const show = summaryColumns(meta, 3);
-  return res.items.map(r => {
+  const choices = res.items.map(r => {
     const text = meta.label.map(c => r[c]).filter(Boolean).join(' ')
       || show.map(c => c.ref ? res.labels?.[c.ref.table]?.[r[c.name]] : r[c.name]).filter(v => v != null && v !== '').map(String).join(' · ')
       || String(r[meta.pk]).slice(0, 8);
     return { id: String(r[meta.pk]), text: text + (r.status && r.status !== 'active' ? ` (${optionLabel(meta, 'status', r.status)})` : '') };
   });
+  return Object.assign(choices, { total: res.total });
 }
+const choiceOptions = (choices, v, required) => `<option value="">${required ? '— seç —' : '— seçilmedi —'}</option>${v && !choices.some(c => c.id === String(v)) ? `<option value="${esc(v)}" selected>${esc(String(v).slice(0, 8))}</option>` : ''}${choices.map(c => `<option value="${esc(c.id)}"${String(v) === c.id ? ' selected' : ''}>${esc(c.text)}</option>`).join('')}`;
+const CURRENCIES = ['TRY', 'EUR', 'USD'];
+/** Allowed values of a column whose list depends on another field's current value (financial_categories.category_group). */
+const dependentValues = (meta, col, row) => {
+  const dep = meta.write?.dependent_options?.[col.name];
+  return dep ? dep.options[row[dep.on]] ?? [...new Set(Object.values(dep.options).flat())] : null;
+};
 
 const localDateTime = v => { if (!v) return ''; const d = new Date(v); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
 
-function inputFor(meta, col, value, choices, { locked = false, required = false, allowed = null } = {}) {
+function inputFor(meta, col, value, choices, { locked = false, required = false, allowed = null, row = {} } = {}) {
   const id = `f-${col.name}`, attrs = `id="${id}" name="${esc(col.name)}"${required ? ' required' : ''}${locked ? ' disabled' : ''}`;
   const v = value == null ? '' : value;
+  const dependent = dependentValues(meta, col, row);
+  if (dependent) {
+    return `<select ${attrs} data-depends-on="${esc(meta.write.dependent_options[col.name].on)}"><option value="">— seç —</option>${dependent.map(o => `<option value="${esc(o)}"${String(v) === o ? ' selected' : ''}>${esc(optionLabel(meta, col.name, o))}</option>`).join('')}</select>`;
+  }
+  if (col.name === 'currency_code' && !col.options) {
+    const list = v && !CURRENCIES.includes(String(v).trim()) ? [String(v).trim(), ...CURRENCIES] : CURRENCIES;
+    return `<select ${attrs}>${col.nullable ? '<option value="">— seçilmedi —</option>' : ''}${list.map(c => `<option${String(v).trim() === c || (!v && !col.nullable && c === 'TRY') ? ' selected' : ''}>${c}</option>`).join('')}</select>`;
+  }
   if (col.options) {
     const opts = allowed ? col.options.filter(o => allowed.includes(o)) : col.options;
     return `<select ${attrs}>${col.nullable || !required ? '<option value="">— seçilmedi —</option>' : ''}${opts.map(o => `<option value="${esc(o)}"${String(v) === o ? ' selected' : ''}>${esc(optionLabel(meta, col.name, o))}</option>`).join('')}</select>`;
   }
   if (col.ref && choices) {
-    const known = choices.some(c => c.id === String(v));
-    return `<select ${attrs}><option value="">${required ? '— seç —' : '— seçilmedi —'}</option>${!known && v ? `<option value="${esc(v)}" selected>${esc(String(v).slice(0, 8))}</option>` : ''}${choices.map(c => `<option value="${esc(c.id)}"${String(v) === c.id ? ' selected' : ''}>${esc(c.text)}</option>`).join('')}</select>`;
+    const search = choices.total > choices.length
+      ? `<input type="search" class="admin-ref-search" data-ref-search="${esc(col.ref.table)}" data-for="${id}" placeholder="${choices.total} kayıt var; ara…" aria-label="${esc(columnLabel(col.name))} ara">` : '';
+    return `${search}<select ${attrs}>${choiceOptions(choices, v, required)}</select>`;
   }
   if (col.type === 'boolean') {
     return col.nullable
@@ -366,11 +385,13 @@ function inputFor(meta, col, value, choices, { locked = false, required = false,
   if (col.type === 'date') return `<input type="date" ${attrs} value="${esc(String(v).slice(0, 10))}">`;
   if (col.type.startsWith('timestamp')) return `<input type="datetime-local" ${attrs} value="${esc(localDateTime(v))}">`;
   if (['integer', 'smallint', 'bigint'].includes(col.type)) return `<input type="number" step="1" ${attrs} value="${esc(v)}">`;
-  if (['numeric', 'double precision', 'real'].includes(col.type)) return `<input inputmode="decimal" ${attrs} value="${esc(v)}" placeholder="0,00">`;
+  if (['numeric', 'double precision', 'real'].includes(col.type)) return `<input inputmode="decimal" ${attrs} value="${esc(v)}" placeholder="0,00" data-decimal>`;
+  if (/(^|_)email$/.test(col.name)) return `<input type="email" ${attrs} value="${esc(v)}">`;
   if (col.type === 'jsonb' || col.type === 'json') return `<textarea rows="4" ${attrs}>${esc(v === '' ? '' : JSON.stringify(v, null, 2))}</textarea>`;
-  if (col.ref) return `<input ${attrs} value="${esc(v)}" placeholder="kayıt numarası">`;
+  if (col.ref) return `<input ${attrs} value="${esc(v)}" placeholder="kayıt numarası (ID)"><small class="admin-help">${esc(label(col.ref.table))} tablosunu görme yetkin yok; kaydın numarasını (ID) yapıştırabilirsin.</small>`;
   if (LONG_TEXT.test(col.name)) return `<textarea rows="3" ${attrs}>${esc(v)}</textarea>`;
-  return `<input ${attrs} value="${esc(v)}"${col.pattern ? ` data-pattern="${esc(col.pattern)}"` : ''}>`;
+  return `<input ${attrs} value="${esc(v)}"${col.pattern ? ` data-pattern="${esc(col.pattern)}"` : ''}${/_code$/.test(col.name) && col.pattern ? ' autocapitalize="characters"' : ''}>`
+    + (col.pattern && /^\^\[A-Z(0-9)?_\]/.test(col.pattern) ? `<small class="admin-help">Büyük harf${col.pattern.includes('0-9') ? ', rakam' : ''} ve _ (ör. YENI_KOD).</small>` : '');
 }
 
 async function formView(table, id, params) {
@@ -389,8 +410,8 @@ async function formView(table, id, params) {
     const locked = !names.includes(c.name);
     const help = w.help?.[c.name];
     const allowed = w.type_permissions?.column === c.name ? w.type_permissions.allowed : null;
-    return `<div class="admin-field${locked ? ' admin-field-locked' : ''}"><label for="f-${esc(c.name)}">${esc(columnLabel(c.name))}${required(c) && !locked ? ' <span class="admin-req" aria-label="zorunlu">*</span>' : ''}${locked ? ' <span class="admin-muted">(değiştirilemez)</span>' : ''}</label>`
-      + (locked ? `<div class="admin-locked-value">${cell(table, c, row[c.name], record?.labels, { full: true })}</div>` : inputFor(meta, c, row[c.name], c.ref ? choices[c.ref.table] : null, { required: required(c), allowed }))
+    return `<div class="admin-field${locked ? ' admin-field-locked' : ''}" data-field="${esc(c.name)}"><label for="f-${esc(c.name)}">${esc(columnLabel(c.name))}${required(c) && !locked ? ' <span class="admin-req" aria-label="zorunlu">*</span>' : ''}${locked ? ' <span class="admin-muted">(değiştirilemez)</span>' : ''}</label>`
+      + (locked ? `<div class="admin-locked-value">${cell(table, c, row[c.name], record?.labels, { full: true })}</div>` : inputFor(meta, c, row[c.name], c.ref ? choices[c.ref.table] : null, { required: required(c), allowed, row }))
       + (help ? `<small class="admin-help">${esc(help)}</small>` : '') + (w.derived?.[c.name] ? `<small class="admin-help">Hesaplama: ${esc(w.derived[c.name])}</small>` : '')
       + `<small class="admin-field-error" data-error-for="${esc(c.name)}" hidden></small></div>`;
   };
@@ -406,7 +427,7 @@ async function formView(table, id, params) {
 function formValues(form, meta, editing, original) {
   const values = {};
   for (const el of form.querySelectorAll('input[name], select[name], textarea[name]')) {
-    if (el.disabled) continue;
+    if (el.disabled || el.closest('.admin-field')?.hidden) continue;
     const col = meta.columns.find(c => c.name === el.name);
     if (!col) continue;
     let v = el.type === 'checkbox' ? el.checked : el.value.trim();
@@ -436,6 +457,67 @@ function showFieldErrors(form, details) {
   first?.closest('.admin-field')?.querySelector('input,select,textarea')?.focus();
   return !!first;
 }
+
+/** Shows, hides and requires fields by the table's conditional rules (transactions: the accounts follow the type). */
+function formDynamics(form) {
+  const meta = tableOf(form.dataset.table), rule = meta?.write?.conditional;
+  if (!rule) return;
+  const value = form.querySelector(`[name="${CSS.escape(rule.on)}"]`)?.value ?? '';
+  const now = rule.cases[value] ?? {};
+  const all = new Set(Object.values(rule.cases).flatMap(c => [...(c.hide ?? []), ...(c.require ?? [])]));
+  for (const name of all) {
+    const field = form.querySelector(`.admin-field[data-field="${CSS.escape(name)}"]`);
+    if (!field || field.classList.contains('admin-field-locked')) continue;
+    field.hidden = !!now.hide?.includes(name);
+    const input = field.querySelector('[name]'), mark = field.querySelector('.admin-req');
+    if (input && !input.dataset.required) input.dataset.required = input.required ? 'static' : 'no';
+    const must = !!now.require?.includes(name) || input?.dataset.required === 'static';
+    if (input) input.required = must;
+    if (must && !mark) field.querySelector('label')?.insertAdjacentHTML('beforeend', ' <span class="admin-req" aria-label="zorunlu">*</span>');
+    if (!must && mark) mark.remove();
+  }
+}
+
+/** The checks the browser can make before asking the server: required, code formats, numbers, e-mail. */
+function checkForm(form) {
+  const errors = [];
+  for (const el of form.querySelectorAll('input[name], select[name], textarea[name]')) {
+    if (el.disabled || el.closest('.admin-field')?.hidden || el.type === 'checkbox') continue;
+    const v = el.value.trim();
+    if (!v) { if (el.required) errors.push({ path: el.name, message: 'zorunlu' }); continue; }
+    if (el.dataset.pattern && !new RegExp(el.dataset.pattern).test(v)) errors.push({ path: el.name, message: /^\^\[A-Z(0-9)?_\]/.test(el.dataset.pattern) ? `yalnızca büyük harf${el.dataset.pattern.includes('0-9') ? ', rakam' : ''} ve _ kullan` : 'biçimi geçersiz' });
+    else if (el.hasAttribute('data-decimal') && !/^-?\d{1,14}([.,]\d{1,6})?$/.test(v)) errors.push({ path: el.name, message: 'sayı olmalı (ör. 12,50)' });
+    else if (el.type === 'number' && !Number.isInteger(Number(v))) errors.push({ path: el.name, message: 'tam sayı olmalı' });
+    else if (el.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) errors.push({ path: el.name, message: 'geçerli bir e-posta olmalı' });
+  }
+  return errors;
+}
+
+let refSearchTimer;
+content.addEventListener('input', event => {
+  const box = event.target.closest('[data-ref-search]'); if (!box) return;
+  clearTimeout(refSearchTimer);
+  refSearchTimer = setTimeout(async () => {
+    const select = content.querySelector(`#${CSS.escape(box.dataset.for)}`); if (!select) return;
+    const choices = await refChoices(box.dataset.refSearch, box.value.trim()).catch(() => null); if (!choices) return;
+    const keep = select.value && !choices.some(c => c.id === select.value) ? [...select.options].find(o => o.value === select.value) : null;
+    select.innerHTML = choiceOptions(choices, select.value, select.required);
+    if (keep) { keep.selected = true; select.append(keep); }
+    if (box.value.trim() && choices.length === 1) select.value = choices[0].id;
+  }, 250);
+});
+
+content.addEventListener('change', event => {
+  const form = event.target.closest('#record-form'); if (!form) return;
+  const meta = tableOf(form.dataset.table);
+  for (const dep of form.querySelectorAll(`[data-depends-on="${CSS.escape(event.target.name)}"]`)) {
+    const col = meta.columns.find(c => c.name === dep.name);
+    const values = dependentValues(meta, col, { [event.target.name]: event.target.value });
+    const keep = values.includes(dep.value) ? dep.value : '';
+    dep.innerHTML = `<option value="">— seç —</option>${values.map(o => `<option value="${esc(o)}"${o === keep ? ' selected' : ''}>${esc(optionLabel(meta, col.name, o))}</option>`).join('')}`;
+  }
+  if (event.target.name === meta?.write?.conditional?.on) formDynamics(form);
+});
 
 // ---------- door check (QR) ----------
 
@@ -506,6 +588,7 @@ async function render() {
       : await overview();
     if (id !== renderId) return;
     content.innerHTML = (nav !== 'genel' ? tabBar(nav, tab) : '') + html;
+    const recordForm = content.querySelector('#record-form'); if (recordForm) formDynamics(recordForm);
     document.title = `${content.querySelector('h1')?.textContent ?? 'Yönetim'} · Fikirhane yönetim`;
   } catch (err) {
     if (id !== renderId) return;
@@ -584,6 +667,8 @@ async function saveRecord(form) {
   let values;
   try {
     const original = id ? (await api(`/admin/data/${table}/${encodeURIComponent(id)}`)).row : {};
+    const problems = checkForm(form);
+    if (problems.length) { showFieldErrors(form, problems); error.textContent = 'İşaretli alanları kontrol eder misin?'; error.hidden = false; return; }
     values = formValues(form, meta, !!id, original);
   } catch (err) { showFieldErrors(form, err.field ? [{ path: err.field, message: err.message }] : []); error.textContent = err.message; error.hidden = false; return; }
   if (id && !Object.keys(values).length) { flash('Değişiklik yok.'); location.hash = `kayit/${table}/${id}`; return; }

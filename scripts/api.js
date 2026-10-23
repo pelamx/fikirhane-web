@@ -85,7 +85,12 @@ const RULES = [
 const ruleText = message => { for (const [re, tr] of RULES) if (re.test(message ?? '')) return message.replace(new RegExp(re.source + '.*$', 's'), tr); return null; };
 
 export class ApiError extends Error {
-  constructor(status, code, message, details) { super((['rule_violation', 'not_allowed'].includes(code) ? ruleText(message) : null) ?? MESSAGES[code] ?? message ?? 'Bir şeyler ters gitti. Tekrar dener misin?'); this.status = status; this.code = code; this.details = details; }
+  constructor(status, code, message, details) {
+    // A rule that names its field already carries a Turkish message from the server.
+    const own = code === 'rule_violation' && Array.isArray(details) && details.length ? message : null;
+    super(own ?? (['rule_violation', 'not_allowed'].includes(code) ? ruleText(message) : null) ?? MESSAGES[code] ?? message ?? 'Bir şeyler ters gitti. Tekrar dener misin?');
+    this.status = status; this.code = code; this.details = details;
+  }
 }
 
 export async function api(path, { method = 'GET', body } = {}) {

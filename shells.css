@@ -165,6 +165,8 @@ body[data-shell=admin] .member-menu{display:none}
 .admin-field input:focus,.admin-field select:focus,.admin-field textarea:focus{outline:1px solid var(--copper)}
 .admin-help{font-size:10.5px;line-height:1.5;color:var(--muted)}
 .admin-req{color:var(--copper)}
+.admin-field .admin-ref-search{min-height:34px;padding:7px 12px;font-size:12px;border-style:dashed}
+.admin-field[hidden]{display:none}
 .admin-check{display:flex!important;gap:8px;align-items:center;font-size:12px!important;min-height:40px}
 .admin-check input{width:auto!important;min-height:0!important}
 .admin-field-error{color:#b3261e;font-size:11px}
