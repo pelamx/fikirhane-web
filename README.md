@@ -1,11 +1,13 @@
 # Fikirhane
 
-Kulüp ve networking odaklı, açık/koyu temalı Fikirhane web sitesi. İlk aşama iki ayrı arayüz içerir:
+Kulüp ve networking odaklı, açık/koyu temalı Fikirhane web sitesi. Site dört katmandan oluşur:
 
-- **Public** (`/`): keşif, tanıtım, kulüpler ve program.
-- **Member** (`/member/`): kişisel ana sayfa, kulüp keşfi/takibi, kişisel buluşma planı ve profil.
+- **Visitor** (`/` ve mekân sayfaları): herkese açık keşif, tanıtım, kulüpler, program ve üyelik.
+- **Member** (`/member/`): hesap açan herkes; kişisel ana sayfa, kulüpler, rezervasyonlar ve profil.
+- **Host** (`/host/`): personel ile kulüp ve etkinlik sorumluları; günün programı, kapıda giriş, başvurular, kendi iş kayıtları.
+- **Admin** (`/admin/`): işletme ve teknik yönetici; bütün tablolar ve ilişkileri, roller ve yetkiler, sistem.
 
-Host ve admin sonraki aşamalardır. Ayrıntılar: [Shell mimarisi](docs/shells.md).
+Kimin hangi katmana girdiğini sunucu belirler (`/api/me` → `shells`). Ayrıntılar: [Shell mimarisi](docs/shells.md).
 
 ## Üyelik: gerçek hesaplar ve önizleme
 

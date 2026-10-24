@@ -106,19 +106,19 @@ html[data-theme=dark] .admin-status:is([data-status=cancelled],[data-status=decl
 .admin-roles{display:block;margin-bottom:18px;line-height:1.7;color:var(--muted)}
 /* Admin: the menu sits in a bar under the header instead of a left column (phones keep the ☰ menu) */
 @media(min-width:651px){
-body[data-shell=admin] .member-layout{display:block;min-height:0}
-body[data-shell=admin] .member-sidebar{flex-direction:row;align-items:center;min-height:0;border-right:0;border-bottom:1px solid var(--line);padding:0 35px;position:sticky;top:0;z-index:10}
-body[data-shell=admin] .member-sidebar nav{flex-direction:row;gap:2px;overflow-x:auto}
-body[data-shell=admin] .member-sidebar nav>a{padding:16px 14px;white-space:nowrap;border-bottom:2px solid transparent}
-body[data-shell=admin] .member-sidebar nav>a[aria-current=page]{background:none;border-bottom-color:var(--copper)}
-body[data-shell=admin] .member-sidebar nav>a>span{font-size:15px}
-body[data-shell=admin] .sidebar-label{display:none}
-body[data-shell=admin] .sidebar-bottom{margin:0 0 0 auto;display:flex;align-items:center;gap:18px;flex-shrink:0}
-body[data-shell=admin] .admin-roles{margin:0;white-space:nowrap}
-body[data-shell=admin] .signout{margin:0;border:0;padding:16px 0;width:auto;gap:10px}
-body[data-shell=admin] .member-menu{display:none}
+body:is([data-shell=admin],[data-shell=host]) .member-layout{display:block;min-height:0}
+body:is([data-shell=admin],[data-shell=host]) .member-sidebar{flex-direction:row;align-items:center;min-height:0;border-right:0;border-bottom:1px solid var(--line);padding:0 35px;position:sticky;top:0;z-index:10}
+body:is([data-shell=admin],[data-shell=host]) .member-sidebar nav{flex-direction:row;gap:2px;overflow-x:auto}
+body:is([data-shell=admin],[data-shell=host]) .member-sidebar nav>a{padding:16px 14px;white-space:nowrap;border-bottom:2px solid transparent}
+body:is([data-shell=admin],[data-shell=host]) .member-sidebar nav>a[aria-current=page]{background:none;border-bottom-color:var(--copper)}
+body:is([data-shell=admin],[data-shell=host]) .member-sidebar nav>a>span{font-size:15px}
+body:is([data-shell=admin],[data-shell=host]) .sidebar-label{display:none}
+body:is([data-shell=admin],[data-shell=host]) .sidebar-bottom{margin:0 0 0 auto;display:flex;align-items:center;gap:18px;flex-shrink:0}
+body:is([data-shell=admin],[data-shell=host]) .admin-roles{margin:0;white-space:nowrap}
+body:is([data-shell=admin],[data-shell=host]) .signout{margin:0;border:0;padding:16px 0;width:auto;gap:10px}
+body:is([data-shell=admin],[data-shell=host]) .member-menu{display:none}
 }
-@media(min-width:651px) and (max-width:900px){body[data-shell=admin] .member-sidebar{padding:0 20px}body[data-shell=admin] .admin-roles{display:none}}
+@media(min-width:651px) and (max-width:900px){body:is([data-shell=admin],[data-shell=host]) .member-sidebar{padding:0 20px}body:is([data-shell=admin],[data-shell=host]) .admin-roles{display:none}}
 #admin-main{padding:25px 45px 35px;min-width:0;width:100%;max-width:1500px;margin-inline:auto}
 #admin-main:focus{outline:none}
 @media(min-width:1700px){#admin-main{padding-inline:65px}}

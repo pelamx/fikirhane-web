@@ -41,7 +41,7 @@ export function windowOf(row: PassRow, config: Config) {
 /** What the QR encodes: the staff check page with the token, plus date and session for anyone reading it. */
 export function qrText(row: PassRow, base: string) {
   const session = `${hm(row.start_datetime)}-${hm(row.end_datetime)}`;
-  return `${base}/admin/#kontrol?k=${row.checkin_token}&tarih=${isoDay(row.start_datetime)}&seans=${encodeURIComponent(session)}`;
+  return `${base}/host/#kontrol?k=${row.checkin_token}&tarih=${isoDay(row.start_datetime)}&seans=${encodeURIComponent(session)}`;
 }
 
 export function passInfo(row: PassRow, config: Config) {

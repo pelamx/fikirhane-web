@@ -9,7 +9,7 @@ const TYPES: Record<string, string> = {
 };
 
 // Only the public site is served from the repository root; never backend/, docs/, .git or dotfiles.
-const ALLOWED_TOP = new Set(['index.html', 'style.css', 'shells.css', 'app.js', 'scripts', 'assets', 'member', 'uyelik', 'admin', 'rezervasyon',
+const ALLOWED_TOP = new Set(['index.html', 'style.css', 'shells.css', 'app.js', 'scripts', 'assets', 'member', 'uyelik', 'host', 'admin', 'rezervasyon',
   'coworking', 'toplanti-odasi', 'etkinlik-alani', 'language-meetup']);
 
 /** Serves the static Fikirhane site so the frontend and API share one origin (no CORS, Lax cookies). */

@@ -1,4 +1,7 @@
-// Admin shell: back-office views over the API. Every action is re-checked on the server; hiding a link here is UX only.
+// Host and admin shells (host/, admin/): the same app over the API, with a different set of areas. Host is daily work —
+// today's program, the door, applications, each staff role's own records, and what a club lead or event host runs.
+// Admin is the back office — every table and relation, roles and permissions, system settings. Every action is
+// re-checked on the server; which shell shows a screen is UX only.
 import { initTheme, escapeHTML as esc } from './shared.js';
 import { api, apiAvailable } from './api.js';
 import { siteUrl } from './session.js';
@@ -7,18 +10,36 @@ import './topnav.js';
 initTheme();
 
 const content = document.querySelector('#admin-content');
+const SHELL = document.body.dataset.shell === 'host' ? 'host' : 'admin';
+const SHELL_NAME = { host: 'Host paneli', admin: 'Yönetim' }[SHELL];
 
 const GROUPS = { identity: 'Kimlik ve erişim', profile: 'Profil', membership: 'Üyelik', clubs: 'Kulüpler ve kurumlar', growth: 'Büyüme ve sponsorluk', events: 'Etkinlik ve mekân', finance: 'Finans ve stok' };
-// The back office is organised by business area; each area has tabs for its own screens and tables.
-const MODULES = [
-  { key: 'uyeler', icon: '◯', title: 'Üyeler', copy: 'Kişiler, üyelikler ve başvurular.',
+// Each shell is organised by area; each area has tabs for its own screens and tables.
+const HOST_MODULES = [
+  { key: 'program', icon: '▦', title: 'Program', copy: 'Etkinlikler, katılımcılar ve kapıda giriş.',
+    views: [{ tab: 'program', label: 'Program', href: '#etkinlikler', show: () => EVENT_PERMS.some(can) },
+      { tab: 'kontrol', label: 'Giriş kontrol', href: '#kontrol', show: () => can('booking.checkin') || can('event_attendance.manage') || scope.events.length > 0 }],
+    tables: ['bookings'] },
+  { key: 'sorumluluk', icon: '◎', title: 'Sorumluluklarım', copy: 'Yürüttüğün kulüpler ve görev aldığın etkinlikler.',
+    views: [{ tab: 'kuluplerim', label: 'Kulüplerim', href: '#kuluplerim', show: () => scope.clubs.length > 0 },
+      { tab: 'etkinliklerim', label: 'Etkinliklerim', href: '#etkinliklerim', show: () => scope.events.length > 0 }],
+    tables: [] },
+  { key: 'uyeler', icon: '◯', title: 'Üyeler', copy: 'Başvurular, kişiler ve üyelikler.',
     views: [{ tab: 'basvurular', label: 'Başvurular', href: '#basvurular', show: () => can('membership.view') }],
+    tables: ['users', 'user_memberships', 'membership_applications'] },
+  { key: 'kafeterya', icon: '▤', title: 'Kafeterya ve stok', copy: 'Ürünler, stok hareketleri ve sayımlar.',
+    tables: ['items', 'stock_movements', 'stock_counts', 'stock_count_items'] },
+  { key: 'finans', icon: '₺', title: 'Finans', copy: 'Belgeler, para hareketleri ve ödeme eşleştirmeleri.',
+    tables: ['documents', 'document_items', 'transactions', 'transaction_allocations'] },
+  { key: 'buyume', icon: '↗', title: 'Büyüme', copy: 'Kampanyalar, davetler, freepass’ler ve üyelerin nereden geldiği.',
+    tables: ['campaigns', 'invitations', 'freepasses', 'freepass_redemptions', 'user_acquisitions'] },
+];
+const ADMIN_MODULES = [
+  { key: 'uyeler', icon: '◯', title: 'Üyeler', copy: 'Kişiler, üyelikler, başvurular ve roller.',
     tables: ['users', 'user_memberships', 'membership_applications', 'user_roles', 'user_emails', 'needs', 'offers'] },
   { key: 'kulupler', icon: '◎', title: 'Kulüpler', copy: 'Kalıcı topluluklar, üyeleri ve kulüp içi roller.',
     tables: ['clubs', 'club_users', 'club_member_roles'] },
-  { key: 'etkinlikler', icon: '▦', title: 'Etkinlikler', copy: 'Program, etkinlik seçenekleri, görevliler ve rezervasyonlar.',
-    views: [{ tab: 'program', label: 'Program', href: '#etkinlikler', show: () => EVENT_PERMS.some(can) },
-      { tab: 'kontrol', label: 'Giriş kontrol', href: '#kontrol', show: () => can('booking.checkin') || can('event_attendance.manage') }],
+  { key: 'etkinlikler', icon: '▦', title: 'Etkinlikler', copy: 'Etkinlik kayıtları, seçenekler, görevliler ve rezervasyonlar.',
     tables: ['events', 'event_series', 'event_options', 'event_clubs', 'event_organizations', 'event_users', 'bookings'] },
   { key: 'mekan', icon: '⌗', title: 'Mekânlar', copy: 'Alanlar, yerleşim düzenleri, masalar ve koltuklar.',
     tables: ['locations', 'space_setups', 'tables', 'seats'] },
@@ -34,6 +55,10 @@ const MODULES = [
     views: [{ tab: 'harita', label: 'Tüm tablolar', href: '#veri', show: () => tables.length > 0, last: true }],
     tables: ['roles', 'role_permissions', 'permissions', 'membership_types', 'audit_log'] },
 ];
+const MODULES = SHELL === 'host' ? HOST_MODULES : ADMIN_MODULES;
+// Daily-work screens live in the host shell; the admin shell sends them there.
+const HOST_VIEWS = ['basvurular', 'etkinlikler', 'etkinlik', 'yeni-etkinlik', 'kontrol', 'kuluplerim', 'etkinliklerim'];
+const hostTables = new Set(HOST_MODULES.flatMap(m => m.tables));
 const moduleOfTable = name => MODULES.find(m => m.tables.includes(name));
 const moduleTabs = m => [...(m.views ?? []).filter(v => !v.last && v.show()).map(v => ({ tab: v.tab, label: v.label, href: v.href })),
   ...m.tables.filter(t => tableOf(t)).map(t => ({ tab: t, label: label(t), href: `#veri/${t}` })),
@@ -43,8 +68,9 @@ const visibleModules = () => MODULES.filter(m => moduleTabs(m).length);
 /** Which area and tab a route belongs to, for the menu and the tab bar. */
 function placeOf(view, a) {
   if (view === 'basvurular') return ['uyeler', 'basvurular'];
-  if (view === 'kontrol') return ['etkinlikler', 'kontrol'];
-  if (['etkinlikler', 'etkinlik', 'yeni-etkinlik'].includes(view)) return ['etkinlikler', 'program'];
+  if (view === 'kontrol') return ['program', 'kontrol'];
+  if (['etkinlikler', 'etkinlik', 'yeni-etkinlik'].includes(view)) return ['program', 'program'];
+  if (view === 'kuluplerim' || view === 'etkinliklerim') return ['sorumluluk', view];
   if (view === 'veri' && !a) return ['sistem', 'harita'];
   if (['veri', 'kayit', 'yeni', 'duzenle'].includes(view) && a) return [moduleOfTable(a)?.key ?? 'sistem', a];
   if (view === 'm' && a) return [a, null];
@@ -87,18 +113,25 @@ const refRole = (column, targetPk) => column === targetPk && column !== 'id_user
 const AUDIT_REFS = ['created_by_user_id', 'updated_by_user_id'];
 
 const EVENT_TYPES = { workspace: 'Çalışma alanı', meetup: 'Buluşma', workshop: 'Atölye', talk: 'Konuşma', class: 'Ders', social: 'Sosyal' };
-const OVERVIEW = [
+const OVERVIEW = SHELL === 'host' ? [
   ['open_applications', 'Açık üyelik başvurusu', '#basvurular'], ['events_awaiting_publish', 'Yayın bekleyen etkinlik', '#etkinlikler/onay'],
   ['upcoming_events', 'Önümüzdeki 7 günde etkinlik', '#etkinlikler'], ['active_bookings', 'Aktif rezervasyon', '#veri/bookings'],
-  ['active_memberships', 'Aktif üyelik', '#veri/user_memberships?status=active'], ['users', 'Aktif kullanıcı', '#veri/users'],
+] : [
+  ['users', 'Aktif kullanıcı', '#veri/users'], ['active_memberships', 'Aktif üyelik', '#veri/user_memberships?status=active'],
+  ['active_bookings', 'Aktif rezervasyon', '#veri/bookings'], ['open_applications', 'Açık üyelik başvurusu', '#veri/membership_applications'],
 ];
+const CLUB_ROLES = { CLUB_LEAD: 'Kulüp lideri', CO_LEAD: 'Yardımcı lider', MODERATOR: 'Moderatör', MEMBER: 'Üye', SPONSOR_REPRESENTATIVE: 'Sponsor temsilcisi' };
+const SCOPE_ROLES = { club: 'Kulübünün etkinliği', host: 'Host', tutor: 'Eğitmen', facilitator: 'Kolaylaştırıcı', moderator: 'Moderatör', staff: 'Görevli' };
 const EVENT_PERMS = ['event.create', 'event.publish', 'event.cancel', 'booking.view'];
 
-let me = null, perms = new Set(), tables = [], toastTimer, busy = false, renderId = 0;
+let me = null, perms = new Set(), tables = [], scope = { clubs: [], events: [] }, toastTimer, busy = false, renderId = 0;
 const resetLinks = {};
 const can = p => perms.has(p);
 const tableOf = name => tables.find(t => t.name === name);
 const label = name => TABLE_LABELS[name] ?? name;
+const hasShell = s => me?.shells?.includes(s);
+/** A daily-work screen: here in the host shell; from the admin shell, in the host shell when this account has it. */
+const opsHref = hash => SHELL === 'host' ? '#' + hash : hasShell('host') ? siteUrl('host/#' + hash) : null;
 
 const dateTime = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 const dateOnly = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -172,8 +205,12 @@ async function overview() {
   const data = await api('/admin/overview').catch(() => ({}));
   const tiles = OVERVIEW.filter(([k]) => k in data);
   const mods = visibleModules();
-  return heading('YÖNETİM', `Merhaba, <em>${esc(me.user.first_name)}.</em>`, 'Fikirhane’nin üyeleri, etkinlikleri ve kayıtları burada. Gördüklerin rollerine göre belirlenir.')
+  const intro = SHELL === 'host' ? 'Günün işleri burada: program, kapı, başvurular ve sorumlu olduğun kayıtlar. Gördüklerin rollerine göre belirlenir.'
+    : 'Fikirhane’nin bütün kayıtları ve ilişkileri, roller ve yetkiler burada. Gördüklerin rollerine göre belirlenir.';
+  const mine = SHELL === 'host' && scope.events.length ? `<section class="admin-section"><div class="member-section-top"><h2>Sıradaki etkinliklerin</h2><a class="text-link" href="#etkinliklerim">Tümü ↗</a></div>${scopeEvents(scope.events.slice(0, 5))}</section>` : '';
+  return heading(SHELL === 'host' ? 'HOST PANELİ' : 'YÖNETİM', `Merhaba, <em>${esc(me.user.first_name)}.</em>`, intro)
     + (tiles.length ? `<div class="admin-stats">${tiles.map(([k, text, href]) => `<a href="${href}"><strong>${data[k]}</strong><span>${text} <span>↗</span></span></a>`).join('')}</div>` : '')
+    + mine
     + `<section class="admin-section"><div class="member-section-top"><h2>Bölümler</h2></div><div class="admin-groups">${mods.map(m => `<a href="#m/${m.key}" class="admin-group"><span class="section-label">${m.icon} ${esc(m.title.toLocaleUpperCase('tr'))}</span><small>${esc(m.copy)}</small><small class="admin-group-tabs">${moduleTabs(m).slice(0, 4).map(t => esc(t.label)).join(' · ')}${moduleTabs(m).length > 4 ? ' …' : ''}</small></a>`).join('')}</div></section>`;
 }
 
@@ -223,16 +260,42 @@ async function eventDetail(id) {
     api(`/admin/events/${id}/participants`).catch(err => err.status === 403 ? null : Promise.reject(err)),
   ]);
   const e = record?.row;
-  const title = e ? esc(e.event_title) : 'Etkinlik';
-  const checkin = can('booking.checkin') || can('event_attendance.manage');
+  // Club leads and event hosts cannot read the event record; their scope carries the title and time.
+  const mine = scope.events.find(x => x.id_event === id);
+  const title = esc(e?.event_title ?? mine?.event_title ?? 'Etkinlik');
+  const checkin = can('booking.checkin') || can('event_attendance.manage') || scope.events.some(x => x.id_event === id);
   const options = record?.related.find(r => r.table === 'event_options' && r.column === 'id_event');
-  return heading('ETKİNLİK', title, e ? `${esc(when(e.start_datetime))} — ${esc(when(e.end_datetime))} · ${esc(money(e.base_price, e.currency_code))}` : '')
+  return heading('ETKİNLİK', title, e ? `${esc(when(e.start_datetime))} — ${esc(when(e.end_datetime))} · ${esc(money(e.base_price, e.currency_code))}`
+    : mine ? `${esc(when(mine.start_datetime))} — ${esc(when(mine.end_datetime))} · ${esc(SCOPE_ROLES[mine.role] ?? mine.role)}` : '')
     + (e ? `<div class="admin-actions admin-actions-top">${badge(e.status)}${eventActions({ ...e, id_event: id }).replace(/<a class="shell-secondary" href="#etkinlik[^>]*>Katılımcılar<\/a>/, '')}<a class="text-link" href="#kayit/events/${esc(id)}">Tüm alanlar ve ilişkiler ↗</a></div>` : '')
     + (options?.items.length ? `<section class="admin-section"><h2 class="admin-h2">Seçenekler</h2>${rowsTable('event_options', options.items, options.labels, summaryColumns(tableOf('event_options')))}</section>` : '')
     + `<section class="admin-section"><h2 class="admin-h2">Katılımcılar${people ? ` <small>(${people.items.length})</small>` : ''}</h2>`
     + (!people ? '<p class="admin-muted">Bu etkinliğin katılımcılarını görme yetkin yok.</p>'
       : people.items.length ? `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th scope="col">Katılımcı</th><th scope="col">Yer</th><th scope="col">Durum</th><th scope="col">Ödeme</th><th scope="col">Tutar</th><th scope="col">Giriş</th></tr></thead><tbody>${people.items.map(p => `<tr><td>${p.first_name ? `${esc(p.first_name)} ${esc(p.last_name)}` : '<span class="admin-muted">Misafir</span>'}</td><td>${esc(p.option_code)}${p.seat_code ? ` · ${esc(p.seat_code)}` : ''}</td><td>${badge(p.booking_status)}</td><td>${esc(valueLabel('payment_status', p.payment_status) ?? p.payment_status)}</td><td>${esc(money(p.final_price, e?.currency_code))}</td><td>${p.checkin_at ? esc(when(p.checkin_at)) : checkin && p.booking_status === 'confirmed' ? `<button class="shell-secondary" data-checkin="${p.id_booking}">Giriş yaptı</button>` : '—'}</td></tr>`).join('')}</tbody></table></div>`
       : '<p class="admin-muted">Henüz rezervasyon yok.</p>') + '</section>';
+}
+
+// ---------- what a club lead or event host runs (host shell) ----------
+
+function scopeEvents(list) {
+  return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th scope="col">Tarih</th><th scope="col">Etkinlik</th><th scope="col">Görevin</th><th scope="col">Durum</th><th scope="col">Doluluk</th><th scope="col"><span class="visually-hidden">İşlemler</span></th></tr></thead><tbody>${list.map(e =>
+    `<tr><td>${esc(when(e.start_datetime))}</td><td>${esc(e.event_title)}</td><td>${esc(SCOPE_ROLES[e.role] ?? e.role)}</td><td>${badge(e.status)}</td><td>${e.booked} / ${e.capacity}</td><td><a class="text-link" href="#etkinlik/${esc(e.id_event)}">Katılımcılar ↗</a></td></tr>`).join('')}</tbody></table></div>`;
+}
+
+async function myEvents() {
+  return heading('SORUMLULUKLARIM', 'Görev aldığın <em>etkinlikler.</em>', 'Görev aldığın ve yürüttüğün kulüplerin yaklaşan etkinlikleri. Katılımcıları görür, girişleri işaretlersin.')
+    + (scope.events.length ? scopeEvents(scope.events) : empty('Yaklaşan bir görevin yok.', 'Bir etkinlikte görev aldığında ya da kulübünün etkinliği olduğunda burada görünür.'));
+}
+
+async function myClubs() {
+  if (!scope.clubs.length) return heading('SORUMLULUKLARIM', 'Yürüttüğün <em>kulüpler.</em>') + empty('Yürüttüğün bir kulüp yok.');
+  const lists = await Promise.all(scope.clubs.map(c => api(`/host/clubs/${c.id_club}/members`).catch(err => err.status === 403 ? null : Promise.reject(err))));
+  return heading('SORUMLULUKLARIM', 'Yürüttüğün <em>kulüpler.</em>', 'Lideri ya da moderatörü olduğun kulüpler ve üyeleri.')
+    + scope.clubs.map((c, i) => `<section class="admin-section"><div class="member-section-top"><h2 class="admin-h2">${esc(c.club_name)} <small>${esc(CLUB_ROLES[c.role_code] ?? c.role_name)}</small></h2></div>`
+      + (!lists[i] ? '<p class="admin-muted">Bu kulübün üyelerini görme yetkin yok.</p>'
+        : lists[i].items.length ? `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th scope="col">Üye</th><th scope="col">Kulüp rolü</th><th scope="col">Seviye</th><th scope="col">Katıldığı tarih</th></tr></thead><tbody>${lists[i].items.map(m =>
+          `<tr><td>${esc(m.first_name)} ${esc(m.last_name ?? '')}</td><td>${esc(CLUB_ROLES[m.role_code] ?? m.role_name)}</td><td>${m.club_level ? esc(valueLabel('club_level', m.club_level) ?? m.club_level) : '—'}</td><td>${esc(dateOnly.format(new Date(m.start_date)))}</td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="admin-muted">Henüz üye yok.</p>') + '</section>').join('');
 }
 
 async function newEvent() {
@@ -294,7 +357,7 @@ async function record(name, id) {
   const emptyRelated = data.related.filter(r => r.total === 0);
   return heading(esc(label(name)).toLocaleUpperCase('tr'), esc(title))
     + recordBar(meta, data.row, id)
-    + (name === 'events' ? `<div class="admin-actions admin-actions-top"><a class="shell-secondary" href="#etkinlik/${esc(id)}">Katılımcılar ve işlemler ↗</a></div>` : '')
+    + (name === 'events' && opsHref('etkinlik/' + id) ? `<div class="admin-actions admin-actions-top"><a class="shell-secondary" href="${esc(opsHref('etkinlik/' + id))}">Katılımcılar ve işlemler ↗</a></div>` : '')
     + (name === 'users' ? await rolePanel(id, data) + resetPanel(id) : '')
     + `<section class="admin-section"><dl class="admin-fields">${meta.columns.map(c => `<div><dt><b>${esc(columnLabel(c.name, c.name === meta.pk))}</b></dt><dd>${cell(name, c, data.row[c.name], data.labels, { full: true })}</dd></div>`).join('')}</dl></section>`
     + related.map(r => { const src = tableOf(r.table); return `<section class="admin-section"><div class="member-section-top"><h2 class="admin-h2">${esc(label(r.table))} <small>${refRole(r.column, meta.pk) ? `· ${esc(refRole(r.column, meta.pk))} olarak ` : ''}(${r.total})</small></h2><span class="admin-related-links">${src.write?.can_create && src.write.create_columns.includes(r.column) ? `<a class="text-link" href="#yeni/${r.table}?${encodeURIComponent(r.column)}=${encodeURIComponent(id)}">Ekle +</a>` : ''}${r.total > r.items.length ? `<a class="text-link" href="#veri/${r.table}?${encodeURIComponent(r.column)}=${encodeURIComponent(id)}">Tümünü gör ↗</a>` : ''}</span></div>${rowsTable(r.table, r.items, r.labels, summaryColumns(src, 5))}</section>`; }).join('')
@@ -513,7 +576,7 @@ content.addEventListener('change', event => {
 
 // ---------- door check (QR) ----------
 
-const loginUrl = () => siteUrl(`uyelik/?giris&view=yonetim&next=${encodeURIComponent('admin/' + location.hash)}`);
+const loginUrl = () => siteUrl(`uyelik/?giris&next=${encodeURIComponent(SHELL + '/' + location.hash)}`);
 const tokenFrom = text => /(?:k=)?([0-9a-f]{64})/i.exec(String(text ?? ''))?.[1]?.toLowerCase() ?? null;
 
 async function doorCheck(params) {
@@ -554,8 +617,6 @@ async function rolePanel(userId, data) {
 
 // ---------- shell ----------
 
-function navigation() {}  // The menu lives in the shared top bar (topnav.js).
-
 async function render() {
   const id = ++renderId;
   const { view, a, b, params } = route();
@@ -563,8 +624,18 @@ async function render() {
     const first = moduleTabs(MODULES.find(m => m.key === a) ?? { tables: [] })[0];
     if (first) { location.replace(first.href); return; }
   }
+  if (SHELL === 'admin' && HOST_VIEWS.includes(view)) {
+    const there = opsHref(location.hash.slice(1));
+    if (there) { location.replace(there); return; }
+    content.innerHTML = empty('Bu ekran host panelinde.', 'Program, kapıda giriş ve başvurular günlük işlerdir; bu hesabın host paneline erişimi yok.');
+    return;
+  }
+  // A table outside the host areas belongs to the back office: open it there when this account has it.
+  if (SHELL === 'host' && (['veri', 'kayit', 'yeni', 'duzenle'].includes(view) && (!a || !hostTables.has(a))) && hasShell('admin')) {
+    location.replace(siteUrl('admin/' + location.hash)); return;
+  }
   const [nav, tab] = placeOf(view, a);
-  window.dispatchEvent(new CustomEvent('fikirhane-nav', { detail: { href: nav === 'genel' ? 'admin/#genel' : `admin/#m/${nav}` } }));
+  window.dispatchEvent(new CustomEvent('fikirhane-nav', { detail: { href: nav === 'genel' ? `${SHELL}/#genel` : `${SHELL}/#m/${nav}` } }));
   content.setAttribute('aria-busy', 'true');
   try {
     const html = view === 'basvurular' ? await applications(params)
@@ -574,6 +645,8 @@ async function render() {
       : view === 'veri' && a ? await dataTable(a, params)
       : view === 'veri' ? dataIndex()
       : view === 'kontrol' ? await doorCheck(params)
+      : view === 'kuluplerim' && SHELL === 'host' ? await myClubs()
+      : view === 'etkinliklerim' && SHELL === 'host' ? await myEvents()
       : view === 'kayit' && a && b ? await record(a, b)
       : view === 'yeni' && a ? await formView(a, null, params)
       : view === 'duzenle' && a && b ? await formView(a, b, params)
@@ -581,7 +654,7 @@ async function render() {
     if (id !== renderId) return;
     content.innerHTML = (nav !== 'genel' ? tabBar(nav, tab) : '') + html;
     const recordForm = content.querySelector('#record-form'); if (recordForm) formDynamics(recordForm);
-    document.title = `${content.querySelector('h1')?.textContent ?? 'Yönetim'} · Fikirhane yönetim`;
+    document.title = `${content.querySelector('h1')?.textContent ?? SHELL_NAME} · Fikirhane ${SHELL_NAME.toLocaleLowerCase('tr')}`;
   } catch (err) {
     if (id !== renderId) return;
     if (err?.status === 401) { location.replace(loginUrl()); return; }
@@ -715,22 +788,25 @@ window.addEventListener('hashchange', () => { render().then(() => document.query
 
 async function start() {
   const loading = document.querySelector('#admin-loading p');
-  if (!await apiAvailable()) { loading.innerHTML = 'Yönetim paneli yalnızca sunucuya bağlıyken çalışır. <a class="text-link" href="../">Keşif sayfasına dön ↗</a>'; return; }
+  if (!await apiAvailable()) { loading.innerHTML = `${SHELL_NAME} yalnızca sunucuya bağlıyken çalışır. <a class="text-link" href="../">Keşif sayfasına dön ↗</a>`; return; }
   try { me = await api('/me'); } catch (err) { if (err.status === 401) { location.replace(loginUrl()); return; } throw err; }
-  let schema;
-  try { schema = await api('/admin/schema'); } catch (err) {
-    if (err.status === 403) {
-      loading.innerHTML = `<b>${esc(me.user.email ?? me.user.first_name)}</b> hesabıyla giriş yaptın; bu hesabın yönetim yetkisi yok.<br><button class="shell-primary admin-switch" data-switch-account>Başka bir hesapla giriş yap <span>↗</span></button> <a class="text-link" href="../member/">Üye alanına dön ↗</a>`;
-      return;
-    }
-    throw err;
+  if (!hasShell(SHELL)) {
+    const elsewhere = [['host', 'host/', 'Host paneline geç'], ['admin', 'admin/', 'Yönetime geç']].filter(([s]) => s !== SHELL && hasShell(s))
+      .map(([, href, text]) => `<a class="text-link" href="${siteUrl(href)}">${text} ↗</a>`).join(' ');
+    loading.innerHTML = `<b>${esc(me.user.email ?? me.user.first_name)}</b> hesabıyla giriş yaptın; bu hesap ${SHELL === 'host' ? 'host paneline' : 'yönetime'} giremiyor.<br><button class="shell-primary admin-switch" data-switch-account>Başka bir hesapla giriş yap <span>↗</span></button> ${elsewhere} <a class="text-link" href="${siteUrl('member/')}">Üye alanına dön ↗</a>`;
+    return;
   }
+  // Club leads and event hosts have no back-office permissions: the schema is refused and they work from their scope.
+  let schema = { permissions: me.permissions, tables: [] };
+  try { schema = await api('/admin/schema'); } catch (err) { if (err.status !== 403) throw err; }
+  if (SHELL === 'host') scope = await api('/host/scope');
   perms = new Set(schema.permissions); tables = schema.tables;
   document.querySelector('#header-name').textContent = me.user.first_name;
   document.querySelector('#header-initial').textContent = me.user.first_name[0].toLocaleUpperCase('tr');
-  navigation();
+  window.dispatchEvent(new CustomEvent('fikirhane-menu', { detail: [[`${SHELL}/#genel`, SHELL === 'host' ? 'Bugün' : 'Genel bakış'],
+    ...visibleModules().map(m => [`${SHELL}/#m/${m.key}`, m.title])] }));
   document.querySelector('#admin-loading').hidden = true;
   document.querySelector('#admin-shell').hidden = false;
   await render();
 }
-start().catch(() => { document.querySelector('#admin-loading p').textContent = 'Yönetim paneli şu anda yüklenemedi. Biraz sonra tekrar dener misin?'; });
+start().catch(() => { document.querySelector('#admin-loading p').textContent = `${SHELL_NAME} şu anda yüklenemedi. Biraz sonra tekrar dener misin?`; });

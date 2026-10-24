@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { createApp } from '../src/app.ts';
 import { runJobs } from '../src/services/jobs.ts';
+import { qrText } from '../src/services/pass.ts';
 import { Client, giveMembership, grantRole, makeEvent, ORIGIN, registered, setup, type TestEnv } from './helpers.ts';
 
 let env: TestEnv;
@@ -315,6 +316,63 @@ describe('admin events', () => {
     assert.equal(own.json.status, 'submitted');
     assert.equal((await lead.client.post('/api/admin/events', { ...payload, club_code: 'ENGLISH' })).status, 403);
     assert.equal((await lead.client.post(`/api/admin/events/${own.json.id_event}/publish`)).status, 403);
+  });
+});
+
+describe('shells', () => {
+  test('a new account is a member; staff roles open host and admin as granted', async () => {
+    const user = await registered(env);
+    assert.deepEqual((await user.client.get('/api/me')).json.shells, ['member']);
+    assert.equal((await user.client.get('/api/host/scope')).json.error.code, 'shell_forbidden');
+
+    const kitchen = await registered(env);
+    await grantRole(env.sql, kitchen.userId, 'KITCHEN_STAFF');
+    assert.deepEqual((await kitchen.client.get('/api/me')).json.shells, ['member', 'host']);
+
+    const tech = await registered(env);
+    await grantRole(env.sql, tech.userId, 'TECH_ADMIN');
+    assert.deepEqual((await tech.client.get('/api/me')).json.shells, ['member', 'admin']);
+
+    const admin = await registered(env);
+    await grantRole(env.sql, admin.userId, 'FIKIRHANE_ADMIN');
+    assert.deepEqual((await admin.client.get('/api/me')).json.shells, ['member', 'host', 'admin']);
+  });
+
+  test('club leads and event hosts reach the host shell for their own clubs and events only', async () => {
+    const lead = await registered(env);
+    await env.sql`insert into club_users (id_club, id_user, id_club_member_role)
+      select c.id_club, ${lead.userId}, r.id_club_member_role from clubs c, club_member_roles r where c.club_code = 'WRITING' and r.role_code = 'CLUB_LEAD'`;
+    const clubEvent = await makeEvent(env.sql, { hoursFromNow: 300, club: 'WRITING' });
+    const otherEvent = await makeEvent(env.sql, { hoursFromNow: 301, club: 'ENGLISH' });
+    assert.deepEqual((await lead.client.get('/api/me')).json.shells, ['member', 'host']);
+    const scope = (await lead.client.get('/api/host/scope')).json;
+    assert.deepEqual(scope.clubs.map((c: any) => [c.club_code, c.role_code]), [['WRITING', 'CLUB_LEAD']]);
+    const ids = scope.events.map((e: any) => e.id_event);
+    assert.ok(ids.includes(clubEvent.eventId));
+    assert.ok(!ids.includes(otherEvent.eventId));
+    const writing = scope.clubs[0].id_club;
+    const members = await lead.client.get(`/api/host/clubs/${writing}/members`);
+    assert.equal(members.status, 200);
+    assert.ok(members.json.items.some((m: any) => m.role_code === 'CLUB_LEAD'));
+    const [english] = await env.sql`select id_club from clubs where club_code = 'ENGLISH'`;
+    assert.equal((await lead.client.get(`/api/host/clubs/${english.id_club}/members`)).status, 403);
+
+    // A plain club member is still just a member.
+    const member = await registered(env, { club_codes: ['WRITING'] });
+    assert.deepEqual((await member.client.get('/api/me')).json.shells, ['member']);
+
+    // An event host sees that event while it is upcoming.
+    const host = await registered(env);
+    await env.sql`insert into event_users (id_event, id_user, event_user_role) values (${otherEvent.eventId}, ${host.userId}, 'host')`;
+    assert.deepEqual((await host.client.get('/api/me')).json.shells, ['member', 'host']);
+    assert.deepEqual((await host.client.get('/api/host/scope')).json.events.map((e: any) => e.id_event), [otherEvent.eventId]);
+    assert.equal((await host.client.get(`/api/admin/events/${otherEvent.eventId}/participants`)).status, 200);
+  });
+
+  test('the booking QR opens the door check in the host shell', () => {
+    const at = new Date('2026-10-24T11:00:00Z');
+    const text = qrText({ checkin_token: 'a'.repeat(64), start_datetime: at, end_datetime: new Date(at.getTime() + 7_200_000) } as any, 'https://fikirhane.example');
+    assert.match(text, /^https:\/\/fikirhane\.example\/host\/#kontrol\?k=a{64}&tarih=2026-10-24&seans=14%3A00-16%3A00$/);
   });
 });
 

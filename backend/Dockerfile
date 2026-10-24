@@ -13,6 +13,7 @@ COPY scripts scripts
 COPY assets assets
 COPY member member
 COPY uyelik uyelik
+COPY host host
 COPY admin admin
 COPY rezervasyon rezervasyon
 COPY coworking coworking

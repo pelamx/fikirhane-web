@@ -7,6 +7,7 @@ import { globalPermissions, globalRoles } from '../services/authz.ts';
 import { cancelBooking } from '../services/bookings.ts';
 import { ownPass, passInfo, pngName, qrPng, qrSvg, qrText } from '../services/pass.ts';
 import { membershipRights, submitApplication, withdrawApplication } from '../services/membership.ts';
+import { shellsOf } from '../services/shells.ts';
 import { MAX_ACTIVE_INTERESTS, MAX_ACTIVE_SKILLS, setInterests, setSkills } from '../services/users.ts';
 
 const code = z.string().regex(/^[A-Z0-9_]{2,60}$/);
@@ -63,6 +64,7 @@ export function meRoutes(deps: Deps) {
         seat_selection_enabled: rights.seatSelectionEnabled },
       roles,
       permissions: [...perms].sort(),
+      shells: await shellsOf(deps.sql, userId, perms),
       clubs,
       active_bookings: bookings,
     });
