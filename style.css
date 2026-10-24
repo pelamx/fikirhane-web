@@ -189,6 +189,7 @@ html[data-theme=dark] .hero-sketch .glint{display:none}
 .club-entry-actions{display:flex;flex-wrap:wrap;align-items:center;gap:14px 28px;margin-top:26px}
 .club-entry-actions .space-cta{margin:0}
 .club-entry-body>p:not(.club-entry-prompt)+p{margin-top:12px}
+.heading-more{display:block;margin-top:12px}
 @media(max-width:760px){.hero-intro p br,.section-heading>p br,.invitation-bottom p br{display:none}}
 .club-model{padding:44px 0;border-bottom:1px solid var(--line)}
 .club-model li p{margin:0}
