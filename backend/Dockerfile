@@ -1,6 +1,7 @@
 # Build from the repository root so the static site ships with the API:
 #   docker build -f backend/Dockerfile -t fikirhane .
-FROM node:24-alpine
+# Pinned to a patched Node release (security release of 2026-10-21); bump it with each new one.
+FROM node:24.22.1-alpine
 WORKDIR /app
 COPY backend/package.json backend/package-lock.json backend/
 RUN cd backend && npm ci --omit=dev && npm cache clean --force
