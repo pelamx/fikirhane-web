@@ -7,7 +7,11 @@ databases:
     plan: free              # free databases expire after 30 days; use basic-256mb or larger for real data
     region: frankfurt
     postgresMajorVersion: "18"
-    ipAllowList: []         # internal network only; the first admin comes from BOOTSTRAP_ADMIN_EMAIL on the service
+    # Internal network only, plus one address while staff accounts are added with create-admin; remove it afterwards.
+    # The first admin comes from BOOTSTRAP_ADMIN_EMAIL on the service.
+    ipAllowList:
+      - source: 24.133.244.219/32
+        description: create-admin (temporary)
 
 services:
   - type: web
