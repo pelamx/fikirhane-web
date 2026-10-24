@@ -23,7 +23,6 @@ function updateEntryLinks() {
   document.querySelectorAll('[data-member-entry]').forEach(link => {
     link.href = siteUrl(session ? 'member/#anasayfa' : 'uyelik/');
     if (link.classList.contains('join-link')) link.innerHTML = session ? 'Üye alanım <span>↗</span>' : 'Aramıza katıl <span>↗</span>';
-    else if (link.classList.contains('public-login')) link.textContent = session ? 'Üye alanım ↗' : 'Üye girişi ↗';
   });
   clubs.forEach(club => {
     const link = document.querySelector('#panel-' + club.id + ' .square-arrow');

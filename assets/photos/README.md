@@ -7,6 +7,7 @@ Source images from Unsplash:
 - Shared workspace: https://images.unsplash.com/photo-1497366811353-6870744d04b2 — 2301 × 1536 (source maximum)
 - Community: https://images.unsplash.com/photo-1521737711867-e3b97375f902 — 2400 × 3598
 - Friendship: https://images.unsplash.com/photo-1511632765486-a01980e01a18 — 2400 × 1600
+- Talk in a small venue (Etkinlik Alanı page): https://images.unsplash.com/photo-1515187029135-18ee286d815b — 2400 × 1600
 
 Each image includes a 960-pixel-wide responsive alternative. Originals were downloaded at up to 2400 pixels wide, without upscaling. Images remain local so visitors do not depend on third-party image servers.
 
