@@ -83,6 +83,7 @@ export const RULES: Record<string, [path: string, message: string]> = {
   transactions_adjustment_description: ['description', 'Düzeltme kaydında açıklama zorunlu.'],
   transactions_posted_at: ['status', STAMPED],
   transactions_reversed: ['status', STAMPED],
+  transactions_reconciled: ['reconciliation_status', STAMPED],
   user_acquisitions_not_self_referral: ['referrer_user_id', 'Kişi kendini yönlendirmiş olamaz.'],
   user_memberships_end_after_start: ['end_date', END],
   user_memberships_cancelled_at: ['status', STAMPED],

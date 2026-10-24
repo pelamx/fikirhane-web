@@ -1343,7 +1343,10 @@
    "posted_at": "Kesinleştirme zamanı; sistem yazar.",
    "reversed_at": "Ters kayıt zamanı; sistem yazar.",
    "reversed_by_user_id": "Ters kaydı yapan kullanıcı; sistem yazar.",
-   "reversal_reason": "Ters kayıt sebebi; yalnızca Tersine çevir işleminde girilir."
+   "reversal_reason": "Ters kayıt sebebi; yalnızca Tersine çevir işleminde girilir.",
+   "reconciliation_status": "Hareket banka/kasa dökümüyle eşleştirildi mi? Yalnızca kesinleşmiş harekette, account.reconcile ile işaretlenir.",
+   "reconciled_at": "Mutabık işaretlendiği zaman.",
+   "reconciled_by_user_id": "Mutabık işaretleyen kişi."
   },
   "enums": {
    "transaction_type": {
@@ -1367,6 +1370,10 @@
     "failed": "Başarısız",
     "cancelled": "İptal",
     "reversed": "Terslendi"
+   },
+   "reconciliation_status": {
+    "unreconciled": "Mutabakat bekliyor",
+    "reconciled": "Mutabık"
    }
   },
   "derived": {},
@@ -1417,6 +1424,30 @@
     "needs_reason": true,
     "label_tr": "Tersine çevir",
     "effects_tr": "reversed_at/by ve sebep yazılır; kayıt silinmez/değişmez. Bağlı aktif allocation'lar aynı işlemde reversed yapılır; tercihen karşı Transaction oluşturulur (örn. tahsilat 500 → iade 500); audit transaction.reversed."
+   },
+   {
+    "action": "reconcile",
+    "from_status": [
+     "unreconciled"
+    ],
+    "to_status": "reconciled",
+    "permission": "account.reconcile",
+    "needs_reason": false,
+    "label_tr": "Mutabık işaretle",
+    "effects_tr": "Kesinleşmiş hareket banka ya da kasa dökümüyle eşleştirildi olarak işaretlenir; reconciled_at/by yazılır. Tutar ve hesaplar değişmez.",
+    "status_column": "reconciliation_status"
+   },
+   {
+    "action": "unreconcile",
+    "from_status": [
+     "reconciled"
+    ],
+    "to_status": "unreconciled",
+    "permission": "account.reconcile",
+    "needs_reason": false,
+    "label_tr": "Mutabakatı kaldır",
+    "effects_tr": "Eşleştirme işareti kaldırılır; hareket yeniden mutabakat bekleyenler arasına döner.",
+    "status_column": "reconciliation_status"
    }
   ],
   "system_fields": [
@@ -1424,7 +1455,10 @@
    "reversed_at",
    "reversed_by_user_id",
    "status",
-   "reversal_reason"
+   "reversal_reason",
+   "reconciliation_status",
+   "reconciled_at",
+   "reconciled_by_user_id"
   ],
   "immutable_fields": [],
   "required_on_create": [
@@ -1664,6 +1698,20 @@
    "CAMP-D08: Kampanya silinmez; completed/archived ile kapatılır. Arşivleme için campaign.archive gerekir.",
    "CAMP-D09: budget_amount gerçek gider değildir; pazarlama giderleri finans belgeleriyle girilir.",
    "CAMP-D07: Davet/booking/dönüşüm sayıları saklanmaz, ilişkili tablolardan türetilir."
+  ],
+  "actions": [
+   {
+    "action": "archive",
+    "from_status": [
+     "completed",
+     "cancelled"
+    ],
+    "to_status": "archived",
+    "permission": "campaign.archive",
+    "needs_reason": false,
+    "label_tr": "Kampanyayı arşivle",
+    "effects_tr": "Tamamlanan ya da iptal edilen kampanya arşivlenir; davetler, freepass'ler ve kazanım kayıtları bağlı kalır (CAMP-D08)."
+   }
   ]
  },
  "invitations": {
@@ -3079,6 +3127,21 @@
    "Yalnızca aktif üyelik tipiyle yeni kayıt açılabilir (UMEM-D06); Visitor için kayıt açılmaz (UMEM-D03).",
    "İptal membership.cancel ile yapılır; cancelled_at ve neden kaydedilir. Kayıt asla silinmez (UMEM-D04).",
    "Üyelik durumu hesap durumundan bağımsızdır; her değişiklik audit'e yazılır (UMEM-D08, D10)."
+  ],
+  "actions": [
+   {
+    "action": "cancel",
+    "from_status": [
+     "pending",
+     "active",
+     "suspended"
+    ],
+    "to_status": "cancelled",
+    "permission": "membership.cancel",
+    "needs_reason": true,
+    "label_tr": "Üyeliği iptal et",
+    "effects_tr": "status = cancelled; cancelled_at/by ve iptal nedeni yazılır. Kayıt silinmez; kişi yeniden başvurabilir ya da yeni üyelik açılabilir (UMEM-D04)."
+   }
   ]
  },
  "membership_applications": {
@@ -3243,6 +3306,21 @@
    "Arşivlenmiş kulübe yeni etkinlik/üye bağlanamaz (CLUB-D09); arşivleme club.archive ister.",
    "Geçmişi olan kulüp silinmez; status = archived yapılır (CLUB-D10).",
    "Kulüp üyeliği Fikirhane üyeliğinden bağımsızdır (CLUB-D08)."
+  ],
+  "actions": [
+   {
+    "action": "archive",
+    "from_status": [
+     "draft",
+     "active",
+     "inactive"
+    ],
+    "to_status": "archived",
+    "permission": "club.archive",
+    "needs_reason": false,
+    "label_tr": "Kulübü arşivle",
+    "effects_tr": "Kulüp arşivlenir: yeni etkinlik ve üye bağlanamaz, geçmiş etkinlikler ve üyelikler korunur (CLUB-D09/D10). Arşivden geri dönüş yok."
+   }
   ]
  },
  "club_users": {
@@ -3402,6 +3480,21 @@
    "Geçmiş işlemi olan kurum silinmez; arşivlenir (organization.archive) (ORG-D07).",
    "Resmi bilgi değişikliği geçmiş belgeleri etkilemez; belgeler anlık kopya tutar (ORG-D08).",
    "Finansal belgede kullanılacak kurumun legal_name alanı dolu olmalıdır."
+  ],
+  "actions": [
+   {
+    "action": "archive",
+    "from_status": [
+     "active",
+     "inactive",
+     "suspended"
+    ],
+    "to_status": "archived",
+    "permission": "organization.archive",
+    "needs_reason": false,
+    "label_tr": "Kurumu arşivle",
+    "effects_tr": "Kurum arşivlenir; geçmiş sponsorluklar, etkinlikler ve kullanıcı bağları korunur, kayıt silinmez (ORG-D07)."
+   }
   ]
  },
  "organization_users": {

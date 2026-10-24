@@ -5,6 +5,7 @@
 import { initTheme, escapeHTML as esc } from './shared.js';
 import { api, apiAvailable } from './api.js';
 import { siteUrl } from './session.js';
+import { API_BASE } from './config.js';
 import { columnLabel, valueLabel } from './admin-labels.js';
 import './topnav.js';
 initTheme();
@@ -28,10 +29,12 @@ const HOST_MODULES = [
     views: [{ tab: 'basvurular', label: 'Başvurular', href: '#basvurular', show: () => can('membership.view') },
       { tab: 'turlar', label: 'Tur talepleri', href: '#turlar', show: () => can('tour.view') }],
     tables: ['users', 'user_memberships', 'membership_applications'] },
-  { key: 'kafeterya', icon: '▤', title: 'Kafeterya ve stok', copy: 'Ürünler, stok hareketleri ve sayımlar.',
+  { key: 'kafeterya', icon: '▤', title: 'Kafeterya ve stok', copy: 'Satış, ürünler, stok hareketleri ve sayımlar.',
+    views: [{ tab: 'satis', label: 'Satış', href: '#satis', show: () => can('cafeteria_sale.create') }],
     tables: ['items', 'stock_movements', 'stock_counts', 'stock_count_items'] },
-  { key: 'finans', icon: '₺', title: 'Finans', copy: 'Belgeler, para hareketleri ve ödeme eşleştirmeleri.',
-    tables: ['documents', 'document_items', 'transactions', 'transaction_allocations'] },
+  { key: 'finans', icon: '₺', title: 'Finans', copy: 'Belgeler, para hareketleri, ödeme eşleştirmeleri, hesaplar ve raporlar.',
+    views: [{ tab: 'raporlar', label: 'Raporlar', href: '#raporlar', show: () => can('report.view'), last: true }],
+    tables: ['documents', 'document_items', 'transactions', 'transaction_allocations', 'accounts', 'financial_centers', 'financial_categories'] },
   { key: 'buyume', icon: '↗', title: 'Büyüme', copy: 'Kampanyalar, davetler, freepass’ler ve üyelerin nereden geldiği.',
     tables: ['campaigns', 'invitations', 'freepasses', 'freepass_redemptions', 'user_acquisitions'] },
 ];
@@ -48,7 +51,8 @@ const ADMIN_MODULES = [
     tables: ['organizations', 'organization_users', 'organization_roles', 'sponsorship_plans', 'club_sponsorships', 'sponsorship_usage'] },
   { key: 'buyume', icon: '↗', title: 'Büyüme', copy: 'Kampanyalar, davetler, freepass’ler ve üyelerin nereden geldiği.',
     tables: ['campaigns', 'invitations', 'freepasses', 'freepass_redemptions', 'user_acquisitions'] },
-  { key: 'finans', icon: '₺', title: 'Finans', copy: 'Satış ve alış belgeleri, para hareketleri, ödeme eşleştirmeleri ve hesaplar.',
+  { key: 'finans', icon: '₺', title: 'Finans', copy: 'Satış ve alış belgeleri, para hareketleri, ödeme eşleştirmeleri, hesaplar ve raporlar.',
+    views: [{ tab: 'raporlar', label: 'Raporlar', href: '#raporlar', show: () => can('report.view'), last: true }],
     tables: ['documents', 'document_items', 'transactions', 'transaction_allocations', 'accounts', 'financial_centers', 'financial_categories'] },
   { key: 'stok', icon: '▤', title: 'Stok', copy: 'Ürün ve hizmet kataloğu, stok hareketleri ve sayımlar.',
     tables: ['items', 'stock_movements', 'stock_counts', 'stock_count_items'] },
@@ -58,7 +62,7 @@ const ADMIN_MODULES = [
 ];
 const MODULES = SHELL === 'host' ? HOST_MODULES : ADMIN_MODULES;
 // Daily-work screens live in the host shell; the admin shell sends them there.
-const HOST_VIEWS = ['basvurular', 'turlar', 'etkinlikler', 'etkinlik', 'yeni-etkinlik', 'kontrol', 'kuluplerim', 'etkinliklerim'];
+const HOST_VIEWS = ['basvurular', 'turlar', 'etkinlikler', 'etkinlik', 'yeni-etkinlik', 'kontrol', 'kuluplerim', 'etkinliklerim', 'satis'];
 const hostTables = new Set(HOST_MODULES.flatMap(m => m.tables));
 const moduleOfTable = name => MODULES.find(m => m.tables.includes(name));
 const moduleTabs = m => [...(m.views ?? []).filter(v => !v.last && v.show()).map(v => ({ tab: v.tab, label: v.label, href: v.href })),
@@ -70,6 +74,8 @@ const visibleModules = () => MODULES.filter(m => moduleTabs(m).length);
 function placeOf(view, a) {
   if (view === 'basvurular' || view === 'turlar') return ['uyeler', view];
   if (view === 'kontrol') return ['program', 'kontrol'];
+  if (view === 'satis') return ['kafeterya', 'satis'];
+  if (view === 'raporlar') return ['finans', 'raporlar'];
   if (['etkinlikler', 'etkinlik', 'yeni-etkinlik'].includes(view)) return ['program', 'program'];
   if (view === 'kuluplerim' || view === 'etkinliklerim') return ['sorumluluk', view];
   if (view === 'veri' && !a) return ['sistem', 'harita'];
@@ -216,6 +222,15 @@ function peopleColumn(columns, people) {
   const column = { name: 'people', label: 'Roller', render: r => kinds(people[r.id_user]) };
   const at = columns.findIndex(c => c.name === 'last_name') + 1;
   return at ? [...columns.slice(0, at), column, ...columns.slice(at)] : [column, ...columns];
+}
+
+const WIRING = { unwired: ['Özelliğe bağlı değil', 'Bu yetki için henüz bir ekran ya da işlem yok; vermek bugün bir şey değiştirmez.'],
+  signed_in: ['Girişle açık', 'Giriş yapan herkes bu işlemi yapabilir; yetki tek tek kontrol edilmez.'] };
+
+/** Permission and role-permission lists: a Kullanım column for rights that are not tied to a feature, from the list's `wiring`. */
+function wiringColumn(columns, wiring) {
+  const chip = w => w ? `<span class="admin-status" data-kind="${w === 'unwired' ? 'none' : 'member'}" title="${esc(WIRING[w][1])}">${esc(WIRING[w][0])}</span>` : '<span class="admin-null">—</span>';
+  return [...columns, { name: 'wiring', label: 'Kullanım', render: r => chip(wiring[r.id_permission]) }];
 }
 
 // ---------- views ----------
@@ -387,9 +402,9 @@ async function dataTable(name, params) {
   const prefill = new URLSearchParams(filters.filter(([k]) => meta.write?.create_columns.includes(k)));
   return heading(esc(moduleOfTable(name)?.title ?? GROUPS[meta.group] ?? '').toLocaleUpperCase('tr'), esc(label(name)), `${data.total} kayıt`)
     + aboutTable(meta)
-    + `<div class="admin-toolbar"><form id="data-search" class="admin-search" role="search"><label class="visually-hidden" for="data-q">Ara</label><input id="data-q" name="q" value="${esc(params.get('q') ?? '')}" placeholder="Metin alanlarında ara"><button class="shell-secondary" type="submit">Ara</button></form><a class="admin-chip" aria-pressed="${all}" href="${link({ tum: all ? null : '1', sayfa: null })}">${all ? 'Özet sütunlar' : 'Tüm sütunlar'}</a><a class="text-link" href="#veri">Tablolar ↗</a>${meta.write?.can_create ? `<a class="shell-primary admin-new" href="#yeni/${name}${prefill.size ? '?' + prefill : ''}">Yeni kayıt <span>+</span></a>` : ''}</div>`
+    + `<div class="admin-toolbar"><form id="data-search" class="admin-search" role="search"><label class="visually-hidden" for="data-q">Ara</label><input id="data-q" name="q" value="${esc(params.get('q') ?? '')}" placeholder="Metin alanlarında ara"><button class="shell-secondary" type="submit">Ara</button></form><a class="admin-chip" aria-pressed="${all}" href="${link({ tum: all ? null : '1', sayfa: null })}">${all ? 'Özet sütunlar' : 'Tüm sütunlar'}</a><a class="text-link" href="#veri">Tablolar ↗</a>${EXPORTS[name] && can(EXPORTS[name][0]) ? `<a class="text-link" href="${exportUrl(EXPORTS[name][1])}" download>Bu ayı indir (CSV) ↓</a>` : ''}${meta.write?.can_create ? `<a class="shell-primary admin-new" href="#yeni/${name}${prefill.size ? '?' + prefill : ''}">Yeni kayıt <span>+</span></a>` : ''}</div>`
     + (filters.length ? `<div class="admin-filters">${filters.map(([k, v]) => `<a class="admin-chip" aria-pressed="true" href="${link({ [k]: null, sayfa: null })}" aria-label="Filtreyi kaldır: ${esc(columnLabel(k))}">${filterLabel(k, v)} ✕</a>`).join('')}</div>` : '')
-    + (data.items.length ? rowsTable(name, data.items, data.labels, data.people ? peopleColumn(columns, data.people) : columns) : empty('Kayıt bulunamadı.'))
+    + (data.items.length ? rowsTable(name, data.items, data.labels, data.people ? peopleColumn(columns, data.people) : data.wiring ? wiringColumn(columns, data.wiring) : columns) : empty('Kayıt bulunamadı.'))
     + (pages > 1 ? `<nav class="admin-pager" aria-label="Sayfalar">${page > 0 ? `<a class="shell-secondary" href="${link({ sayfa: page - 1 || null })}">← Önceki</a>` : ''}<span>${page + 1} / ${pages}</span>${page + 1 < pages ? `<a class="shell-secondary" href="${link({ sayfa: page + 1 })}">Sonraki →</a>` : ''}</nav>` : '')
 ;
 }
@@ -664,6 +679,74 @@ async function rolePanel(userId, data) {
 
 // ---------- shell ----------
 
+// ---------- cafeteria counter (host shell, cafeteria_sale.create) ----------
+
+/** An amount as money, zero included (money() says Ücretsiz for prices). */
+const tl = (amount, currency) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: currency || 'TRY', maximumFractionDigits: 2 }).format(Number(amount ?? 0));
+
+/** Line total as the server computes it: gross = round(qty × price, 2), plus tax on it. */
+const lineTotal = (item, qty) => { const gross = Math.round(qty * Number(item.price) * 100) / 100; return gross + Math.round(gross * Number(item.tax_rate)) / 100; };
+const timeOnly = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' });
+let counter = null;
+
+async function cafeteria() {
+  counter = await api('/host/cafeteria');
+  const { items, payment, today } = counter;
+  const cur = items[0]?.currency_code ?? 'TRY';
+  const total = today.reduce((s, r) => s + Number(r.grand_total), 0);
+  const pay = [['cash', 'Nakit al', payment.cash], ['card', 'Kartla al', payment.card]];
+  return heading('KAFETERYA', 'Kafeterya <em>satışı.</em>', 'Ürünlerin adedini seç, ödeme yöntemine bas. Fiş kesilir, ürün stoktan düşer, tutar kasaya ya da POS hesabına işlenir.')
+    + (items.length ? `<form id="sale-form" class="sale-layout"><div class="sale-items">${items.map(i => `<label class="sale-item"><span><b>${esc(i.item_name)}</b><small>${esc(tl(lineTotal(i, 1), i.currency_code))} · KDV dahil${i.is_stock_tracked ? ` · stok ${esc(String(Number(i.current_stock ?? 0)))}` : ''}</small></span><input type="number" name="qty" data-item="${esc(i.id_item)}" min="0" max="1000" step="1" value="0" inputmode="numeric" aria-label="${esc(i.item_name)} adedi"></label>`).join('')}</div>`
+      + `<aside class="sale-summary"><h2 class="admin-h2">Sepet</h2><div id="sale-lines" class="admin-muted">Henüz ürün seçilmedi.</div><p class="sale-total">Toplam <strong id="sale-total">${esc(tl(0, cur))}</strong></p>`
+      + `<div class="admin-actions">${pay.map(([k, text, account]) => `<button class="${k === 'cash' ? 'shell-primary' : 'shell-secondary'}" type="submit" name="payment" value="${k}" ${account ? '' : 'disabled'} title="${esc(account ? `${account} hesabına işlenir` : 'Bu ödeme için aktif hesap yok')}">${text}</button>`).join('')}</div>`
+      + (!payment.cash || !payment.card ? `<p class="admin-muted">${!payment.cash ? 'Kasa hesabı yok. ' : ''}${!payment.card ? 'Kart için POS ya da banka hesabı yok. ' : ''}Muhasebe Hesaplar sekmesinden açabilir.</p>` : '')
+      + '</aside></form>'
+      : empty('Satışta ürün yok.', 'Kafeterya merkezine bağlı, satılabilir ve fiyatı girilmiş ürünler burada görünür. Ürün ve hizmetler sekmesinden ekleyebilirsin.'))
+    + `<section class="admin-section"><h2 class="admin-h2">Bugünkü satışlar <small>(${today.length} fiş · ${esc(tl(total, cur))})</small></h2>`
+    + (today.length ? `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th scope="col">Saat</th><th scope="col">Fiş</th><th scope="col">Ürünler</th><th scope="col">Ödeme</th><th scope="col">Tutar</th></tr></thead><tbody>${today.map(r => `<tr><td>${esc(timeOnly.format(new Date(r.posted_at)))}</td><td><code>${esc(r.document_number)}</code></td><td>${esc(r.lines)}</td><td>${r.payment_method === 'cash' ? 'Nakit' : 'Kart'}</td><td>${esc(tl(r.grand_total, r.currency_code))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">Bugün henüz satış yok.</p>')
+    + '</section>';
+}
+
+/** Keeps the basket and total in step with the quantities typed on the counter. */
+function saleBasket(form) {
+  const picked = [...form.querySelectorAll('input[name=qty]')].map(i => [counter.items.find(x => x.id_item === i.dataset.item), Math.max(0, Math.floor(Number(i.value) || 0))]).filter(([item, q]) => item && q > 0);
+  const cur = counter.items[0]?.currency_code ?? 'TRY';
+  form.querySelector('#sale-lines').innerHTML = picked.length ? picked.map(([item, q]) => `<div class="sale-line"><span>${esc(item.item_name)} × ${q}</span><span>${esc(tl(lineTotal(item, q), cur))}</span></div>`).join('') : 'Henüz ürün seçilmedi.';
+  form.querySelector('#sale-total').textContent = tl(picked.reduce((s, [item, q]) => s + lineTotal(item, q), 0), cur);
+  return picked;
+}
+
+// ---------- finance reports (report.view; exports need report.export / document.export / transaction.export) ----------
+
+const EXPORTS = { documents: ['document.export', 'export/documents.csv'], transactions: ['transaction.export', 'export/transactions.csv'] };
+const exportUrl = (path, p = {}) => `${API_BASE}/admin/${path}${new URLSearchParams(p).size ? '?' + new URLSearchParams(p) : ''}`;
+const isoDay = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(d);
+function presetPeriods() {
+  const [y, m] = isoDay(new Date()).split('-').map(Number);
+  const pad = n => String(n).padStart(2, '0'), end = (yy, mm) => new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+  const [py, pm] = m === 1 ? [y - 1, 12] : [y, m - 1];
+  return [['Bu ay', `${y}-${pad(m)}-01`, `${y}-${pad(m)}-${end(y, m)}`], ['Geçen ay', `${py}-${pad(pm)}-01`, `${py}-${pad(pm)}-${end(py, pm)}`], ['Bu yıl', `${y}-01-01`, `${y}-12-31`]];
+}
+
+async function reports(params) {
+  if (!can('report.view')) return empty('Bu bölüm için yetkin yok.');
+  const q = {}; for (const k of ['from', 'to']) if (/^\d{4}-\d{2}-\d{2}$/.test(params.get(k) ?? '')) q[k] = params.get(k);
+  const r = await api(`/admin/reports/finance${Object.keys(q).length ? '?' + new URLSearchParams(q) : ''}`);
+  const { from, to } = r.period, amount = (v, c = 'TRY') => Number(v) === 0 ? '—' : esc(tl(v, c));
+  const table = (head, rows) => rows.length ? `<div class="admin-table-wrap"><table class="admin-table"><thead><tr>${head.map(h => `<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(cells => `<tr>${cells.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">Bu dönemde kayıt yok.</p>';
+  const downloads = [['report.export', 'reports/finance.csv', 'Raporu indir'], ['document.export', 'export/documents.csv', 'Belgeleri indir'], ['transaction.export', 'export/transactions.csv', 'Para hareketlerini indir']]
+    .filter(([perm]) => can(perm)).map(([, path, text]) => `<a class="text-link" href="${exportUrl(path, { from, to })}" download>${text} (CSV) ↓</a>`).join('');
+  return heading('FİNANS', 'Dönem <em>raporu.</em>', 'Kesinleşmiş belgeler (vergi hariç tutarlar) ve kesinleşmiş para hareketleri. Belge, belge tarihine; para hareketi, gerçekleştiği güne sayılır.')
+    + `<div class="admin-toolbar"><form id="report-form" class="admin-search"><label class="visually-hidden" for="report-from">Başlangıç</label><input id="report-from" name="from" type="date" value="${esc(from)}" required><label class="visually-hidden" for="report-to">Bitiş</label><input id="report-to" name="to" type="date" value="${esc(to)}" required><button class="shell-secondary" type="submit">Göster</button></form>`
+    + presetPeriods().map(([text, f, t]) => `<a class="admin-chip" aria-pressed="${f === from && t === to}" href="#raporlar?from=${f}&to=${t}">${text}</a>`).join('') + '</div>'
+    + (downloads ? `<div class="report-downloads">${downloads}</div>` : '')
+    + `<div class="admin-stats report-totals"><div><strong>${amount(r.totals.income)}</strong><span>Gelir</span></div><div><strong>${amount(r.totals.expense)}</strong><span>Gider</span></div><div><strong>${amount(r.totals.net)}</strong><span>Net</span></div></div>`
+    + `<section class="admin-section"><h2 class="admin-h2">Finans merkezleri</h2>${table(['Merkez', 'Gelir', 'Gider', 'Net'], r.centers.map(c => [esc(c.name), amount(c.income), amount(c.expense), amount(Number(c.income) - Number(c.expense))]))}</section>`
+    + `<section class="admin-section"><h2 class="admin-h2">Kategoriler</h2>${table(['Kategori', 'Yön', 'Tutar', 'Vergi'], r.categories.map(c => [esc(c.name), c.direction === 'income' ? 'Gelir' : 'Gider', amount(c.amount), amount(c.tax)]))}</section>`
+    + `<section class="admin-section"><h2 class="admin-h2">Hesap hareketleri</h2>${table(['Hesap', 'Giriş', 'Çıkış', 'Net'], r.cash.map(c => [esc(c.name), amount(c.money_in, c.currency_code), amount(c.money_out, c.currency_code), amount(Number(c.money_in) - Number(c.money_out), c.currency_code)]))}</section>`
+    + (r.balances ? `<section class="admin-section"><h2 class="admin-h2">Hesap bakiyeleri <small>(bugün)</small></h2>${table(['Hesap', 'Bakiye', 'Mutabık bakiye', 'Mutabakat bekleyen'], r.balances.map(b => [esc(b.name), esc(tl(b.balance, b.currency_code)), esc(tl(b.reconciled, b.currency_code)), b.open_count ? `<a class="text-link" href="#veri/transactions?status=posted&reconciliation_status=unreconciled">${b.open_count} hareket ↗</a>` : '—']))}</section>` : '');
+}
+
 async function render() {
   const id = ++renderId;
   const { view, a, b, params } = route();
@@ -693,6 +776,8 @@ async function render() {
       : view === 'veri' ? dataIndex()
       : view === 'kontrol' ? await doorCheck(params)
       : view === 'turlar' && SHELL === 'host' ? await tours(params)
+      : view === 'satis' && SHELL === 'host' ? await cafeteria()
+      : view === 'raporlar' ? await reports(params)
       : view === 'kuluplerim' && SHELL === 'host' ? await myClubs()
       : view === 'etkinliklerim' && SHELL === 'host' ? await myEvents()
       : view === 'kayit' && a && b ? await record(a, b)
@@ -812,6 +897,16 @@ content.addEventListener('submit', event => {
     location.hash = `veri/${a}${params.size ? '?' + params : ''}`;
   }
   if (form.id === 'record-form') { saveRecord(form); return; }
+  if (form.id === 'report-form') { const f = new FormData(form); location.hash = `raporlar?${new URLSearchParams({ from: f.get('from'), to: f.get('to') })}`; return; }
+  if (form.id === 'sale-form') {
+    const picked = saleBasket(form), method = event.submitter?.value;
+    if (!picked.length) { flash('Önce en az bir ürün seç.'); return; }
+    run(async () => {
+      const r = await api('/host/cafeteria/sales', { method: 'POST', body: { payment_method: method, lines: picked.map(([item, quantity]) => ({ id_item: item.id_item, quantity })) } });
+      flash(`Satış kaydedildi: ${r.document_number} · ${tl(r.grand_total, r.currency_code)} (${r.account}).`);
+    });
+    return;
+  }
   if (form.id === 'pass-form') { const k = tokenFrom(new FormData(form).get('code')); if (!k) { flash('QR bağlantısında geçerli bir kod yok.'); return; } location.hash = `kontrol?k=${k}`; return; }
   if (form.id === 'role-form') {
     const code = new FormData(form).get('role_code');
@@ -831,6 +926,8 @@ content.addEventListener('submit', event => {
     run(async () => { const r = await api('/admin/events', { method: 'POST', body }); location.hash = `etkinlik/${r.id_event}`; }, 'Taslak kaydedildi.');
   }
 });
+
+content.addEventListener('input', event => { if (event.target.name === 'qty') saleBasket(event.target.form); });
 
 content.addEventListener('change', event => {
   if (event.target.name !== 'setup') return;

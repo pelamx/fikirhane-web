@@ -4,6 +4,7 @@ import { ApiError, forbidden, notFound } from '../errors.ts';
 import { body, idParam, permissionsOf, query, requireUser, type Deps, type Env } from '../http.ts';
 import { audit } from '../services/audit.ts';
 import { hasClubPermission, requirePermission } from '../services/authz.ts';
+import { cafeteriaCounter, cafeteriaSale } from '../services/cafeteria.ts';
 import { hostScope, shellsOf } from '../services/shells.ts';
 
 /**
@@ -65,6 +66,21 @@ export function hostRoutes(deps: Deps) {
     if (!row) throw notFound('Tour request');
     await audit(sql, { actorUserId: userId, action: 'tour.update', entityType: 'tour_request', entityId: id, source: 'admin_web', metadata: { status: input.status } });
     return c.json(row);
+  });
+
+  // Cafeteria counter: the menu with today's sales, and one sale (receipt, stock, payment and allocation together).
+  const Sale = z.object({
+    lines: z.array(z.object({ id_item: z.uuid(), quantity: z.number().positive().max(1000).multipleOf(0.001) })).min(1).max(30),
+    payment_method: z.enum(['cash', 'card']),
+  });
+  app.get('/cafeteria', async c => {
+    requirePermission(await permissionsOf(c, deps), 'cafeteria_sale.create');
+    return c.json(await cafeteriaCounter(sql));
+  });
+  app.post('/cafeteria/sales', async c => {
+    const userId = requireUser(c);
+    requirePermission(await permissionsOf(c, deps), 'cafeteria_sale.create');
+    return c.json(await cafeteriaSale(sql, userId, await body(c, Sale)), 201);
   });
 
   return app;

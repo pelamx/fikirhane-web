@@ -11,6 +11,7 @@ import { checkIn } from '../services/bookings.ts';
 import { passByToken, passInfo, verdict } from '../services/pass.ts';
 import { cancelEvent, createEvent, publishEvent } from '../services/events.ts';
 import { decideApplication } from '../services/membership.ts';
+import { documentsCsv, financeReport, financeReportCsv, thisMonth, transactionsCsv, type Period } from '../services/reports.ts';
 
 const code = z.string().regex(/^[A-Z0-9_]{2,60}$/);
 const money = z.string().regex(/^\d{1,10}(\.\d{1,2})?$/);
@@ -303,6 +304,39 @@ export function adminRoutes(deps: Deps) {
       await audit(tx, { actorUserId: actor, action: 'role.revoke', entityType: 'user', entityId: target, source: 'admin_web', metadata: { role } });
     });
     return c.body(null, 204);
+  });
+
+  // Finance reports and exports, for a period given as ?from=YYYY-MM-DD&to=YYYY-MM-DD (default: this month in Istanbul).
+  const PeriodQuery = z.object({ from: z.iso.date().optional(), to: z.iso.date().optional() });
+  const period = (c: Ctx): Period => {
+    const q = query(c, PeriodQuery), month = thisMonth();
+    const p = { from: q.from ?? month.from, to: q.to ?? month.to };
+    if (p.from > p.to) throw badRequest('validation_failed', 'Başlangıç tarihi bitişten sonra olamaz.', [{ path: 'from', message: 'bitişten sonra' }]);
+    return p;
+  };
+  const download = (c: Ctx, name: string, body: string) => c.body(body, 200, {
+    'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${name}"`, 'cache-control': 'no-store' });
+
+  app.get('/reports/finance', async c => {
+    const perms = await permissionsOf(c, deps);
+    requirePermission(perms, 'report.view');
+    return c.json(await financeReport(sql, period(c), perms.has('account_balance.view')));
+  });
+  app.get('/reports/finance.csv', async c => {
+    const perms = await permissionsOf(c, deps);
+    requirePermission(perms, 'report.export');
+    const p = period(c);
+    return download(c, `finans-raporu-${p.from}-${p.to}.csv`, await financeReportCsv(sql, p, perms.has('account_balance.view')));
+  });
+  app.get('/export/documents.csv', async c => {
+    requirePermission(await permissionsOf(c, deps), 'document.export');
+    const p = period(c);
+    return download(c, `belgeler-${p.from}-${p.to}.csv`, await documentsCsv(sql, p));
+  });
+  app.get('/export/transactions.csv', async c => {
+    requirePermission(await permissionsOf(c, deps), 'transaction.export');
+    const p = period(c);
+    return download(c, `para-hareketleri-${p.from}-${p.to}.csv`, await transactionsCsv(sql, p));
   });
 
   return app;

@@ -189,7 +189,7 @@ const money = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
 const NEGATIVE_MOVES = new Set(['sale', 'consumption', 'waste', 'return_out']);
 const POSITIVE_MOVES = new Set(['purchase_receive', 'return_in', 'opening_balance']);
 
-async function documentTotals(tx: Tx, documentId: unknown) {
+export async function documentTotals(tx: Tx, documentId: unknown) {
   await tx`update documents d set subtotal_amount = coalesce(l.gross, 0), discount_amount = coalesce(l.discount, 0),
       tax_amount = coalesce(l.tax, 0), grand_total = coalesce(l.total, 0)
     from (select sum(gross_amount) gross, sum(discount_amount) discount, sum(tax_amount) tax, sum(line_total) total
@@ -197,13 +197,43 @@ async function documentTotals(tx: Tx, documentId: unknown) {
     where d.id_document = ${String(documentId)} and d.status = 'draft'`;
 }
 
-async function accountBalances(tx: Tx, ids: unknown[]) {
+export async function accountBalances(tx: Tx, ids: unknown[]) {
   for (const id of new Set(ids.filter(Boolean).map(String))) {
     await tx`update accounts a set current_balance = a.opening_balance
         + coalesce((select sum(amount) from transactions where to_account_id = a.id_account and status = 'posted'), 0)
         - coalesce((select sum(amount) from transactions where from_account_id = a.id_account and status = 'posted'), 0)
       where a.id_account = ${id}`;
   }
+}
+
+/** Next number in the yearly series of sale (SA-) or purchase (AL-) documents. */
+export async function nextDocumentNumber(tx: Tx, direction: string) {
+  const prefix = direction === 'purchase' ? 'AL' : 'SA';
+  const year = new Date().getFullYear();
+  const [{ n }] = await tx<{ n: number }[]>`select count(*)::int + 1 as n from documents
+    where direction = ${direction} and document_number like ${`${prefix}-${year}-%`}`;
+  return `${prefix}-${year}-${String(n).padStart(5, '0')}`;
+}
+
+/**
+ * DOC: posting a document moves the stock of its stock-tracked lines (a sale takes it out, a purchase brings it in);
+ * cancelling a posted document puts those movements back with counter-movements.
+ */
+export async function documentStock(tx: Tx, documentId: string, mode: 'post' | 'cancel', actor: string) {
+  if (mode === 'post') {
+    await tx`insert into stock_movements (id_item, movement_type, quantity, unit_cost, id_document_item, created_by_user_id)
+      select l.id_item, case when d.direction = 'sale' then 'sale' else 'purchase_receive' end,
+             case when d.direction = 'sale' then -l.quantity else l.quantity end,
+             case when d.direction = 'purchase' then l.unit_price end, l.id_document_item, ${actor}
+      from document_items l join documents d using (id_document) join items i using (id_item)
+      where l.id_document = ${documentId} and i.is_stock_tracked and l.quantity > 0`;
+    return;
+  }
+  await tx`insert into stock_movements (id_item, movement_type, quantity, unit_cost, id_document_item, reason_code, notes, reversed_movement_id, created_by_user_id)
+    select m.id_item, m.movement_type, -m.quantity, m.unit_cost, m.id_document_item, 'data_correction', 'Belge iptal edildi', m.id_stock_movement, ${actor}
+    from stock_movements m join document_items l using (id_document_item)
+    where l.id_document = ${documentId} and m.reversed_movement_id is null
+      and not exists (select 1 from stock_movements r where r.reversed_movement_id = m.id_stock_movement)`;
 }
 
 const HOOKS: Record<string, Hooks> = {
@@ -241,16 +271,19 @@ const HOOKS: Record<string, Hooks> = {
     async beforeAction(tx, action, before, set) {
       if (action !== 'post') return;
       await documentTotals(tx, before.id_document);
-      if (!before.document_number) {
-        const prefix = before.direction === 'purchase' ? 'AL' : 'SA';
-        const year = new Date().getFullYear();
-        const [{ n }] = await tx<{ n: number }[]>`select count(*)::int + 1 as n from documents
-          where direction = ${String(before.direction)} and document_number like ${`${prefix}-${year}-%`}`;
-        set.document_number = `${prefix}-${year}-${String(n).padStart(5, '0')}`;
-      }
+      if (!before.document_number) set.document_number = await nextDocumentNumber(tx, String(before.direction));
+    },
+    async afterAction(tx, action, before, _after, actor) {
+      if (action === 'post') await documentStock(tx, String(before.id_document), 'post', actor);
+      if (action === 'cancel' && before.status === 'posted') await documentStock(tx, String(before.id_document), 'cancel', actor);
     },
   },
   transactions: {
+    // Only a posted movement can be matched with a statement; taking the mark off clears who and when.
+    async beforeAction(_tx, action, before, set) {
+      if (action === 'reconcile' && before.status !== 'posted') throw new ApiError(409, 'invalid_transition', 'Yalnızca kesinleşmiş hareket mutabık işaretlenebilir.');
+      if (action === 'unreconcile') Object.assign(set, { reconciled_at: null, reconciled_by_user_id: null });
+    },
     async afterAction(tx, action, before, after, actor, reason) {
       if (action === 'reverse') {
         // TRX: reversing a payment also reverses its active allocations in the same transaction.
@@ -373,6 +406,8 @@ export async function updateRow(sql: Sql, perms: Set<string>, actor: string, tab
       const allowed = m.status_transitions[from];
       if (allowed && !allowed.includes(to)) throw new ApiError(409, 'invalid_transition', `Durum ${from} → ${to} değiştirilemez.`);
     }
+    const via = 'status' in changed ? m.actions?.find(a => (a.status_column ?? 'status') === 'status' && a.to_status === changed.status) : undefined;
+    if (via) throw new ApiError(409, 'use_action', `Bu durum için “${via.label_tr}” işlemini kullan.`);
     await HOOKS[table]?.beforeWrite?.(tx, changed, before, actor);
     crossFieldRules(table, { ...before, ...changed });
     // A status set by hand still stamps its time when the table records one (invitations: accepted → accepted_at).
@@ -393,8 +428,9 @@ export async function updateRow(sql: Sql, perms: Set<string>, actor: string, tab
 const STAMPS: Record<string, string> = {
   post: 'posted', send: 'sent', cancel: 'cancelled', reverse: 'reversed', approve: 'approved', complete: 'completed', close: 'closed', verify: 'verified',
   submit: 'submitted', archive: 'archived', revoke: 'revoked', confirm: 'confirmed', decline: 'declined', reject: 'declined', start: 'started',
+  reconcile: 'reconciled',
 };
-const REASONS = ['reversal_reason', 'cancellation_reason_text', 'cancel_reason', 'cancellation_note', 'reason', 'notes'];
+const REASONS = ['reversal_reason', 'cancellation_reason_text', 'cancel_reason', 'cancellation_note', 'cancellation_reason', 'reason', 'notes'];
 
 export async function runAction(sql: Sql, perms: Set<string>, actor: string, table: string, id: string, actionName: string, reason: string | null) {
   const { meta } = await visibleTable(sql, perms, table);

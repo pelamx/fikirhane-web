@@ -1,5 +1,6 @@
 import type { Sql } from '../db.ts';
 import { badRequest, forbidden, notFound } from '../errors.ts';
+import { wiringOf, type Wiring } from './permission-wiring.ts';
 
 /**
  * Read-only back-office view over the documented tables, driven by the live Postgres catalog (columns, primary keys,
@@ -8,7 +9,11 @@ import { badRequest, forbidden, notFound } from '../errors.ts';
  */
 
 export type Group = 'identity' | 'profile' | 'membership' | 'clubs' | 'growth' | 'events' | 'finance';
-interface TableDef { group: Group; perms: readonly string[]; contact?: readonly string[] }
+interface TableDef {
+  group: Group; perms: readonly string[]; contact?: readonly string[];
+  /** Columns shown only to holders of a further permission (accounts.current_balance needs account_balance.view). */
+  guarded?: Readonly<Record<string, string>>;
+}
 
 const EVENT_ADMIN = ['event.create', 'event.publish', 'event.cancel', 'booking.view'] as const;
 const VENUE = ['event.create', 'event.update_location', 'booking.view'] as const;
@@ -57,7 +62,7 @@ export const TABLES: Record<string, TableDef> = {
   space_setups: { group: 'events', perms: VENUE },
   tables: { group: 'events', perms: VENUE },
   seats: { group: 'events', perms: VENUE },
-  accounts: { group: 'finance', perms: ['account.view'] },
+  accounts: { group: 'finance', perms: ['account.view'], guarded: { current_balance: 'account_balance.view' } },
   financial_centers: { group: 'finance', perms: ['financial_center.view', 'document.view'] },
   financial_categories: { group: 'finance', perms: ['financial_category.view', 'document.view'] },
   documents: { group: 'finance', perms: ['document.view'] },
@@ -76,6 +81,8 @@ const REDACTED = '•••';
 
 export interface Column {
   name: string; type: string; nullable: boolean; ref: { table: string; column: string } | null; contact: boolean;
+  /** Permission needed to see the value, beyond opening the table. */
+  guard: string | null;
   /** Allowed values from a single-column CHECK (col = ANY (ARRAY[...])). */
   options: string[] | null;
   /** Regex from a single-column CHECK (col ~ '...'). */
@@ -156,7 +163,7 @@ async function loadCatalog(sql: Sql): Promise<Catalog> {
     tables.set(name, {
       name, pk, label: labelColumns(name, own.map(c => c.column_name)),
       columns: own.map(c => ({ name: c.column_name, type: c.data_type, nullable: c.is_nullable === 'YES',
-        ref: refOf.get(`${name}.${c.column_name}`) ?? null, contact: contact.has(c.column_name),
+        ref: refOf.get(`${name}.${c.column_name}`) ?? null, contact: contact.has(c.column_name), guard: TABLES[name].guarded?.[c.column_name] ?? null,
         options: optionsOf.get(`${name}.${c.column_name}`) ?? null, pattern: patternOf.get(`${name}.${c.column_name}`) ?? null,
         hasDefault: c.column_default !== null, generated: c.is_generated === 'ALWAYS' })),
     });
@@ -192,13 +199,15 @@ export async function visibleTable(sql: Sql, perms: Set<string>, table: string):
   return { cat, meta };
 }
 
-/** JSON-safe row with contact columns masked for viewers without user.view_contact. */
+/** Contact columns need user.view_contact; guarded columns need their own permission. */
+const hidden = (c: Column, perms: Set<string>) => (c.contact && !perms.has('user.view_contact')) || (!!c.guard && !perms.has(c.guard));
+
+/** JSON-safe row with contact and guarded columns masked for viewers who may not see them. */
 export function present(meta: CatalogTable, row: Record<string, unknown>, perms: Set<string>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  const masked = !perms.has('user.view_contact');
   for (const c of meta.columns) {
     const v = row[c.name];
-    out[c.name] = c.contact && masked && v != null ? REDACTED : typeof v === 'bigint' ? v.toString() : v;
+    out[c.name] = hidden(c, perms) && v != null ? REDACTED : typeof v === 'bigint' ? v.toString() : v;
   }
   return out;
 }
@@ -245,11 +254,11 @@ export async function listRows(sql: Sql, perms: Set<string>, table: string, opts
   for (const [col, value] of Object.entries(opts.filters)) {
     const column = meta.columns.find(c => c.name === col);
     if (!column) throw badRequest('unknown_column', `Unknown column ${col}.`);
-    if (column.contact && !perms.has('user.view_contact')) throw forbidden();
+    if (hidden(column, perms)) throw forbidden();
     conditions.push(value === '' ? sql`${sql(col)} is null` : sql`${sql(col)}::text = ${value}`);
   }
   if (opts.q) {
-    const searchable = meta.columns.filter(c => (c.type === 'text' || c.type === 'character varying') && (!c.contact || perms.has('user.view_contact')))
+    const searchable = meta.columns.filter(c => (c.type === 'text' || c.type === 'character varying') && !hidden(c, perms))
       .map(c => c.name);
     if (searchable.length) conditions.push(sql`${joined(sql, searchable)} ilike ${'%' + opts.q.replace(/[\\%_]/g, m => '\\' + m) + '%'}`);
     else conditions.push(sql`${sql(meta.pk)}::text = ${opts.q}`);
@@ -260,9 +269,18 @@ export async function listRows(sql: Sql, perms: Set<string>, table: string, opts
     sql`select * from ${sql(table)} where ${where} order by ${order} limit ${opts.limit} offset ${opts.offset}`,
     sql<{ total: number }[]>`select count(*)::int as total from ${sql(table)} where ${where}`,
   ]);
-  const [labels, people] = await Promise.all([labelsFor(sql, cat, meta, rows, perms),
-    table === 'users' ? peopleFor(sql, rows.map(r => String(r.id_user)), perms) : undefined]);
-  return { table, total, items: rows.map(r => present(meta, r, perms)), labels, ...(people ? { people } : {}) };
+  const [labels, people, wiring] = await Promise.all([labelsFor(sql, cat, meta, rows, perms),
+    table === 'users' ? peopleFor(sql, rows.map(r => String(r.id_user)), perms) : undefined,
+    table === 'permissions' || table === 'role_permissions' ? wiringFor(sql, rows.map(r => String(r.id_permission))) : undefined]);
+  return { table, total, items: rows.map(r => present(meta, r, perms)), labels, ...(people ? { people } : {}), ...(wiring ? { wiring } : {}) };
+}
+
+/** Per permission id on the page: whether it is not tied to a feature yet, or open to every signed-in account. */
+async function wiringFor(sql: Sql, ids: string[]): Promise<Record<string, Wiring>> {
+  if (!ids.length) return {};
+  const rows = await sql<{ id: string; code: string }[]>`
+    select id_permission::text as id, permission_code as code from permissions where id_permission::text = any(${[...new Set(ids)]})`;
+  return Object.fromEntries(rows.flatMap(r => { const w = wiringOf(r.code); return w ? [[r.id, w]] : []; }));
 }
 
 export type People = Record<string, { roles?: { code: string; name: string }[]; membership?: { code: string; name: string } | null }>;

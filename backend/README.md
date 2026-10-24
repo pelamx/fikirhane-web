@@ -139,10 +139,13 @@ Browsers authenticate with the httpOnly `fh_session` cookie; other clients can s
 | POST | `/admin/users/:id/password-reset-link` | `user.reset_password`; refused for staff accounts; audited |
 | GET / POST | `/admin/pass?k=`, `/admin/pass/checkin` | door check of a scanned QR; valid only from `CHECKIN_EARLY_MINUTES` (15) before the session start until its end; `booking.checkin` or the event's attendance role |
 | POST / DELETE | `/admin/users/:id/roles[/:role]` | `role.assign` / `role.revoke`, audited |
+| GET | `/admin/reports/finance`, `/admin/reports/finance.csv` | `from`, `to` (default: this month); income and expense by financial center and category from posted documents, money in and out per account; `report.view` / `report.export`; account balances and reconciled balances only with `account_balance.view` |
+| GET | `/admin/export/documents.csv`, `/admin/export/transactions.csv` | `from`, `to`; `document.export` / `transaction.export`. CSVs are semicolon-separated with comma decimals and a BOM, for Turkish Excel |
+| GET / POST | `/host/cafeteria`, `/host/cafeteria/sales` | `cafeteria_sale.create`; the counter's menu (sellable items of a cafeteria center) and today's sales; a sale posts a receipt, takes the stock out, collects into the cash account (cards: POS, else bank) and allocates the payment |
 
 Writes through `/admin/data` follow `src/services/admin-meta.json`: per table, extracted from the 48 table documents, who may
 create or edit, which fields are fixed after creation or managed by the system, Turkish help texts and value names, and the
-lifecycle actions. Table-specific steps live in `src/services/admin-write.ts` (document line amounts and totals, document
+lifecycle actions. A status that an action reaches (cancelled, archived ...) is only set through that action, with its own permission and reason; editing the field returns `use_action`. Permissions that no endpoint checks yet are listed in `src/services/permission-wiring.ts` and marked on the role screens; a test keeps that list in step with the code. Table-specific steps live in `src/services/admin-write.ts` (document line amounts and totals, document
 numbering on posting, account balances, reversing a payment's allocations, stock signs and counter-movements, stock count
 posting, signing out a suspended user). Every write is audited with old and new values. Reads are as before: Each table opens with one of the permissions listed in `src/services/admin-data.ts`;
 `auth_identities` and `user_sessions` are never exposed, and guest emails/phones are masked without `user.view_contact`.
