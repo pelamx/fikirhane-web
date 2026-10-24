@@ -306,6 +306,21 @@ export function adminRoutes(deps: Deps) {
     return c.body(null, 204);
   });
 
+  // Shortages: stock-tracked items at or below their reorder level, with what it takes to get back to the target stock.
+  app.get('/stock/shortages', async c => {
+    requirePermission(await permissionsOf(c, deps), 'stock.view');
+    const items = await sql`
+      select id_item::text, item_code, item_name, item_category, unit, storage_area, coalesce(current_stock, 0)::text as current_stock,
+             reorder_level::text, target_stock::text,
+             greatest(coalesce(target_stock, reorder_level) - coalesce(current_stock, 0), 0)::text as to_buy
+      from items
+      where status = 'active' and is_stock_tracked and reorder_level is not null and coalesce(current_stock, 0) <= reorder_level
+      order by coalesce(current_stock, 0) / nullif(reorder_level, 0) nulls first, item_name`;
+    const [{ unset }] = await sql<{ unset: number }[]>`
+      select count(*)::int as unset from items where status = 'active' and is_stock_tracked and reorder_level is null`;
+    return c.json({ items, without_level: unset });
+  });
+
   // Finance reports and exports, for a period given as ?from=YYYY-MM-DD&to=YYYY-MM-DD (default: this month in Istanbul).
   const PeriodQuery = z.object({ from: z.iso.date().optional(), to: z.iso.date().optional() });
   const period = (c: Ctx): Period => {

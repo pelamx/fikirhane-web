@@ -30,7 +30,8 @@ const HOST_MODULES = [
       { tab: 'turlar', label: 'Tur talepleri', href: '#turlar', show: () => can('tour.view') }],
     tables: ['users', 'user_memberships', 'membership_applications'] },
   { key: 'kafeterya', icon: '▤', title: 'Kafeterya ve stok', copy: 'Satış, ürünler, stok hareketleri ve sayımlar.',
-    views: [{ tab: 'satis', label: 'Satış', href: '#satis', show: () => can('cafeteria_sale.create') }],
+    views: [{ tab: 'satis', label: 'Satış', href: '#satis', show: () => can('cafeteria_sale.create') },
+      { tab: 'eksikler', label: 'Eksikler', href: '#eksikler', show: () => can('stock.view') }],
     tables: ['items', 'stock_movements', 'stock_counts', 'stock_count_items'] },
   { key: 'finans', icon: '₺', title: 'Finans', copy: 'Belgeler, para hareketleri, ödeme eşleştirmeleri, hesaplar ve raporlar.',
     views: [{ tab: 'raporlar', label: 'Raporlar', href: '#raporlar', show: () => can('report.view'), last: true }],
@@ -54,7 +55,8 @@ const ADMIN_MODULES = [
   { key: 'finans', icon: '₺', title: 'Finans', copy: 'Satış ve alış belgeleri, para hareketleri, ödeme eşleştirmeleri, hesaplar ve raporlar.',
     views: [{ tab: 'raporlar', label: 'Raporlar', href: '#raporlar', show: () => can('report.view'), last: true }],
     tables: ['documents', 'document_items', 'transactions', 'transaction_allocations', 'accounts', 'financial_centers', 'financial_categories'] },
-  { key: 'stok', icon: '▤', title: 'Stok', copy: 'Ürün ve hizmet kataloğu, stok hareketleri ve sayımlar.',
+  { key: 'stok', icon: '▤', title: 'Stok', copy: 'Ürün ve hizmet kataloğu, stok hareketleri, sayımlar ve eksikler.',
+    views: [{ tab: 'eksikler', label: 'Eksikler', href: '#eksikler', show: () => can('stock.view') }],
     tables: ['items', 'stock_movements', 'stock_counts', 'stock_count_items'] },
   { key: 'sistem', icon: '⚙', title: 'Sistem', copy: 'Roller ve yetkiler, üyelik tipleri, denetim kaydı.',
     views: [{ tab: 'harita', label: 'Tüm tablolar', href: '#veri', show: () => tables.length > 0, last: true }],
@@ -75,6 +77,7 @@ function placeOf(view, a) {
   if (view === 'basvurular' || view === 'turlar') return ['uyeler', view];
   if (view === 'kontrol') return ['program', 'kontrol'];
   if (view === 'satis') return ['kafeterya', 'satis'];
+  if (view === 'eksikler') return [SHELL === 'host' ? 'kafeterya' : 'stok', 'eksikler'];
   if (view === 'raporlar') return ['finans', 'raporlar'];
   if (['etkinlikler', 'etkinlik', 'yeni-etkinlik'].includes(view)) return ['program', 'program'];
   if (view === 'kuluplerim' || view === 'etkinliklerim') return ['sorumluluk', view];
@@ -92,7 +95,7 @@ function tabBar(moduleKey, tab) {
 
 const TABLE_LABELS = {
   users: 'Kullanıcılar', user_emails: 'E-posta adresleri', roles: 'Roller', permissions: 'Yetkiler', role_permissions: 'Rol yetkileri', user_roles: 'Kullanıcı rolleri', audit_log: 'Denetim kaydı',
-  skills: 'Beceriler', user_skills: 'Kullanıcı becerileri', interests: 'İlgi alanları', user_interests: 'Kullanıcı ilgi alanları', needs: 'İhtiyaçlar', offers: 'Katkılar',
+  skills: 'Beceriler', user_skills: 'Kullanıcı becerileri', interests: 'İlgi alanları', user_interests: 'Kullanıcı ilgi alanları', needs: 'Üye ihtiyaçları', offers: 'Üye katkıları',
   membership_types: 'Üyelik tipleri', user_memberships: 'Üyelikler', membership_applications: 'Üyelik başvuruları',
   clubs: 'Kulüpler', club_users: 'Kulüp üyeleri', club_member_roles: 'Kulüp rolleri', organizations: 'Kurumlar', organization_users: 'Kurum kullanıcıları', organization_roles: 'Kurum rolleri',
   campaigns: 'Kampanyalar', invitations: 'Davetler', freepasses: 'Freepass’ler', freepass_redemptions: 'Freepass kullanımları', user_acquisitions: 'Kazanım kaynakları',
@@ -716,6 +719,20 @@ function saleBasket(form) {
   return picked;
 }
 
+// ---------- shortages (stock.view): what to buy before the counter runs out ----------
+
+const UNITS = { piece: 'adet', kg: 'kg', gram: 'g', liter: 'L', ml: 'ml', pack: 'paket' };
+const qty = (v, unit) => `${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 3 }).format(Number(v))} ${UNITS[unit] ?? unit ?? ''}`.trim();
+
+async function shortages() {
+  const { items, without_level } = await api('/admin/stock/shortages');
+  const receive = can('stock.receive');
+  return heading('STOK', 'Azalan <em>ürünler.</em>', 'Stoğu yeniden sipariş seviyesine inen ürünler. “Alınacak”, hedef stoğa dönmek için gereken miktar; hedef yoksa sipariş seviyesine göre hesaplanır.')
+    + (items.length ? `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th scope="col">Ürün</th><th scope="col">Mevcut</th><th scope="col">Sipariş seviyesi</th><th scope="col">Hedef</th><th scope="col">Alınacak</th><th scope="col">Depo</th><th scope="col"><span class="visually-hidden">İşlemler</span></th></tr></thead><tbody>${items.map(i => `<tr><td><a href="#kayit/items/${esc(i.id_item)}"><b>${esc(i.item_name)}</b></a></td><td>${Number(i.current_stock) <= 0 ? `<span class="admin-status" data-status="cancelled">Bitti</span>` : esc(qty(i.current_stock, i.unit))}</td><td>${esc(qty(i.reorder_level, i.unit))}</td><td>${i.target_stock ? esc(qty(i.target_stock, i.unit)) : '—'}</td><td><b>${esc(qty(i.to_buy, i.unit))}</b></td><td>${esc(i.storage_area ?? '—')}</td><td>${receive ? `<a class="text-link" href="#yeni/stock_movements?${new URLSearchParams({ id_item: i.id_item, movement_type: 'purchase_receive', quantity: Number(i.to_buy) || '' })}">Stok girişi ↗</a>` : ''}</td></tr>`).join('')}</tbody></table></div>`
+      : empty('Eksik ürün yok.', 'Bütün ürünler sipariş seviyesinin üstünde.'))
+    + (without_level ? `<p class="admin-muted">${without_level} stoklu üründe sipariş seviyesi tanımlı değil; bu ürünler listeye giremez. <a class="text-link" href="#veri/items?reorder_level=">Ürünleri gör ↗</a></p>` : '');
+}
+
 // ---------- finance reports (report.view; exports need report.export / document.export / transaction.export) ----------
 
 const EXPORTS = { documents: ['document.export', 'export/documents.csv'], transactions: ['transaction.export', 'export/transactions.csv'] };
@@ -778,6 +795,7 @@ async function render() {
       : view === 'turlar' && SHELL === 'host' ? await tours(params)
       : view === 'satis' && SHELL === 'host' ? await cafeteria()
       : view === 'raporlar' ? await reports(params)
+      : view === 'eksikler' ? await shortages()
       : view === 'kuluplerim' && SHELL === 'host' ? await myClubs()
       : view === 'etkinliklerim' && SHELL === 'host' ? await myEvents()
       : view === 'kayit' && a && b ? await record(a, b)

@@ -115,6 +115,25 @@ describe('cafeteria counter', () => {
   });
 });
 
+describe('stock shortages', () => {
+  test('list tracked items at or below their reorder level with what brings them back to target', async () => {
+    const kitchen = await withRole('KITCHEN_STAFF');
+    const [low] = await env.sql<{ id: string }[]>`insert into items (item_code, item_name, item_type, unit, is_stock_tracked, reorder_level, target_stock)
+      values ('TEST_SYRUP', 'Şurup', 'stock_item', 'piece', true, 10, 30) returning id_item::text as id`;
+    await env.sql`insert into stock_movements (id_item, movement_type, quantity) values (${low.id}, 'opening_balance', 4)`;
+    const [fine] = await env.sql<{ id: string }[]>`insert into items (item_code, item_name, item_type, unit, is_stock_tracked, reorder_level)
+      values ('TEST_SUGAR', 'Şeker', 'stock_item', 'piece', true, 5) returning id_item::text as id`;
+    await env.sql`insert into stock_movements (id_item, movement_type, quantity) values (${fine.id}, 'opening_balance', 50)`;
+
+    assert.equal((await (await withRole('MARKETING')).client.get('/api/admin/stock/shortages')).status, 403);
+    const list = (await kitchen.client.get('/api/admin/stock/shortages')).json;
+    const syrup = list.items.find((i: { id_item: string }) => i.id_item === low.id);
+    assert.equal(Number(syrup.to_buy), 26, 'back to the target of 30');
+    assert.ok(!list.items.some((i: { id_item: string }) => i.id_item === fine.id), 'above its level');
+    assert.equal(typeof list.without_level, 'number');
+  });
+});
+
 describe('finance reports, exports, balances and reconciliation', () => {
   test('reports need report.view, balances need account_balance.view, downloads need their export permission', async () => {
     const accounting = await withRole('ACCOUNTING');
