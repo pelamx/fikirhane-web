@@ -321,4 +321,8 @@ html[data-theme=dark] .booking-plan{background:#f4f1ea}
 .admin-pass-form input{width:420px}
 @media(max-width:650px){.pass-card{flex-direction:column;align-items:center;text-align:center}.pass-info dl div{text-align:left}.pass-download{align-self:center}.admin-pass{flex-direction:column}.admin-pass-form input{width:100%}}
 .member-layout{grid-template-columns:minmax(0,1fr)!important}
-.booking-lead button.text-link{background:none;border:0;border-bottom:1px solid var(--line);padding:0 0 3px;font:inherit;font-size:15px;color:var(--ink);cursor:pointer}
+
+.booking-areas{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 24px}
+.booking-areas button{border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:10px 18px;border-radius:999px;font:inherit;font-size:14px;cursor:pointer}
+.booking-areas button:hover{border-color:var(--copper);color:var(--copper)}
+.booking-areas button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--bg)}

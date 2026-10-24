@@ -33,10 +33,18 @@ const seatNo = code => String(Number(String(code).replace(/\D/g, '')) || code);
 
 let me = null, policy = null, week = { start: null, items: [] }, detail = null, busy = false, toastTimer;
 const cache = new Map();
-// ?alan= narrows the program to one space, e.g. from the meeting room page; without it every session is listed.
-const AREAS = { toplanti: { location: 'MEETING_ROOM', title: 'Toplantı odasını ayırt', lead: 'Hafta içi akşamları iki saatlik dilimler: 18.00, 20.00 ve 22.00. Odanın tamamı senin.' } };
-const areaOf = () => AREAS[new URLSearchParams(location.search).get('alan')] ?? null;
-const listed = () => { const a = areaOf(); return a ? week.items.filter(e => optionsOf(e).some(o => o.location_code === a.location)) : week.items; };
+// ?alan= narrows the program to one kind of booking; the choice sits above the week so every entry point reaches each one.
+const inMeetingRoom = e => optionsOf(e).some(o => o.location_code === 'MEETING_ROOM');
+const AREAS = {
+  coworking: { label: 'Coworking', title: 'Coworking seansını seç', lead: 'Hafta içi sabah 10.00–14.00 ve öğleden sonra 14.00–18.00. Salonunu ve koltuğunu sonra seçersin.',
+    match: e => e.event_type === 'workspace' && !inMeetingRoom(e) },
+  toplanti: { label: 'Toplantı odası', title: 'Toplantı odasını ayırt', lead: 'Hafta içi akşamları iki saatlik dilimler: 18.00, 20.00 ve 22.00. Odanın tamamı senin.',
+    match: inMeetingRoom },
+  bulusma: { label: 'Buluşmalar', title: 'Buluşmanı seç', lead: 'Kulüplerin buluşmaları ve etkinlikleri.', match: e => e.event_type !== 'workspace' },
+};
+const areaKey = () => { const k = new URLSearchParams(location.search).get('alan'); return k in AREAS ? k : ''; };
+const areaOf = () => AREAS[areaKey()] ?? null;
+const listed = () => { const a = areaOf(); return a ? week.items.filter(a.match) : week.items; };
 const PASS_OK = ['confirmed', 'checked_in'];
 /** One option, booked as a whole place by one person: the meeting room. */
 const wholeRoom = e => optionsOf(e).length === 1 && optionsOf(e)[0].booking_unit === 'location' && optionsOf(e)[0].capacity === 1;
@@ -98,8 +106,10 @@ function sessionsStep(s) {
   const end = addDays(start, 6);
   const label = `${dayNum.format(at(start))}${monthShort.format(at(start)) !== monthShort.format(at(end)) ? ' ' + monthShort.format(at(start)) : ''} – ${dayNum.format(at(end))} ${monthShort.format(at(end))}`;
   const area = areaOf();
-  return (area ? `<h1 class="booking-title">${esc(area.title)}</h1><p class="booking-lead">${esc(area.lead)} <button class="text-link" data-all-sessions>Bütün seansları gör</button></p>`
-    : `<h1 class="booking-title">Seansını seç</h1><p class="booking-lead">Günü ve seansı belirle; uygun seansları anında gör.</p>`) + `
+  const tabs = `<div class="booking-areas" role="group" aria-label="Ne ayırtmak istiyorsun?">${[['', 'Hepsi'], ...Object.entries(AREAS).map(([k, a]) => [k, a.label])]
+    .map(([k, label]) => `<button data-area="${k}" aria-pressed="${k === areaKey()}">${esc(label)}</button>`).join('')}</div>`;
+  return (area ? `<h1 class="booking-title">${esc(area.title)}</h1><p class="booking-lead">${esc(area.lead)}</p>`
+    : `<h1 class="booking-title">Seansını seç</h1><p class="booking-lead">Günü ve seansı belirle; uygun seansları anında gör.</p>`) + tabs + `
     <div class="booking-week"><button class="booking-arrow" data-week="-7" ${start <= mondayOf(today) ? 'disabled' : ''} aria-label="Önceki hafta">‹</button><strong>${esc(label)}</strong><button class="booking-arrow" data-week="7" aria-label="Sonraki hafta">›</button></div>
     <div class="booking-days" role="group" aria-label="Gün">${days.map(k => {
       const past = k < today, has = byDay(k).length > 0, d = at(k);
@@ -313,7 +323,7 @@ document.addEventListener('click', ev => {
     go({ seans: t.dataset.session, salon: null, koltuk: null }, true);
   }
   else if (t.dataset.passRetry) { document.querySelector('#pass-slot').innerHTML = '<p class="entry-loading">Giriş QR kodun hazırlanıyor…</p>'; showPass(t.dataset.passRetry); }
-  else if (t.hasAttribute('data-all-sessions')) go({ alan: null, seans: null, adim: null, salon: null, koltuk: null });
+  else if (t.dataset.area !== undefined) go({ alan: t.dataset.area, tarih: null, seans: null, adim: null, salon: null, koltuk: null });
   else if (t.dataset.room) go({ salon: t.dataset.room, koltuk: null }, true);
   else if (t.dataset.seat) { const s = state(); go({ salon: t.dataset.option, koltuk: s.seatId === t.dataset.seat ? null : t.dataset.seat }, true); }
   else if (t.hasAttribute('data-submit')) submit();
