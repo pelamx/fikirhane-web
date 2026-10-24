@@ -319,6 +319,51 @@ describe('admin events', () => {
   });
 });
 
+describe('tour requests', () => {
+  const nextWeekday = (days: number) => {
+    const d = new Date(Date.now() + days * 86_400_000);
+    while ([0, 6].includes(d.getUTCDay())) d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+  };
+
+  test('anyone can ask for a visit; staff with tour permissions see and follow it up in the host shell', async () => {
+    const guest = new Client(env);
+    const date = nextWeekday(3);
+    const sent = await guest.post('/api/tours', { first_name: 'Selin', contact_phone: '+90 532 000 00 00', preferred_date: date,
+      preferred_slot: 'afternoon', interests: ['coworking', 'meeting_room'], note: 'Ekiple bakmak istiyoruz.' });
+    assert.equal(sent.status, 201);
+
+    assert.equal((await guest.post('/api/tours', { first_name: 'X', preferred_date: date, preferred_slot: 'morning' })).json.error.code, 'contact_required');
+    const saturday = (() => { const d = new Date(Date.now() + 7 * 86_400_000); while (d.getUTCDay() !== 6) d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); })();
+    assert.equal((await guest.post('/api/tours', { first_name: 'X', contact_email: 'x@example.com', preferred_date: saturday, preferred_slot: 'morning' })).json.error.code, 'tour_date_invalid');
+    assert.equal((await guest.post('/api/tours', { first_name: 'X', contact_email: 'x@example.com', preferred_date: '2020-01-06', preferred_slot: 'morning' })).json.error.code, 'tour_date_invalid');
+
+    const kitchen = await registered(env);
+    await grantRole(env.sql, kitchen.userId, 'KITCHEN_STAFF');
+    assert.equal((await kitchen.client.get('/api/host/tours')).status, 403);
+    const member = await registered(env);
+    assert.equal((await member.client.get('/api/host/tours')).status, 403);
+
+    const admin = await registered(env);
+    await grantRole(env.sql, admin.userId, 'FIKIRHANE_ADMIN');
+    const open = (await admin.client.get('/api/host/tours')).json.items;
+    const mine = open.find((r: any) => r.first_name === 'Selin');
+    assert.deepEqual([mine.preferred_slot, mine.interests, mine.status], ['afternoon', ['coworking', 'meeting_room'], 'new']);
+    const updated = await admin.client.patch(`/api/host/tours/${mine.id_tour_request}`, { status: 'visited', staff_note: 'Geldi, gezdik.' });
+    assert.equal(updated.json.status, 'visited');
+    assert.ok(!(await admin.client.get('/api/host/tours')).json.items.some((r: any) => r.id_tour_request === mine.id_tour_request));
+    assert.ok((await admin.client.get('/api/host/tours?durum=kapali')).json.items.some((r: any) => r.id_tour_request === mine.id_tour_request));
+  });
+
+  test('a filled honeypot is accepted but not stored', async () => {
+    const bot = new Client(env);
+    const before = (await env.sql`select count(*)::int as n from tour_requests`)[0].n;
+    const res = await bot.post('/api/tours', { first_name: 'Bot', contact_email: 'bot@example.com', preferred_date: nextWeekday(2), preferred_slot: 'morning', website: 'http://spam' });
+    assert.equal(res.status, 201);
+    assert.equal((await env.sql`select count(*)::int as n from tour_requests`)[0].n, before);
+  });
+});
+
 describe('meeting room', () => {
   test('weekday evening two-hour slots from 18:00; one booking takes the whole room', async () => {
     const slots = await env.sql<{ h: number; dow: number; hours: number; capacity: number; unit: string; price: string }[]>`

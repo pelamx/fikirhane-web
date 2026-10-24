@@ -1,9 +1,8 @@
 import { Hono } from 'hono';
-import { getConnInfo } from '@hono/node-server/conninfo';
 import { deleteCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { ApiError, unauthorized } from '../errors.ts';
-import { body, linkBase, sessionToken, SESSION_COOKIE, type Deps, type Env, type Ctx } from '../http.ts';
+import { body, clientIp, linkBase, sessionToken, SESSION_COOKIE, type Deps, type Env, type Ctx } from '../http.ts';
 import { createSession, dummyPasswordHash, normalizeEmail, RateLimiter, revokeSession, verifyPassword } from '../services/auth.ts';
 import { mailerFromConfig } from '../services/mail.ts';
 import { consumeResetToken, createResetToken, resetEmail, resetUrl } from '../services/password-reset.ts';
@@ -42,11 +41,7 @@ export function authRoutes(deps: Deps) {
   const resetRequests = new RateLimiter(deps.config.passwordResetRequestsPerHour, 60 * 60_000);
   const resetConfirms = new RateLimiter(deps.config.loginAttemptsPer15Min, 15 * 60_000);
   const mailer = deps.mailer !== undefined ? deps.mailer : mailerFromConfig(deps.config);
-  // Forwarded headers are only trusted behind a known reverse proxy (TRUST_PROXY=true); otherwise they are spoofable.
-  const ip = (c: Ctx) => {
-    if (deps.config.trustProxy) return c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-    try { return getConnInfo(c).remote.address ?? 'unknown'; } catch { return 'unknown'; }
-  };
+  const ip = (c: Ctx) => clientIp(c, deps.config.trustProxy);
 
   async function startSession(c: Ctx, userId: string) {
     const token = await createSession(deps.sql, userId, deps.config.sessionDays, c.req.header('user-agent') ?? null);

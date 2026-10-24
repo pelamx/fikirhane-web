@@ -1,3 +1,4 @@
+import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Context } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { z } from 'zod';
@@ -70,4 +71,10 @@ export function idParam(c: Ctx, name: string): string {
   const parsed = uuid.safeParse(c.req.param(name));
   if (!parsed.success) throw badRequest('invalid_id', 'Invalid identifier.');
   return parsed.data;
+}
+
+/** The caller's address for rate limits. Forwarded headers are trusted only behind a known reverse proxy (TRUST_PROXY=true). */
+export function clientIp(c: Ctx, trustProxy: boolean): string {
+  if (trustProxy) return c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  try { return getConnInfo(c).remote.address ?? 'unknown'; } catch { return 'unknown'; }
 }

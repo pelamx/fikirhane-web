@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
-import { ApiError, forbidden } from '../errors.ts';
-import { idParam, permissionsOf, requireUser, type Deps, type Env } from '../http.ts';
-import { hasClubPermission } from '../services/authz.ts';
+import { z } from 'zod';
+import { ApiError, forbidden, notFound } from '../errors.ts';
+import { body, idParam, permissionsOf, query, requireUser, type Deps, type Env } from '../http.ts';
+import { audit } from '../services/audit.ts';
+import { hasClubPermission, requirePermission } from '../services/authz.ts';
 import { hostScope, shellsOf } from '../services/shells.ts';
 
 /**
@@ -32,6 +34,37 @@ export function hostRoutes(deps: Deps) {
       where cu.id_club = ${clubId} and cu.status = 'active'
       order by r.role_rank desc, cu.start_date, u.first_name`;
     return c.json({ items: rows });
+  });
+
+  // Visit requests from "Tur planla", oldest preferred date first among the open ones.
+  const TourUpdate = z.object({
+    status: z.enum(['new', 'contacted', 'scheduled', 'visited', 'cancelled']),
+    staff_note: z.string().trim().max(1000).nullable().optional(),
+  });
+  app.get('/tours', async c => {
+    requirePermission(await permissionsOf(c, deps), 'tour.view');
+    const { durum } = query(c, z.object({ durum: z.enum(['acik', 'kapali']).default('acik') }));
+    const open = durum === 'acik';
+    const rows = await sql`
+      select t.id_tour_request, t.first_name, t.contact_email, t.contact_phone, t.preferred_date, t.preferred_slot, t.interests, t.note,
+             t.status, t.staff_note, t.created_at, t.updated_at, h.first_name as handled_by
+      from tour_requests t left join users h on h.id_user = t.handled_by_user_id
+      where ${open ? sql`t.status in ('new', 'contacted', 'scheduled')` : sql`t.status in ('visited', 'cancelled')`}
+      order by ${open ? sql`t.preferred_date, t.created_at` : sql`t.updated_at desc`} limit 300`;
+    return c.json({ items: rows });
+  });
+  app.patch('/tours/:id', async c => {
+    const userId = requireUser(c);
+    requirePermission(await permissionsOf(c, deps), 'tour.manage');
+    const input = await body(c, TourUpdate);
+    const id = idParam(c, 'id');
+    const [row] = await sql<{ status: string }[]>`
+      update tour_requests set status = ${input.status}, handled_by_user_id = ${userId},
+        staff_note = ${input.staff_note === undefined ? sql`staff_note` : input.staff_note || null}
+      where id_tour_request = ${id} returning status`;
+    if (!row) throw notFound('Tour request');
+    await audit(sql, { actorUserId: userId, action: 'tour.update', entityType: 'tour_request', entityId: id, source: 'admin_web', metadata: { status: input.status } });
+    return c.json(row);
   });
 
   return app;

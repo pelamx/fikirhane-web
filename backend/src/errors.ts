@@ -29,6 +29,7 @@ const STAMPED = 'Bu durum yalnızca ilgili işlemle verilir (zamanı ve yapanı 
 export const RULES: Record<string, [path: string, message: string]> = {
   audit_log_user_actor: ['actor_user_id', 'Kullanıcı işlemlerinde işlemi yapan kişi kayıtlı olmalı.'],
   auth_identities_password_hash: ['secret_hash', 'Şifreyle giriş için şifre gerekli.'],
+  tour_requests_contact_required: ['contact_email', 'E-posta adresi ya da telefon numarası gerekli.'],
   bookings_seat_required: ['id_seat', 'Koltuk bazlı rezervasyonda koltuk seçilmeli.'],
   bookings_table_required: ['id_table', 'Masa bazlı rezervasyonda masa seçilmeli.'],
   bookings_seat_only_for_seat_unit: ['id_seat', 'Koltuk yalnızca koltuk bazlı rezervasyonda seçilir.'],

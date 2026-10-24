@@ -28,6 +28,8 @@ const MESSAGES = {
   reset_token_invalid: 'Bu bağlantı geçersiz ya da süresi dolmuş. Yeni bir bağlantı isteyebilirsin.',
   staff_account: 'Yönetici hesapları için sıfırlama bağlantısı oluşturulamaz; e-postayla şifre yenileme kullanılmalı.',
   not_editable: 'Bu tablodaki kayıtlar buradan değiştirilemez.',
+  contact_required: 'Sana ulaşabilmemiz için e-posta adresini ya da telefonunu yaz.',
+  tour_date_invalid: 'Bu gün için tur planlanamıyor; önümüzdeki bir hafta içi gününü seç.',
   not_deletable: 'Bu kayıt silinemez; durumunu değiştirebilirsin.',
   invalid_transition: 'Bu durum değişikliğine izin verilmiyor.',
   rule_violation: 'Bu değişiklik bir iş kuralına aykırı.',

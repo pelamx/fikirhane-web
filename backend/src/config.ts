@@ -43,6 +43,8 @@ export interface Config {
   /** How early before a session its QR pass opens the door. */
   checkinEarlyMinutes: number;
   passwordResetRequestsPerHour: number;
+  /** Visit requests (Tur planla) accepted per network per hour. */
+  tourRequestsPerHour: number;
 }
 
 export function loadConfig(overrides: Partial<Config> = {}): Config {
@@ -77,6 +79,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     visitorSeatSelection: (process.env.VISITOR_SEAT_SELECTION ?? 'true') !== 'false',
     checkinEarlyMinutes: int('CHECKIN_EARLY_MINUTES', 15),
     passwordResetRequestsPerHour: int('PASSWORD_RESET_REQUESTS_PER_HOUR', 5),
+    tourRequestsPerHour: int('TOUR_REQUESTS_PER_HOUR', 5),
     ...overrides,
   };
   if (config.cookieSameSite === 'None' && !config.cookieSecure) throw new Error('COOKIE_SAMESITE=None requires COOKIE_SECURE=true');

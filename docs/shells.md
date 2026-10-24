@@ -27,6 +27,7 @@ How people move between them:
 
 - `/`: public introduction/discovery.
 - `/coworking/`, `/toplanti-odasi/`, `/etkinlik-alani/`, `/language-meetup/`: one page per space, linked from the home page's Mekân & topluluk list; facts from fikirhane.co/ng (24 October 2026); each page is built around its use (session times, room plan, seating layouts, questions about the meetup); `scripts/space.js` for theme, menu and membership links.
+- `/tur/`: Tur planla — a visit request written as a short note (name, a weekday, morning or afternoon, interests, e-mail or phone); it lands in the host shell.
 - `/uyelik/`: account sign-up / login in API mode; in preview mode the labeled prototype onboarding (no password or email collected).
 - `/uyelik/sifre/`: forgot password; `#t=<token>` sets a new password from an emailed or staff-created link.
 - `/rezervasyon/?tarih&seans&adim&salon&koltuk`: reservation flow — Seans (week strip, day's sessions with personal price and availability) → Koltuk (rooms and seat plans drawn over `assets/plans/*.png`; seat picking for members whose membership allows it, otherwise the first free seat is assigned) → Bilgiler (need/offer, freepass; sign-in returns to the same step) → Onay. The member area's "Yer ayırt" opens it.
@@ -39,6 +40,7 @@ How people move between them:
 - `/host/#genel`: Bugün — counts for daily work, the signed-in person's upcoming events, and the areas they can use.
 - `/host/#m/<area>`: host areas in the top menu — Program, Sorumluluklarım, Üyeler, Kafeterya ve stok, Finans, Büyüme; each shows only the screens and tables the account may use.
 - `/host/#basvurular`: membership applications; approve, review, waitlist, decline.
+- `/host/#turlar`: visit requests from Tur planla; contact details, and the status staff set (contacted, time agreed, visited, cancelled) with an optional note.
 - `/host/#etkinlikler`, `#etkinlik/<id>`, `#yeni-etkinlik`: events incl. drafts; create, publish, cancel, participants, check-in.
 - `/host/#kontrol?k=<token>&tarih&seans`: door check opened by scanning a booking's QR; green with "Girişi onayla" only during that session (from 15 minutes before the start), red with the reason otherwise.
 - `/host/#kuluplerim`, `#etkinliklerim`: what a club lead or event host runs — their clubs with members, and their upcoming events with participants and check-in.

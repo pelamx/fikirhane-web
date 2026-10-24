@@ -25,7 +25,8 @@ const HOST_MODULES = [
       { tab: 'etkinliklerim', label: 'Etkinliklerim', href: '#etkinliklerim', show: () => scope.events.length > 0 }],
     tables: [] },
   { key: 'uyeler', icon: '◯', title: 'Üyeler', copy: 'Başvurular, kişiler ve üyelikler.',
-    views: [{ tab: 'basvurular', label: 'Başvurular', href: '#basvurular', show: () => can('membership.view') }],
+    views: [{ tab: 'basvurular', label: 'Başvurular', href: '#basvurular', show: () => can('membership.view') },
+      { tab: 'turlar', label: 'Tur talepleri', href: '#turlar', show: () => can('tour.view') }],
     tables: ['users', 'user_memberships', 'membership_applications'] },
   { key: 'kafeterya', icon: '▤', title: 'Kafeterya ve stok', copy: 'Ürünler, stok hareketleri ve sayımlar.',
     tables: ['items', 'stock_movements', 'stock_counts', 'stock_count_items'] },
@@ -57,7 +58,7 @@ const ADMIN_MODULES = [
 ];
 const MODULES = SHELL === 'host' ? HOST_MODULES : ADMIN_MODULES;
 // Daily-work screens live in the host shell; the admin shell sends them there.
-const HOST_VIEWS = ['basvurular', 'etkinlikler', 'etkinlik', 'yeni-etkinlik', 'kontrol', 'kuluplerim', 'etkinliklerim'];
+const HOST_VIEWS = ['basvurular', 'turlar', 'etkinlikler', 'etkinlik', 'yeni-etkinlik', 'kontrol', 'kuluplerim', 'etkinliklerim'];
 const hostTables = new Set(HOST_MODULES.flatMap(m => m.tables));
 const moduleOfTable = name => MODULES.find(m => m.tables.includes(name));
 const moduleTabs = m => [...(m.views ?? []).filter(v => !v.last && v.show()).map(v => ({ tab: v.tab, label: v.label, href: v.href })),
@@ -67,7 +68,7 @@ const visibleModules = () => MODULES.filter(m => moduleTabs(m).length);
 
 /** Which area and tab a route belongs to, for the menu and the tab bar. */
 function placeOf(view, a) {
-  if (view === 'basvurular') return ['uyeler', 'basvurular'];
+  if (view === 'basvurular' || view === 'turlar') return ['uyeler', view];
   if (view === 'kontrol') return ['program', 'kontrol'];
   if (['etkinlikler', 'etkinlik', 'yeni-etkinlik'].includes(view)) return ['program', 'program'];
   if (view === 'kuluplerim' || view === 'etkinliklerim') return ['sorumluluk', view];
@@ -98,6 +99,7 @@ const TABLE_LABELS = {
 const STATUS = {
   draft: 'Taslak', submitted: 'Gönderildi', under_review: 'İnceleniyor', approved: 'Onaylandı', waitlisted: 'Bekleme listesi', declined: 'Reddedildi', withdrawn: 'Geri çekildi',
   published: 'Yayında', cancelled: 'İptal', completed: 'Tamamlandı', archived: 'Arşiv', active: 'Aktif', inactive: 'Pasif', ended: 'Sona erdi', expired: 'Süresi doldu',
+  new: 'Yeni', contacted: 'İletişime geçildi', scheduled: 'Saati belli', visited: 'Geldi',
   confirmed: 'Onaylı', pending_payment: 'Ödeme bekliyor', checked_in: 'Giriş yaptı', no_show: 'Gelmedi', suspended: 'Askıda', revoked: 'Geri alındı',
 };
 // What a reference column means when it is not simply "the" link (e.g. bookings.cancelled_by_user_id → who cancelled).
@@ -114,7 +116,7 @@ const AUDIT_REFS = ['created_by_user_id', 'updated_by_user_id'];
 
 const EVENT_TYPES = { workspace: 'Çalışma alanı', meetup: 'Buluşma', workshop: 'Atölye', talk: 'Konuşma', class: 'Ders', social: 'Sosyal' };
 const OVERVIEW = SHELL === 'host' ? [
-  ['open_applications', 'Açık üyelik başvurusu', '#basvurular'], ['events_awaiting_publish', 'Yayın bekleyen etkinlik', '#etkinlikler/onay'],
+  ['new_tours', 'Yeni tur talebi', '#turlar'], ['open_applications', 'Açık üyelik başvurusu', '#basvurular'], ['events_awaiting_publish', 'Yayın bekleyen etkinlik', '#etkinlikler/onay'],
   ['upcoming_events', 'Önümüzdeki 7 günde etkinlik', '#etkinlikler'], ['active_bookings', 'Aktif rezervasyon', '#veri/bookings'],
 ] : [
   ['users', 'Aktif kullanıcı', '#veri/users'], ['active_memberships', 'Aktif üyelik', '#veri/user_memberships?status=active'],
@@ -202,7 +204,9 @@ function rowsTable(table, items, labels, columns) {
 // ---------- views ----------
 
 async function overview() {
-  const data = await api('/admin/overview').catch(() => ({}));
+  const [data, tours] = await Promise.all([api('/admin/overview').catch(() => ({})),
+    SHELL === 'host' && can('tour.view') ? api('/host/tours').catch(() => null) : null]);
+  if (tours) data.new_tours = tours.items.filter(r => r.status === 'new').length;
   const tiles = OVERVIEW.filter(([k]) => k in data);
   const mods = visibleModules();
   const intro = SHELL === 'host' ? 'Günün işleri burada: program, kapı, başvurular ve sorumlu olduğun kayıtlar. Gördüklerin rollerine göre belirlenir.'
@@ -273,6 +277,32 @@ async function eventDetail(id) {
     + (!people ? '<p class="admin-muted">Bu etkinliğin katılımcılarını görme yetkin yok.</p>'
       : people.items.length ? `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th scope="col">Katılımcı</th><th scope="col">Yer</th><th scope="col">Durum</th><th scope="col">Ödeme</th><th scope="col">Tutar</th><th scope="col">Giriş</th></tr></thead><tbody>${people.items.map(p => `<tr><td>${p.first_name ? `${esc(p.first_name)} ${esc(p.last_name)}` : '<span class="admin-muted">Misafir</span>'}</td><td>${esc(p.option_code)}${p.seat_code ? ` · ${esc(p.seat_code)}` : ''}</td><td>${badge(p.booking_status)}</td><td>${esc(valueLabel('payment_status', p.payment_status) ?? p.payment_status)}</td><td>${esc(money(p.final_price, e?.currency_code))}</td><td>${p.checkin_at ? esc(when(p.checkin_at)) : checkin && p.booking_status === 'confirmed' ? `<button class="shell-secondary" data-checkin="${p.id_booking}">Giriş yaptı</button>` : '—'}</td></tr>`).join('')}</tbody></table></div>`
       : '<p class="admin-muted">Henüz rezervasyon yok.</p>') + '</section>';
+}
+
+// ---------- visit requests from "Tur planla" (host shell) ----------
+
+const TOUR_INTERESTS = { coworking: 'Çalışma alanı', meeting_room: 'Toplantı odası', event_space: 'Etkinlik alanı', clubs: 'Kulüpler' };
+const TOUR_SLOTS = { morning: 'sabah (10.00–14.00)', afternoon: 'öğleden sonra (14.00–18.00)' };
+const TOUR_NEXT = [['contacted', 'İletişime geçildi'], ['scheduled', 'Saati belli'], ['visited', 'Geldi'], ['cancelled', 'İptal']];
+const longDate = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' });
+
+async function tours(params) {
+  const filter = params.get('durum') === 'kapali' ? 'kapali' : 'acik';
+  const { items } = await api(`/host/tours?durum=${filter}`);
+  const manage = can('tour.manage');
+  return heading('ZİYARETLER', 'Tur <em>talepleri.</em>', 'Gelip görmek isteyenler. Ara ya da yaz, saati birlikte netleştir; durumu buradan işaretle.')
+    + `<div class="event-filter admin-filter">${[['acik', 'Açık'], ['kapali', 'Gelen ve iptal']].map(([k, label]) => `<a href="#turlar?durum=${k}" aria-pressed="${k === filter}" class="admin-chip">${label}</a>`).join('')}</div>`
+    + (items.length ? `<div class="admin-cards">${items.map(r => {
+      const contact = [r.contact_phone ? `<a class="text-link" href="tel:${esc(r.contact_phone.replace(/[^+0-9]/g, ''))}">${esc(r.contact_phone)}</a>` : '',
+        r.contact_email ? `<a class="text-link" href="mailto:${esc(r.contact_email)}">${esc(r.contact_email)}</a>` : ''].filter(Boolean).join(' · ');
+      return `<article class="admin-card"><div class="admin-card-top"><div><h2>${esc(r.first_name)}</h2><p>${esc(longDate.format(new Date(`${String(r.preferred_date).slice(0, 10)}T12:00:00+03:00`)))}, ${esc(TOUR_SLOTS[r.preferred_slot] ?? r.preferred_slot)} · ${contact}</p></div>${badge(r.status)}</div>`
+        + (r.interests?.length ? `<p><b>İlgilendiği:</b> ${esc(r.interests.map(i => TOUR_INTERESTS[i] ?? i).join(', '))}</p>` : '')
+        + (r.note ? `<blockquote>${esc(r.note)}</blockquote>` : '')
+        + (r.staff_note ? `<p class="admin-muted">Ekip notu: ${esc(r.staff_note)}${r.handled_by ? ` (${esc(r.handled_by)})` : ''}</p>` : '')
+        + `<p class="admin-muted">Gönderildi: ${esc(when(r.created_at))}</p>`
+        + (manage ? `<div class="admin-actions">${TOUR_NEXT.filter(([s]) => s !== r.status).map(([s, label]) => `<button class="${s === 'cancelled' ? 'shell-secondary admin-danger' : 'shell-secondary'}" data-tour="${esc(r.id_tour_request)}" data-tour-status="${s}">${label}</button>`).join('')}</div>` : '')
+        + '</article>';
+    }).join('')}</div>` : empty(filter === 'acik' ? 'Bekleyen tur talebi yok.' : 'Henüz kapanan tur talebi yok.', filter === 'acik' ? '“Tur planla” sayfasından gelen notlar burada görünür.' : ''));
 }
 
 // ---------- what a club lead or event host runs (host shell) ----------
@@ -645,6 +675,7 @@ async function render() {
       : view === 'veri' && a ? await dataTable(a, params)
       : view === 'veri' ? dataIndex()
       : view === 'kontrol' ? await doorCheck(params)
+      : view === 'turlar' && SHELL === 'host' ? await tours(params)
       : view === 'kuluplerim' && SHELL === 'host' ? await myClubs()
       : view === 'etkinliklerim' && SHELL === 'host' ? await myEvents()
       : view === 'kayit' && a && b ? await record(a, b)
@@ -716,6 +747,13 @@ document.addEventListener('click', async event => {
     if (await ask({ title: 'Kaydı sil', copy: 'Bu kayıt kalıcı olarak silinecek. Silme işlemi denetim kaydına yazılır.', ok: 'Sil' }) === null) return;
     const table = t.dataset.table;
     run(async () => { await api(`/admin/data/${table}/${t.dataset.id}`, { method: 'DELETE' }); location.hash = `veri/${table}`; }, 'Kayıt silindi.');
+  }
+  if (t.dataset.tourStatus) {
+    const label = TOUR_NEXT.find(([s]) => s === t.dataset.tourStatus)?.[1] ?? '';
+    const note = await ask({ title: label, copy: 'Talebin durumu değişir; istersen ekip için kısa bir not bırak.', input: 'Not (isteğe bağlı)', ok: 'Kaydet' });
+    if (note === null) return;
+    run(() => api(`/host/tours/${t.dataset.tour}`, { method: 'PATCH', body: { status: t.dataset.tourStatus, ...(note ? { staff_note: note } : {}) } }), 'Kaydedildi.');
+    return;
   }
   if (t.dataset.passCheckin) { run(() => api('/admin/pass/checkin', { method: 'POST', body: { k: t.dataset.passCheckin } }), 'Giriş onaylandı.'); return; }
   if (t.dataset.checkin) run(() => api(`/admin/bookings/${t.dataset.checkin}/checkin`, { method: 'POST', body: {} }), 'Giriş kaydedildi.');

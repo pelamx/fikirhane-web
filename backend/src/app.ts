@@ -8,6 +8,7 @@ import { authRoutes } from './routes/auth.ts';
 import { catalogRoutes } from './routes/catalog.ts';
 import { hostRoutes } from './routes/host.ts';
 import { meRoutes } from './routes/me.ts';
+import { tourRoutes } from './routes/tours.ts';
 import { resolveSession } from './services/auth.ts';
 import { staticSite } from './static.ts';
 
@@ -56,6 +57,7 @@ export function createApp(deps: Deps) {
   app.route('/api/me', meRoutes(deps));
   app.route('/api/admin', adminRoutes(deps));
   app.route('/api/host', hostRoutes(deps));
+  app.route('/api/tours', tourRoutes(deps));
   app.route('/api', catalogRoutes(deps));
   app.all('/api/*', c => c.json({ error: { code: 'not_found', message: 'Unknown endpoint.' } }, 404));
 
