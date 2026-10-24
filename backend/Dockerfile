@@ -15,6 +15,10 @@ COPY member member
 COPY uyelik uyelik
 COPY admin admin
 COPY rezervasyon rezervasyon
+COPY coworking coworking
+COPY toplanti-odasi toplanti-odasi
+COPY etkinlik-alani etkinlik-alani
+COPY language-meetup language-meetup
 ENV NODE_ENV=production PORT=8080 SITE_DIR=..
 WORKDIR /app/backend
 USER node
