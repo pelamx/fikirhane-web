@@ -218,7 +218,7 @@ function bottomBar(s, e) {
   const option = e && (optionsOf(e).find(o => o.id_event_option === s.optionId) ?? (optionsOf(e).length === 1 ? optionsOf(e)[0] : null));
   const seat = e?.seats.find(x => x.id_seat === s.seatId);
   const price = option?.price ?? (e && cheapest(e));
-  const labels = { seans: noSeatStep(e) ? 'Devam et' : 'Koltuk seçimine devam et', koltuk: 'Bilgilere devam et', bilgiler: 'Onaya devam et', onay: option?.available === 0 ? 'Bekleme listesine katıl' : 'Rezervasyonu tamamla' };
+  const labels = { seans: noSeatStep(e) || (!e && areaOf()) ? 'Devam et' : 'Koltuk seçimine devam et', koltuk: 'Bilgilere devam et', bilgiler: 'Onaya devam et', onay: option?.available === 0 ? 'Bekleme listesine katıl' : 'Rezervasyonu tamamla' };
   const ready = s.step === 'seans' ? !!e && !['mine', 'soon'].includes(availability(e)[0])
     : s.step === 'koltuk' ? !!option : s.step === 'bilgiler' ? !!policy?.signed_in : true;
   const what = s.step === 'seans' ? ['Seçilen seans', e ? `${dayTitle(dayKey(new Date(e.start_datetime)))} · ${range(e)}` : 'Henüz seans seçmedin']
