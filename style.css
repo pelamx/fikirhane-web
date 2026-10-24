@@ -170,10 +170,28 @@ html[data-theme=dark] .hero-sketch .glint{display:none}
 .space-more{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px 34px;padding:34px 0 20px;font-size:16px}
 .space-more>span{font-size:12px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
 .space-more a{font:400 22px var(--serif)}
+/* Kulüpler (kulupler/): one section per club — its art beside what it is, its next meetings and the way in. */
+.club-jump{display:flex;flex-wrap:wrap;gap:10px 30px;padding:28px 0;border-bottom:1px solid var(--line);font:400 20px var(--serif)}
+.club-jump a{border-bottom:1px solid var(--line)}
+.club-jump a:hover{color:var(--copper);border-color:var(--copper)}
+.club-entry{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:56px;align-items:start;padding:60px 0;border-bottom:1px solid var(--line);scroll-margin-top:20px}
+.club-entry .club-art{height:320px}
+.club-entry-body h2{font:400 clamp(34px,3.6vw,48px)/1.08 var(--serif);margin:14px 0 10px}
+.club-entry-prompt{font:italic 22px/1.3 var(--serif);color:var(--copper);margin-bottom:16px}
+.club-entry-body>p:not(.club-entry-prompt){font-size:16.5px;line-height:1.75;color:var(--muted);max-width:560px}
+.club-next{margin-top:26px}
+.club-next h3{font-size:12px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.club-next ul{list-style:none;margin:0;padding:0}
+.club-next a{display:flex;flex-wrap:wrap;gap:4px 16px;padding:11px 0;border-bottom:1px solid var(--line);font-size:15px}
+.club-next a strong{font-weight:500}
+.club-next a span{color:var(--muted)}
+.club-next a:hover strong{color:var(--copper)}
+.club-entry-actions{display:flex;flex-wrap:wrap;align-items:center;gap:14px 28px;margin-top:26px}
+.club-entry-actions .space-cta{margin:0}
 .space-more a span{font:16px 'DM Sans',sans-serif;color:var(--copper)}
 .space-more a:hover{color:var(--copper)}
 @media(max-width:1100px){.layouts{grid-template-columns:1fr;max-width:620px}.next-meet{grid-template-columns:auto 1fr auto}.next-meet .space-h{grid-column:1/-1}}
-@media(max-width:760px){.crumbs{font-size:12px;padding-top:18px}.space-head{grid-template-columns:1fr;padding:32px 0 40px}.space-num{padding:0 0 10px}.space-head h1{grid-row:auto;font-size:clamp(46px,13vw,68px);letter-spacing:-2px}.space-lead,.space-cta{grid-column:1}.space-lead{font-size:16px;margin-top:18px}.space section{padding:36px 0}.space-body,.fit{grid-template-columns:1fr;gap:40px}.facts>div{grid-template-columns:105px 1fr;gap:14px;font-size:15px}.day strong{font-size:21px}.day li{padding:18px 14px 14px}.steps ol{grid-template-columns:1fr;gap:16px}.layouts{gap:22px 16px}.layout strong{font-size:18px}.layout figcaption{font-size:14px}.next-meet{grid-template-columns:1fr;gap:16px}.next-date strong{font-size:52px}.next-what h2{font-size:25px}.qa-q,.qa-a{max-width:92%;font-size:16px}.qa-q{font-size:16px}.space-more{gap:10px 24px}.space-more>span{width:100%}.space-more a{font-size:19px}}
+@media(max-width:760px){.club-entry{grid-template-columns:1fr;gap:28px;padding:40px 0}.club-entry .club-art{height:250px}.club-jump{font-size:17px}.crumbs{font-size:12px;padding-top:18px}.space-head{grid-template-columns:1fr;padding:32px 0 40px}.space-num{padding:0 0 10px}.space-head h1{grid-row:auto;font-size:clamp(46px,13vw,68px);letter-spacing:-2px}.space-lead,.space-cta{grid-column:1}.space-lead{font-size:16px;margin-top:18px}.space section{padding:36px 0}.space-body,.fit{grid-template-columns:1fr;gap:40px}.facts>div{grid-template-columns:105px 1fr;gap:14px;font-size:15px}.day strong{font-size:21px}.day li{padding:18px 14px 14px}.steps ol{grid-template-columns:1fr;gap:16px}.layouts{gap:22px 16px}.layout strong{font-size:18px}.layout figcaption{font-size:14px}.next-meet{grid-template-columns:1fr;gap:16px}.next-date strong{font-size:52px}.next-what h2{font-size:25px}.qa-q,.qa-a{max-width:92%;font-size:16px}.qa-q{font-size:16px}.space-more{gap:10px 24px}.space-more>span{width:100%}.space-more a{font-size:19px}}
 .day.day-3{grid-template-columns:repeat(3,1fr)}
 .join-link{white-space:nowrap}@media(max-width:400px){.join-link span{margin-left:5px}.header .brand{width:135px}}
 

@@ -13,8 +13,8 @@ const area = path.startsWith('/admin') ? 'admin' : path.startsWith('/host') ? 'h
 const onHome = path === '/' || path === '/index.html';
 
 const SITE = onHome
-  ? [['#kulupler', 'Kulüpler'], ['#takvim', 'Buluşma takvimi'], ['#mekan', 'Mekân & topluluk'], [url('rezervasyon/'), 'Rezervasyon']]
-  : [[url(''), 'Keşfet'], [url('rezervasyon/'), 'Rezervasyon']];
+  ? [[url('kulupler/'), 'Kulüpler'], ['#takvim', 'Buluşma takvimi'], ['#mekan', 'Mekân & topluluk'], [url('rezervasyon/'), 'Rezervasyon']]
+  : [[url(''), 'Keşfet'], [url('kulupler/'), 'Kulüpler'], [url('rezervasyon/'), 'Rezervasyon']];
 const MEMBER = [['member/#anasayfa', 'Ana sayfam'], ['member/#kesfet', 'Kulüpleri keşfet'], ['member/#kuluplerim', 'Kulüplerim'],
   ['member/#bulusmalar', 'Buluşmalar'], ['rezervasyon/', 'Rezervasyon yap']].map(([h, t]) => [url(h), t]);
 const HOST = [['host/#genel', 'Bugün'], ['host/#etkinlikler', 'Program'], ['host/#kontrol', 'Giriş kontrol']].map(([h, t]) => [url(h), t]);

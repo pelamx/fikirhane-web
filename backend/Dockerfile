@@ -21,6 +21,7 @@ COPY toplanti-odasi toplanti-odasi
 COPY etkinlik-alani etkinlik-alani
 COPY language-meetup language-meetup
 COPY tur tur
+COPY kulupler kulupler
 ENV NODE_ENV=production PORT=8080 SITE_DIR=..
 WORKDIR /app/backend
 USER node

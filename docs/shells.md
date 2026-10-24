@@ -5,7 +5,7 @@ per API endpoint by permissions.
 
 | Shell | Who enters | What it is for | Where |
 | --- | --- | --- | --- |
-| Visitor | Everyone, signed in or not | Discover Fikirhane: clubs, program, spaces, sign-up | `/`, `/coworking/` and the other space pages, `/uyelik/`, `/rezervasyon/` (booking asks for sign-in) |
+| Visitor | Everyone, signed in or not | Discover Fikirhane: clubs, program, spaces, sign-up | `/`, `/kulupler/`, `/coworking/` and the other space pages, `/uyelik/`, `/rezervasyon/` (booking asks for sign-in) |
 | Member | Every signed-in account (from sign-up on; the Basic and Plus plans change prices, booking window and active bookings, and Plus adds a monthly free guest) | Personal home, clubs, bookings, profile, membership application | `/member/` |
 | Host | Staff roles holding `shell.host` (FIKIRHANE_ADMIN, KITCHEN_STAFF, ACCOUNTING, MARKETING), plus club leads, co-leads and moderators and event hosts/tutors/facilitators/moderators/staff for their own clubs and upcoming events | Daily work: today, program, door check, membership applications, each staff role's own records, "Sorumluluklarım" | `/host/` |
 | Admin | Roles holding `shell.admin` (FIKIRHANE_ADMIN, TECH_ADMIN) | The back office: every table and relation the role may see, roles and permissions, system settings, audit log | `/admin/` |
@@ -27,6 +27,7 @@ How people move between them:
 
 - `/`: public introduction/discovery.
 - `/coworking/`, `/toplanti-odasi/`, `/etkinlik-alani/`, `/language-meetup/`: one page per space, linked from the home page's Mekân & topluluk list; facts from fikirhane.co/ng (24 October 2026); each page is built around its use (session times, room plan, seating layouts, questions about the meetup); `scripts/space.js` for theme, menu and membership links.
+- `/kulupler/`: Kulüpler — every club with its art, what it is, its next meetings (API mode, linking into the reservation flow) and Kulübe katıl (member area for members, sign-up for visitors); the top menu's Kulüpler and the home page's club links open it; `scripts/clubs.js`.
 - `/tur/`: Tur planla — a visit request written as a short note (name, a weekday, morning or afternoon, interests, e-mail or phone); it lands in the host shell.
 - `/uyelik/`: account sign-up / login in API mode; in preview mode the labeled prototype onboarding (no password or email collected).
 - `/uyelik/sifre/`: forgot password; `#t=<token>` sets a new password from an emailed or staff-created link.
