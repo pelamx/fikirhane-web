@@ -10,7 +10,7 @@
 ## Routes
 
 - `/`: public introduction/discovery.
-- `/coworking/`, `/toplanti-odasi/`, `/etkinlik-alani/`, `/language-meetup/`: one page per space, linked from the home page's Mekân & topluluk list; static content from fikirhane.co/ng (24 October 2026), shared layout, `scripts/space.js` for theme, menu and membership links.
+- `/coworking/`, `/toplanti-odasi/`, `/etkinlik-alani/`, `/language-meetup/`: one page per space, linked from the home page's Mekân & topluluk list; facts from fikirhane.co/ng (24 October 2026); each page is built around its use (session times, room plan, seating layouts, questions about the meetup); `scripts/space.js` for theme, menu and membership links.
 - `/uyelik/`: account sign-up / login in API mode; in preview mode the labeled prototype onboarding (no password or email collected).
 - `/uyelik/sifre/`: forgot password; `#t=<token>` sets a new password from an emailed or staff-created link.
 - `/rezervasyon/?tarih&seans&adim&salon&koltuk`: reservation flow — Seans (week strip, day's sessions with personal price and availability) → Koltuk (rooms and seat plans drawn over `assets/plans/*.png`; seat picking for members whose membership allows it, otherwise the first free seat is assigned) → Bilgiler (need/offer, freepass; sign-in returns to the same step) → Onay. The member area's "Yer ayırt" opens it.
