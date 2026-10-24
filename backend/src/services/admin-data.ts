@@ -260,7 +260,33 @@ export async function listRows(sql: Sql, perms: Set<string>, table: string, opts
     sql`select * from ${sql(table)} where ${where} order by ${order} limit ${opts.limit} offset ${opts.offset}`,
     sql<{ total: number }[]>`select count(*)::int as total from ${sql(table)} where ${where}`,
   ]);
-  return { table, total, items: rows.map(r => present(meta, r, perms)), labels: await labelsFor(sql, cat, meta, rows, perms) };
+  const [labels, people] = await Promise.all([labelsFor(sql, cat, meta, rows, perms),
+    table === 'users' ? peopleFor(sql, rows.map(r => String(r.id_user)), perms) : undefined]);
+  return { table, total, items: rows.map(r => present(meta, r, perms)), labels, ...(people ? { people } : {}) };
+}
+
+export type People = Record<string, { roles?: { code: string; name: string }[]; membership?: { code: string; name: string } | null }>;
+
+/** What each listed person is: staff roles (besides USER) and the active membership, each only for viewers of that table. */
+async function peopleFor(sql: Sql, ids: string[], perms: Set<string>): Promise<People> {
+  const people: People = Object.fromEntries(ids.map(id => [id, {}]));
+  if (!ids.length) return people;
+  const [roles, memberships] = await Promise.all([
+    canSee(perms, 'user_roles') ? sql<{ id_user: string; code: string; name: string }[]>`
+      select ur.id_user::text, r.role_code as code, r.role_name as name from user_roles ur join roles r using (id_role)
+      where ur.id_user::text = any(${ids}) and ur.status = 'active' and (ur.expires_at is null or ur.expires_at > now()) and r.role_code <> 'USER'
+      order by r.sort_order` : null,
+    canSee(perms, 'user_memberships') ? sql<{ id_user: string; code: string; name: string }[]>`
+      select m.id_user::text, t.membership_type_code as code, t.membership_type_name as name
+      from user_memberships m join membership_types t using (id_membership_type)
+      where m.id_user::text = any(${ids}) and m.status = 'active'` : null,
+  ]);
+  if (roles) for (const id of ids) people[id].roles = roles.filter(r => r.id_user === id).map(({ code, name }) => ({ code, name }));
+  if (memberships) for (const id of ids) {
+    const m = memberships.find(x => x.id_user === id);
+    people[id].membership = m ? { code: m.code, name: m.name } : null;
+  }
+  return people;
 }
 
 /** One record, its outgoing references, and the first rows of every visible table that points at it. */

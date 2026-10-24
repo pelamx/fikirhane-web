@@ -494,6 +494,30 @@ describe('admin data', () => {
     assert.equal(filtered.json.total, 1);
   });
 
+  test('the users list says who is staff and who holds which membership, as far as the viewer may see', async () => {
+    const admin = await registered(env, { last_name: 'RolTestiAdmin' });
+    await grantRole(env.sql, admin.userId, 'FIKIRHANE_ADMIN');
+    await grantRole(env.sql, admin.userId, 'TECH_ADMIN');
+    const member = await registered(env, { last_name: 'RolTestiÜye' });
+    await env.sql`insert into user_memberships (id_user, id_membership_type, start_date, source)
+      select ${member.userId}, id_membership_type, current_date, 'manual' from membership_types where membership_type_code = 'PREMIUM'`;
+    const basic = await registered(env, { last_name: 'RolTestiBasic' });
+
+    const list = (await admin.client.get('/api/admin/data/users?q=RolTesti&limit=10')).json;
+    assert.equal(list.total, 3);
+    assert.deepEqual(list.people[admin.userId].roles.map((r: { code: string }) => r.code), ['FIKIRHANE_ADMIN', 'TECH_ADMIN']);
+    assert.equal(list.people[admin.userId].membership, null);
+    assert.deepEqual(list.people[member.userId], { roles: [], membership: { code: 'PREMIUM', name: 'Plus' } });
+    assert.deepEqual(list.people[basic.userId], { roles: [], membership: null });
+
+    // Marketing sees users and their roles, but not memberships.
+    const marketer = await registered(env);
+    await grantRole(env.sql, marketer.userId, 'MARKETING');
+    const seen = (await marketer.client.get('/api/admin/data/users?q=RolTesti&limit=10')).json;
+    assert.deepEqual(seen.people[member.userId], { roles: [] });
+    assert.equal((await admin.client.get('/api/admin/data/clubs')).json.people, undefined);
+  });
+
   test('guest contact details are masked without user.view_contact', async () => {
     const { eventId, optionId } = await makeEvent(env.sql, { hoursFromNow: 300 });
     await env.sql`insert into bookings (id_event, id_event_option, booking_status, booking_source, booking_unit, final_price, currency_code,

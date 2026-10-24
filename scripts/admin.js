@@ -196,9 +196,26 @@ function summaryColumns(meta, max = 6) {
   return cols.map((c, i) => [c, score(c), i]).sort((x, y) => x[1] - y[1] || x[2] - y[2]).slice(0, max).map(x => x[0]).sort((x, y) => meta.columns.indexOf(x) - meta.columns.indexOf(y));
 }
 
+// Columns may also be computed ones ({ name, label, render }) that are not in the table itself.
 function rowsTable(table, items, labels, columns) {
   const meta = tableOf(table);
-  return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr>${columns.map(c => `<th scope="col">${esc(columnLabel(c.name, c.name === meta.pk))}</th>`).join('')}<th scope="col"><span class="visually-hidden">Kayıt</span></th></tr></thead><tbody>${items.map(r => `<tr>${columns.map(c => `<td>${cell(table, c, r[c.name], labels)}</td>`).join('')}<td><a class="admin-open" href="#kayit/${esc(table)}/${esc(r[meta.pk])}" aria-label="Kaydı aç">↗</a></td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr>${columns.map(c => `<th scope="col">${esc(c.label ?? columnLabel(c.name, c.name === meta.pk))}</th>`).join('')}<th scope="col"><span class="visually-hidden">Kayıt</span></th></tr></thead><tbody>${items.map(r => `<tr>${columns.map(c => `<td>${c.render ? c.render(r) : cell(table, c, r[c.name], labels)}</td>`).join('')}<td><a class="admin-open" href="#kayit/${esc(table)}/${esc(r[meta.pk])}" aria-label="Kaydı aç">↗</a></td></tr>`).join('')}</tbody></table></div>`;
+}
+
+const STAFF_ROLES = { FIKIRHANE_ADMIN: 'Admin', TECH_ADMIN: 'Teknik admin', ACCOUNTING: 'Muhasebe', MARKETING: 'Pazarlama', KITCHEN_STAFF: 'Mutfak' };
+
+/** The users list's Roller column: staff roles and the active plan by its name (Basic, Plus); Üyeliksiz when neither. */
+function peopleColumn(columns, people) {
+  const chip = (kind, code, text) => `<span class="admin-status" data-kind="${kind}" title="${esc(code)}">${esc(text)}</span>`;
+  const kinds = p => {
+    const chips = [...(p?.roles ?? []).map(r => chip('staff', r.code, STAFF_ROLES[r.code] ?? r.name)),
+      ...(p?.membership ? [chip('member', p.membership.code, p.membership.name)] : [])];
+    if (!chips.length && p && 'membership' in p) chips.push(chip('none', 'Aktif üyeliği yok', 'Üyeliksiz'));
+    return chips.length ? `<span class="admin-kinds">${chips.join('')}</span>` : '<span class="admin-null">—</span>';
+  };
+  const column = { name: 'people', label: 'Roller', render: r => kinds(people[r.id_user]) };
+  const at = columns.findIndex(c => c.name === 'last_name') + 1;
+  return at ? [...columns.slice(0, at), column, ...columns.slice(at)] : [column, ...columns];
 }
 
 // ---------- views ----------
@@ -372,7 +389,7 @@ async function dataTable(name, params) {
     + aboutTable(meta)
     + `<div class="admin-toolbar"><form id="data-search" class="admin-search" role="search"><label class="visually-hidden" for="data-q">Ara</label><input id="data-q" name="q" value="${esc(params.get('q') ?? '')}" placeholder="Metin alanlarında ara"><button class="shell-secondary" type="submit">Ara</button></form><a class="admin-chip" aria-pressed="${all}" href="${link({ tum: all ? null : '1', sayfa: null })}">${all ? 'Özet sütunlar' : 'Tüm sütunlar'}</a><a class="text-link" href="#veri">Tablolar ↗</a>${meta.write?.can_create ? `<a class="shell-primary admin-new" href="#yeni/${name}${prefill.size ? '?' + prefill : ''}">Yeni kayıt <span>+</span></a>` : ''}</div>`
     + (filters.length ? `<div class="admin-filters">${filters.map(([k, v]) => `<a class="admin-chip" aria-pressed="true" href="${link({ [k]: null, sayfa: null })}" aria-label="Filtreyi kaldır: ${esc(columnLabel(k))}">${filterLabel(k, v)} ✕</a>`).join('')}</div>` : '')
-    + (data.items.length ? rowsTable(name, data.items, data.labels, columns) : empty('Kayıt bulunamadı.'))
+    + (data.items.length ? rowsTable(name, data.items, data.labels, data.people ? peopleColumn(columns, data.people) : columns) : empty('Kayıt bulunamadı.'))
     + (pages > 1 ? `<nav class="admin-pager" aria-label="Sayfalar">${page > 0 ? `<a class="shell-secondary" href="${link({ sayfa: page - 1 || null })}">← Önceki</a>` : ''}<span>${page + 1} / ${pages}</span>${page + 1 < pages ? `<a class="shell-secondary" href="${link({ sayfa: page + 1 })}">Sonraki →</a>` : ''}</nav>` : '')
 ;
 }
