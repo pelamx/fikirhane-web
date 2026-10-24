@@ -15,14 +15,14 @@ const isoDay = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, yea
 const hm = (d: Date) => part(d, { hour: '2-digit', minute: '2-digit' });
 
 interface PassRow {
-  id_booking: string; id_event: string; id_user: string | null; checkin_token: string; booking_status: string; checkin_at: Date | null;
+  id_booking: string; id_event: string; id_user: string | null; booked_by_user_id: string | null; checkin_token: string; booking_status: string; checkin_at: Date | null;
   start_datetime: Date; end_datetime: Date; event_title: string; location_name: string; seat_code: string | null; seat_name: string | null;
   table_name: string | null; first_name: string | null; last_name: string | null; guest_first_name: string | null; guest_last_name: string | null;
 }
 
 async function load(db: Db, where: { id?: string; token?: string }): Promise<PassRow | null> {
   const [row] = await db<PassRow[]>`
-    select b.id_booking, b.id_event, b.id_user, b.checkin_token, b.booking_status, b.checkin_at, e.start_datetime, e.end_datetime,
+    select b.id_booking, b.id_event, b.id_user, b.booked_by_user_id, b.checkin_token, b.booking_status, b.checkin_at, e.start_datetime, e.end_datetime,
            e.event_title, l.location_name, s.seat_code, s.seat_name, t.table_name, u.first_name, u.last_name,
            b.guest_first_name, b.guest_last_name
     from bookings b join events e using (id_event) join event_options o using (id_event_option)
@@ -74,7 +74,8 @@ export function verdict(row: PassRow, config: Config, now = new Date()) {
 
 export async function ownPass(db: Db, userId: string, bookingId: string) {
   const row = await passById(db, bookingId);
-  if (!row || row.id_user !== userId) throw notFound('Booking');
+  // The member also holds the pass of a friend they brought as a guest, to show or send it.
+  if (!row || (row.id_user !== userId && !(row.id_user === null && row.booked_by_user_id === userId))) throw notFound('Booking');
   if (!PASS_STATUSES.has(row.booking_status)) throw new ApiError(409, 'pass_not_valid', 'Only confirmed bookings have an entry pass.');
   return row;
 }

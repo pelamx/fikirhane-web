@@ -167,7 +167,7 @@ function detailsStep(e) {
     <form id="extra-form" class="booking-form">
       ${e.enable_need ? `<label for="need">Bu buluşmada neye ihtiyacın var? <small>İsteğe bağlı · diğer katılımcılar tanışırken görebilir</small></label><textarea id="need" name="need" maxlength="500" rows="3" placeholder="Örn. ürünüm için ilk kullanıcı geri bildirimi">${esc(saved.need ?? '')}</textarea>` : ''}
       ${e.enable_offer ? `<label for="offer">Neler sunabilirsin? <small>İsteğe bağlı</small></label><textarea id="offer" name="offer" maxlength="500" rows="3" placeholder="Örn. pazarlama stratejisi üzerine fikir alışverişi">${esc(saved.offer ?? '')}</textarea>` : ''}
-      <label for="freepass">Freepass kodun var mı? <small>İsteğe bağlı</small></label><input id="freepass" name="freepass" maxlength="40" autocomplete="off" value="${esc(saved.freepass ?? '')}" placeholder="FREEPASS-KODU">
+      <label for="freepass">Freepass ya da misafir kodun var mı? <small>İsteğe bağlı</small></label><input id="freepass" name="freepass" maxlength="40" autocomplete="off" value="${esc(saved.freepass ?? '')}" placeholder="FREEPASS-KODU">
     </form>`;
 }
 

@@ -6,7 +6,7 @@ per API endpoint by permissions.
 | Shell | Who enters | What it is for | Where |
 | --- | --- | --- | --- |
 | Visitor | Everyone, signed in or not | Discover Fikirhane: clubs, program, spaces, sign-up | `/`, `/coworking/` and the other space pages, `/uyelik/`, `/rezervasyon/` (booking asks for sign-in) |
-| Member | Every signed-in account (from sign-up on; Member/Premium only change prices, booking window and seat choice) | Personal home, clubs, bookings, profile, membership application | `/member/` |
+| Member | Every signed-in account (from sign-up on; the Basic and Plus plans change prices, booking window and active bookings, and Plus adds a monthly free guest) | Personal home, clubs, bookings, profile, membership application | `/member/` |
 | Host | Staff roles holding `shell.host` (FIKIRHANE_ADMIN, KITCHEN_STAFF, ACCOUNTING, MARKETING), plus club leads, co-leads and moderators and event hosts/tutors/facilitators/moderators/staff for their own clubs and upcoming events | Daily work: today, program, door check, membership applications, each staff role's own records, "Sorumluluklarım" | `/host/` |
 | Admin | Roles holding `shell.admin` (FIKIRHANE_ADMIN, TECH_ADMIN) | The back office: every table and relation the role may see, roles and permissions, system settings, audit log | `/admin/` |
 

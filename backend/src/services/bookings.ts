@@ -89,7 +89,7 @@ export async function createBooking(db: Db, config: Config, req: BookingRequest)
     if (!full && option.booking_unit === 'seat') seatId = await pickSeat(tx, option, req.seatId ?? null, rights.seatSelectionEnabled);
     if (!full && option.booking_unit === 'table') tableId = await pickTable(tx, option, req.tableId ?? null);
 
-    const freepass = req.freepassCode ? await claimFreepass(tx, req.userId, req.freepassCode, event) : null;
+    const freepass = req.freepassCode ? await claimFreepass(tx, config, req.userId, req.freepassCode, event) : null;
     const price = quote({ basePrice: event.base_price, priceAdjustment: option.price_adjustment, currency: event.currency_code,
       discountRate: rights.discountRate, freepass: !!freepass });
     if (!price) throw unprocessable('not_bookable', 'This event has no price yet.');
@@ -175,11 +175,11 @@ async function pickTable(tx: Tx, option: OptionRow, requested: string | null): P
  * Validates a freepass for this user and event (FP-D07..D09, FPRED-D02/D03) under a row lock, claiming
  * an unowned pass for the user (FREEPASSES rule 16).
  */
-async function claimFreepass(tx: Tx, userId: string, code: string, event: EventRow): Promise<{ id: string }> {
+async function claimFreepass(tx: Tx, config: Config, userId: string, code: string, event: EventRow): Promise<{ id: string }> {
   const [fp] = await tx<{
     id_freepass: string; id_user: string | null; status: string; valid_from: Date; valid_until: Date; usage_limit: number;
-    id_event: string | null; id_club: string | null; event_type: string | null;
-  }[]>`select id_freepass, id_user, status, valid_from, valid_until, usage_limit, id_event, id_club, event_type
+    id_event: string | null; id_club: string | null; event_type: string | null; granted_to_user_id: string | null;
+  }[]>`select id_freepass, id_user, status, valid_from, valid_until, usage_limit, id_event, id_club, event_type, granted_to_user_id
        from freepasses where freepass_code = ${code.trim().toUpperCase()} for update`;
   const invalid = new ApiError(422, 'freepass_invalid', 'This freepass code is not valid.');
   if (!fp || (fp.id_user && fp.id_user !== userId)) throw invalid;
@@ -194,10 +194,18 @@ async function claimFreepass(tx: Tx, userId: string, code: string, event: EventR
     const [linked] = await tx`select 1 from event_clubs where id_event = ${event.id_event} and id_club = ${fp.id_club} and status = 'active'`;
     if (!linked) throw new ApiError(422, 'freepass_not_eligible', 'This freepass cannot be used for this event.');
   }
+  // A plan's monthly guest pass (guest-pass.ts) is for a friend, and only while the member still holds a plan with guest rights.
+  if (fp.granted_to_user_id) {
+    if (fp.granted_to_user_id === userId) throw new ApiError(422, 'guest_pass_own', 'Your guest pass is for a friend, not for your own booking.');
+    if (!(await membershipRights(tx, fp.granted_to_user_id, config)).monthlyGuestPasses) {
+      throw new ApiError(422, 'freepass_expired', 'This freepass is no longer valid.');
+    }
+  }
   const [{ used }] = await tx<{ used: number }[]>`select count(*)::int as used from freepass_redemptions
     where id_freepass = ${fp.id_freepass} and status = 'active'`;
   if (used >= fp.usage_limit) throw new ApiError(422, 'freepass_used', 'This freepass has already been used.');
-  if (!fp.id_user) {
+  // Guest passes stay with the member: whoever uses one is recorded per booking, so a returned right can go to another friend.
+  if (!fp.id_user && !fp.granted_to_user_id) {
     await tx`update freepasses set id_user = ${userId}, claimed_at = now(), updated_by_user_id = ${userId} where id_freepass = ${fp.id_freepass}`;
     await audit(tx, { actorUserId: userId, action: 'freepass.claim', entityType: 'freepass', entityId: fp.id_freepass });
   }
@@ -212,11 +220,12 @@ export async function cancelBooking(db: Db, config: Config, input: {
   bookingId: string; actorUserId: string; canCancelAny: boolean; reason?: string; note?: string | null;
 }) {
   return inTx(db, async tx => {
-    const [b] = await tx<{ id_user: string | null; booking_status: string; start_datetime: Date }[]>`
-      select b.id_user, b.booking_status, e.start_datetime from bookings b join events e using (id_event)
+    const [b] = await tx<{ id_user: string | null; booked_by_user_id: string | null; booking_status: string; start_datetime: Date }[]>`
+      select b.id_user, b.booked_by_user_id, b.booking_status, e.start_datetime from bookings b join events e using (id_event)
       where b.id_booking = ${input.bookingId} for update of b`;
     if (!b) throw notFound('Booking');
-    const own = b.id_user === input.actorUserId;
+    // Own booking, or a guest's booking the member made for a friend (guest-pass.ts).
+    const own = b.id_user === input.actorUserId || (b.id_user === null && b.booked_by_user_id === input.actorUserId);
     if (!own && !input.canCancelAny) throw notFound('Booking');
     if (!CANCELLABLE.includes(b.booking_status)) throw unprocessable('not_cancellable', 'This booking can no longer be cancelled.');
     const lockAt = b.start_datetime.getTime() - config.cancellationLockHours * 3_600_000;
@@ -257,7 +266,8 @@ export async function getBooking(db: Db, bookingId: string) {
     select b.id_booking, b.id_event, b.id_event_option, b.booking_status, b.payment_status, b.booking_unit,
            b.price_list_amount, b.discount_amount, b.final_price, b.currency_code, b.booked_at, b.expires_at, b.cancelled_at,
            b.checkin_at, s.seat_code, s.seat_name, t.table_code, t.table_name, e.event_title, e.start_datetime, e.end_datetime,
-           o.option_name, l.location_name, (b.id_freepass is not null) as used_freepass
+           o.option_name, l.location_name, (b.id_freepass is not null) as used_freepass,
+           (b.id_user is null) as is_guest, b.guest_first_name, b.guest_last_name
     from bookings b join events e using (id_event) join event_options o using (id_event_option)
     join locations l on l.id_location = o.id_location
     left join seats s on s.id_seat = b.id_seat left join tables t on t.id_table = b.id_table

@@ -59,7 +59,7 @@ function mapEvent(e, clubList) {
     name: e.event_title, description: e.event_description, day: dayFmt.format(start), month: monthFmt.format(start).toLocaleUpperCase('tr'),
     date: date.replace(/^(\S+) (\S+) (\S+) (\S+)$/, '$1 $2 $3, $4').replace(/^(\d+ \S+ \d+) (\S+)$/, '$1, $2'),
     time: `${time(start)} — ${time(end)}`, location: [...new Set(e.options.map(o => o.location_name))].join(' / '),
-    sourceUrl: null, options: e.options, booking: e.my_booking, start: e.start_datetime,
+    sourceUrl: null, options: e.options, booking: e.my_booking, guest: e.my_guest ?? null, start: e.start_datetime,
   };
 }
 
@@ -102,6 +102,10 @@ export async function membershipStatus() { return currentMode === 'api' ? api('/
 /** Books an event option, or cancels the existing booking when no option is given. */
 export async function bookEvent(eventId, optionId) {
   return apiAction(() => api('/bookings', { method: 'POST', body: { event_id: eventId, ...(optionId ? { event_option_id: optionId } : {}) } }));
+}
+/** Plus: brings a friend to the member's own booking with this month's guest pass. */
+export async function addGuest(bookingId, guest) {
+  return apiAction(() => api(`/me/bookings/${bookingId}/guest`, { method: 'POST', body: guest }));
 }
 export async function cancelBooking(bookingId) {
   return apiAction(() => api(`/me/bookings/${bookingId}/cancel`, { method: 'POST', body: {} }));

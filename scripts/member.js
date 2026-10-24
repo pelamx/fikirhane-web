@@ -2,7 +2,7 @@ import { initTheme, escapeHTML as esc } from './shared.js';
 import { passCard } from './pass.js';
 import { api } from './api.js';
 import './topnav.js';
-import { ready, mode, getCatalog, getSession, saveProfile, toggleClub, toggleEvent, bookEvent, cancelBooking, signOut, clearPreview, siteUrl } from './session.js';
+import { ready, mode, getCatalog, getSession, saveProfile, toggleClub, toggleEvent, bookEvent, cancelBooking, addGuest, signOut, clearPreview, siteUrl } from './session.js';
 initTheme();
 const content = document.querySelector('#member-content');
 let query = '', category = 'all', eventFilter = 'all', toastTimer, busy = false;
@@ -30,7 +30,7 @@ function bookingControls(event) {
     const b = event.booking;
     const option = event.options.find(o => o.id_event_option === b.id_event_option);
     const label = b.booking_status === 'waitlisted' ? 'Bekleme listesindesin' : 'Yerin ayrıldı';
-    return `<p class="booking-state">✓ ${label}${option ? ' · ' + esc(option.option_name ?? option.location_name) : ''}</p>${['confirmed', 'checked_in'].includes(b.booking_status) ? `<button class="shell-primary option-button" data-action="pass" data-id="${esc(b.id_booking)}">QR kodum <span>▣</span></button>` : ''}<button class="shell-secondary" data-action="cancel-booking" data-id="${esc(b.id_booking)}">Rezervasyonu iptal et</button>`;
+    return `<p class="booking-state">✓ ${label}${option ? ' · ' + esc(option.option_name ?? option.location_name) : ''}</p>${['confirmed', 'checked_in'].includes(b.booking_status) ? `<button class="shell-primary option-button" data-action="pass" data-id="${esc(b.id_booking)}">QR kodum <span>▣</span></button>` : ''}${guestControls(event)}<button class="shell-secondary" data-action="cancel-booking" data-id="${esc(b.id_booking)}">Rezervasyonu iptal et</button>`;
   }
   // Booking happens in the reservation flow (session → seat → details → confirm); here we show price and room availability.
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(event.start));
@@ -38,6 +38,35 @@ function bookingControls(event) {
   const prices = event.options.map(o => o.price).filter(Boolean).sort((a, b) => Number(a.finalPrice) - Number(b.finalPrice));
   const price = prices[0] ? money(prices[0].finalPrice, prices[0].currency) : '';
   return `<p class="booking-state">${price}${price ? ' · ' : ''}${free ? `${free} yer boş` : 'Dolu · bekleme listesi'}</p><a class="shell-primary option-button" href="${siteUrl(`rezervasyon/?tarih=${day}&seans=${encodeURIComponent(event.id)}&adim=koltuk`)}">Yer ayırt <span>↗</span></a>`;
+}
+// Plus: once a month a friend comes along for free, on the member's own booking (or with the code from the profile).
+const guestRight = () => live() && (getSession()?.membership?.monthly_guest_passes ?? 0) > 0;
+function guestControls(event) {
+  const g = event.guest;
+  if (g) return `<p class="booking-guest">+ Misafirin: ${esc([g.guest_first_name, g.guest_last_name].filter(Boolean).join(' '))}</p><button class="shell-secondary" data-action="pass" data-id="${esc(g.id_booking)}">Misafirin QR kodu <span>▣</span></button><button class="shell-secondary" data-action="cancel-guest" data-id="${esc(g.id_booking)}">Misafiri çıkar</button>`;
+  if (!guestRight() || event.booking.booking_status !== 'confirmed') return '';
+  return `<button class="shell-secondary" data-action="add-guest" data-id="${esc(event.booking.id_booking)}">+ Arkadaşını ekle <span>↗</span></button>`;
+}
+function guestDialog(bookingId) {
+  const dialog = document.querySelector('#guest-dialog') ?? document.body.appendChild(Object.assign(document.createElement('dialog'), { id: 'guest-dialog', className: 'pass-dialog guest-dialog' }));
+  dialog.innerHTML = `<form id="guest-form" class="profile-form" data-booking="${esc(bookingId)}"><h2>Arkadaşını ekle</h2><p>Plus planınla ayda bir arkadaşın seninle aynı seansa ücretsiz gelir. Ona ayrı bir QR kodu çıkar; masanda yer varsa yanına oturur.</p>
+    <label for="guest-first">Adı</label><input id="guest-first" name="first_name" maxlength="50" required autocomplete="off">
+    <label for="guest-last">Soyadı <small>İsteğe bağlı</small></label><input id="guest-last" name="last_name" maxlength="50" autocomplete="off">
+    <label for="guest-contact">E-postası ya da telefonu</label><input id="guest-contact" name="contact" maxlength="200" required autocomplete="off" placeholder="ornek@eposta.com ya da 0532 000 00 00">
+    <p class="guest-error" role="alert" hidden></p>
+    <div class="dialog-actions"><button class="shell-secondary" type="button" data-close-guest>Vazgeç</button><button class="shell-primary" type="submit">Arkadaşımı ekle <span>↗</span></button></div></form>`;
+  dialog.showModal();
+  dialog.querySelector('#guest-first').focus();
+}
+async function submitGuest(form) {
+  const contact = form.contact.value.trim();
+  const guest = { first_name: form.first_name.value.trim(), last_name: form.last_name.value.trim() || null,
+    ...(contact.includes('@') ? { email: contact } : { phone: contact }) };
+  const error = form.querySelector('.guest-error'); const button = form.querySelector('[type=submit]');
+  if (busy) return; busy = true; button.disabled = true; error.hidden = true;
+  try { await addGuest(form.dataset.booking, guest); document.querySelector('#guest-dialog').close(); render(); flash('Arkadaşın eklendi. QR kodunu ona gönderebilirsin.'); }
+  catch (err) { error.textContent = err?.message || 'Arkadaşın eklenemedi.'; error.hidden = false; }
+  finally { busy = false; button.disabled = false; }
 }
 function eventCard(event, session) {
   const club = clubs().find(c => c.id === event.clubId);
@@ -90,7 +119,26 @@ function profile(session) {
   const settings = live()
     ? `<section class="preview-settings"><h2>Hesap</h2><p>${esc(session.profile.email ?? '')}</p><div><button class="shell-secondary" data-signout>Çıkış yap ↗</button></div></section>`
     : `<section class="preview-settings"><h2>Önizleme tercihleri</h2><p>Çıkış yaparsan seçimlerin korunur. Önizlemeyi silersen bu tarayıcıdaki profilin ve seçimlerin kaldırılır.</p><div><button class="shell-secondary" data-signout>Çıkış yap ↗</button><button class="text-danger" data-action="reset">Önizlemeyi sil</button></div></section>`;
-  return heading('PROFİLİM', 'Biraz da <em>senden.</em>', 'Bir sonraki sohbet, ortak bir merakla başlayabilir.') + `<div class="profile-layout"><form id="profile-form" class="profile-form"><label for="profile-name">Adın</label><input id="profile-name" name="name" maxlength="50" required autocomplete="given-name" value="${esc(session.profile.name)}"><label for="profile-bio">Nelerle ilgileniyorsun?</label><textarea id="profile-bio" name="bio" maxlength="240" rows="4" placeholder="Kısaca kendinden ve merak ettiklerinden bahset.">${esc(session.profile.bio)}</textarea><p class="entry-footnote">${foot}</p><button class="shell-primary" type="submit">Değişiklikleri kaydet <span>↗</span></button></form><aside class="profile-summary"><div class="profile-avatar">${esc(session.profile.name[0].toLocaleUpperCase('tr'))}</div><h2>${esc(session.profile.name)}</h2><p>${session.clubIds.length} kulüp · ${session.eventIds.length} ${live() ? 'rezervasyon' : 'buluşma'}</p><span class="preview-badge">${badge}</span>${live() ? '' : '<a class="text-link" href="https://www.fikirhane.co/ng/uyelik" target="_blank" rel="noopener">Gerçek Fikirhane üyeliği ↗</a>'}</aside></div>${live() ? '<section class="preview-settings profile-tags" id="profile-tags" aria-busy="true"><h2>İlgi alanların ve becerilerin</h2><p>Yükleniyor…</p></section>' : ''}${settings}`;
+  return heading('PROFİLİM', 'Biraz da <em>senden.</em>', 'Bir sonraki sohbet, ortak bir merakla başlayabilir.') + `<div class="profile-layout"><form id="profile-form" class="profile-form"><label for="profile-name">Adın</label><input id="profile-name" name="name" maxlength="50" required autocomplete="given-name" value="${esc(session.profile.name)}"><label for="profile-bio">Nelerle ilgileniyorsun?</label><textarea id="profile-bio" name="bio" maxlength="240" rows="4" placeholder="Kısaca kendinden ve merak ettiklerinden bahset.">${esc(session.profile.bio)}</textarea><p class="entry-footnote">${foot}</p><button class="shell-primary" type="submit">Değişiklikleri kaydet <span>↗</span></button></form><aside class="profile-summary"><div class="profile-avatar">${esc(session.profile.name[0].toLocaleUpperCase('tr'))}</div><h2>${esc(session.profile.name)}</h2><p>${session.clubIds.length} kulüp · ${session.eventIds.length} ${live() ? 'rezervasyon' : 'buluşma'}</p><span class="preview-badge">${badge}</span>${live() ? '' : '<a class="text-link" href="https://www.fikirhane.co/ng/uyelik" target="_blank" rel="noopener">Gerçek Fikirhane üyeliği ↗</a>'}</aside></div>${live() ? '<section class="preview-settings profile-tags" id="profile-tags" aria-busy="true"><h2>İlgi alanların ve becerilerin</h2><p>Yükleniyor…</p></section>' : ''}${live() && session.membership?.code ? planSummary(session.membership) : ''}${settings}`;
+}
+
+// The member's plan (Basic or Plus) and, with Plus, this month's guest pass.
+function planSummary(m) {
+  const rights = [m.discount_rate ? `Buluşmalarda %${Number(m.discount_rate)} indirim` : null, `${m.reservation_window_days} gün önceden rezervasyon`,
+    `Aynı anda ${m.max_active_bookings} rezervasyon`, m.monthly_guest_passes ? `Ayda ${m.monthly_guest_passes} kez bir arkadaşınla ücretsiz gelme` : null].filter(Boolean);
+  const until = m.end_date ? ` · ${new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${m.end_date}T12:00:00+03:00`))} tarihine kadar` : '';
+  return `<section class="preview-settings plan-summary"><h2>Planın: ${esc(m.name)}</h2><p>${esc(rights.join(' · '))}${esc(until)}</p>${m.monthly_guest_passes ? '<div id="guest-pass" aria-busy="true"><p>Misafir hakkın yükleniyor…</p></div>' : ''}</section>`;
+}
+async function loadGuestPass() {
+  const box = content.querySelector('#guest-pass'); if (!box) return;
+  try {
+    const { pass } = await api('/me/guest-pass');
+    const month = pass && new Intl.DateTimeFormat('tr-TR', { month: 'long' }).format(new Date(new Date(pass.valid_until).getTime() - 86_400_000));
+    box.innerHTML = !pass ? '' : pass.remaining > 0
+      ? `<h3>${esc(month)} ayı misafir hakkın: ${pass.remaining} / ${pass.usage_limit}</h3><p>Bir rezervasyonunda “Arkadaşını ekle”yi seç ya da bu kodu arkadaşına ver; rezervasyon yaparken “Freepass ya da misafir kodun var mı?” alanına yazsın. İkisi aynı haktan düşer.</p><p class="guest-code"><code>${esc(pass.code)}</code><button class="shell-secondary" data-action="copy-guest-code" data-id="${esc(pass.code)}">Kodu kopyala</button></p>`
+      : `<h3>${esc(month)} ayı misafir hakkını kullandın.</h3><p>Yeni hakkın ay başında açılır. Arkadaşının rezervasyonunu zamanında iptal edersen hak geri gelir.</p>`;
+  } catch { box.innerHTML = '<p>Misafir hakkın şu anda yüklenemedi.</p>'; }
+  box.removeAttribute('aria-busy');
 }
 
 // Interests and skills are the member's own: chosen here from Fikirhane's lists, shown to others only per profile settings.
@@ -131,7 +179,7 @@ function render() {
   if (view==='bulusmalar' && id==='tumu') eventFilter='all';
   content.innerHTML = view==='anasayfa' ? home(session) : view==='kesfet' ? discover() : view==='kuluplerim' ? myClubs(session) : view==='kulup' ? clubDetail(id,session) : view==='bulusmalar' ? gatherings(session) : profile(session);
   if (view==='kesfet') renderResults(session);
-  if (view==='profil' && live()) loadTags();
+  if (view==='profil' && live()) { loadTags(); loadGuestPass(); }
 }
 async function exit() { try { await signOut(); location.assign(siteUrl('')); } catch { flash('Çıkış kaydedilemedi. Tarayıcı depolama iznini kontrol et.'); } }
 async function run(task, success) {
@@ -144,6 +192,7 @@ document.addEventListener('click', event => {
   const target = event.target.closest('button'); if (!target) return;
   if (target.hasAttribute('data-signout')) { exit(); return; }
   if (target.hasAttribute('data-close-pass')) { document.querySelector('#pass-dialog')?.close(); return; }
+  if (target.hasAttribute('data-close-guest')) { document.querySelector('#guest-dialog')?.close(); return; }
   if (target.dataset.category) { category=target.dataset.category; render(); return; }
   if (target.dataset.eventFilter) { eventFilter=target.dataset.eventFilter; if(location.hash==='#bulusmalar/tumu')history.replaceState(null,'','#bulusmalar'); render(); return; }
   const { action, id, option } = target.dataset;
@@ -160,6 +209,9 @@ document.addEventListener('click', event => {
     return;
   }
   if (action==='cancel-booking') run(async () => { await cancelBooking(id); }, 'Rezervasyonun iptal edildi.');
+  if (action==='add-guest') guestDialog(id);
+  if (action==='cancel-guest') run(async () => { await cancelBooking(id); }, 'Misafirin çıkarıldı.');
+  if (action==='copy-guest-code') navigator.clipboard?.writeText(id).then(() => flash('Kod kopyalandı.'), () => flash(id));
   if (action==='reset-search') {query='';category='all';render();document.querySelector('#club-search').focus();}
   if (action==='reset') document.querySelector('#reset-dialog').showModal();
 });
@@ -182,6 +234,7 @@ content.addEventListener('submit', event => {
   if(!name){document.querySelector('#profile-name').setCustomValidity('Adını yazabilir misin?');document.querySelector('#profile-name').reportValidity();return;}
   run(() => saveProfile(name, document.querySelector('#profile-bio').value.trim()), 'Profilin kaydedildi.');
 });
+document.addEventListener('submit', event => { if (event.target.id === 'guest-form') { event.preventDefault(); submitGuest(event.target); } });
 window.addEventListener('hashchange',()=>{render();document.querySelector('#member-main').focus({preventScroll:true});window.scrollTo({top:0});});
 window.addEventListener('fikirhane-session',()=>{if(!mode())return;if(!getSession())requireSession();else if(!busy && !document.activeElement?.closest('form'))render();});
 document.querySelector('#cancel-reset').addEventListener('click',()=>document.querySelector('#reset-dialog').close());

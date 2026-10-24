@@ -39,7 +39,7 @@ export function catalogRoutes(deps: Deps) {
   app.get('/skills', async c => c.json({ items: await sql`select skill_code as code, skill_name as name, category
     from skills where status = 'active' order by sort_order nulls last, skill_name` }));
   app.get('/membership-types', async c => c.json({ items: await sql`select membership_type_code as code, membership_type_name as name, description,
-      discount_rate, reservation_window_days, max_active_bookings, seat_selection_enabled, priority_booking_enabled
+      discount_rate, reservation_window_days, max_active_bookings, seat_selection_enabled, priority_booking_enabled, monthly_guest_passes
     from membership_types where status = 'active' order by sort_order` }));
 
   async function clubs(userId: string | null, code?: string) {
@@ -84,7 +84,7 @@ export function catalogRoutes(deps: Deps) {
       order by e.start_datetime limit 200`;
     if (!rows.length) return [];
     const ids = rows.map(r => r.id_event);
-    const [clubLinks, options, mine, rights] = await Promise.all([
+    const [clubLinks, options, mine, rights, guests] = await Promise.all([
       sql<{ id_event: string; club_code: string; club_name: string; club_event_role: string; is_primary: boolean }[]>`
         select ec.id_event, c.club_code, c.club_name, ec.club_event_role, ec.is_primary from event_clubs ec join clubs c using (id_club)
         where ec.id_event in ${sql(ids)} and ec.status = 'active' order by ec.is_primary desc`,
@@ -99,6 +99,11 @@ export function catalogRoutes(deps: Deps) {
         select id_event, id_booking, booking_status, id_event_option from bookings where id_user = ${userId} and id_event in ${sql(ids)}
           and booking_status in ('pending_payment', 'confirmed', 'checked_in', 'waitlisted')` : Promise.resolve([]),
       userId ? membershipRights(sql, userId, deps.config) : Promise.resolve(null),
+      // A friend the member brings with their monthly guest pass (guest-pass.ts).
+      userId ? sql<{ id_event: string; id_booking: string; booking_status: string; guest_first_name: string; guest_last_name: string | null }[]>`
+        select id_event, id_booking, booking_status, guest_first_name, guest_last_name from bookings
+        where booked_by_user_id = ${userId} and id_user is null and id_event in ${sql(ids)}
+          and booking_status in ${sql(CAPACITY_STATUSES)}` : Promise.resolve([]),
     ]);
     return rows.map(e => ({
       ...e,
@@ -110,6 +115,7 @@ export function catalogRoutes(deps: Deps) {
           discountRate: rights?.discountRate ?? null, freepass: false }),
       })),
       my_booking: mine.find(b => b.id_event === e.id_event) ?? null,
+      my_guest: guests.find(b => b.id_event === e.id_event) ?? null,
     }));
   }
 

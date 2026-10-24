@@ -5,6 +5,7 @@ import { body, idParam, linkBase, requireUser, selfOrigin, type Deps, type Env }
 import { audit } from '../services/audit.ts';
 import { globalPermissions, globalRoles } from '../services/authz.ts';
 import { cancelBooking } from '../services/bookings.ts';
+import { addGuest, currentGuestPass } from '../services/guest-pass.ts';
 import { ownPass, passInfo, pngName, qrPng, qrSvg, qrText } from '../services/pass.ts';
 import { membershipRights, submitApplication, withdrawApplication } from '../services/membership.ts';
 import { shellsOf } from '../services/shells.ts';
@@ -25,6 +26,12 @@ const Skills = z.object({ items: z.array(z.object({
   level: z.enum(['beginner', 'intermediate', 'advanced', 'expert', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'native']).nullable().optional(),
   priority: z.int().positive().nullable().optional(),
 })).max(MAX_ACTIVE_SKILLS) });
+const Guest = z.object({
+  first_name: z.string().trim().min(1).max(50),
+  last_name: z.string().trim().max(50).nullable().optional(),
+  email: z.email().trim().toLowerCase().max(200).nullable().optional(),
+  phone: z.string().trim().regex(/^[+0-9 ()-]{7,25}$/).nullable().optional(),
+}).strict();
 const Application = z.object({
   membership_type_code: code,
   motivation_text: z.string().trim().max(2000).nullable().optional(),
@@ -61,7 +68,7 @@ export function meRoutes(deps: Deps) {
       user,
       membership: { code: rights.code, name: rights.name, end_date: rights.endDate, discount_rate: rights.discountRate,
         reservation_window_days: rights.reservationWindowDays, max_active_bookings: rights.maxActiveBookings,
-        seat_selection_enabled: rights.seatSelectionEnabled },
+        seat_selection_enabled: rights.seatSelectionEnabled, monthly_guest_passes: rights.monthlyGuestPasses },
       roles,
       permissions: [...perms].sort(),
       shells: await shellsOf(deps.sql, userId, perms),
@@ -132,13 +139,29 @@ export function meRoutes(deps: Deps) {
     const rows = await deps.sql`
       select b.id_booking, b.id_event, b.booking_status, b.payment_status, b.final_price, b.price_list_amount, b.discount_amount,
              b.currency_code, b.booked_at, b.cancelled_at, e.event_title, e.start_datetime, e.end_datetime, l.location_name,
-             o.option_name, s.seat_code, t.table_code, (b.id_freepass is not null) as used_freepass
+             o.option_name, s.seat_code, t.table_code, (b.id_freepass is not null) as used_freepass,
+             (b.id_user is null) as is_guest, b.guest_first_name, b.guest_last_name
       from bookings b join events e using (id_event) join event_options o using (id_event_option)
       join locations l on l.id_location = o.id_location
       left join seats s on s.id_seat = b.id_seat left join tables t on t.id_table = b.id_table
-      where b.id_user = ${userId}
+      where b.id_user = ${userId} or (b.id_user is null and b.booked_by_user_id = ${userId})
       order by e.start_datetime desc limit 200`;
     return c.json({ items: rows });
+  });
+
+  // Plus: this month's guest pass (code and what is left), and adding a friend to one's own booking with it.
+  app.get('/guest-pass', async c => {
+    const pass = await currentGuestPass(deps.sql, requireUser(c), deps.config);
+    return c.json({ pass: pass && { code: pass.code, valid_until: pass.valid_until, usage_limit: pass.usage_limit, remaining: pass.remaining } });
+  });
+
+  app.post('/bookings/:id/guest', async c => {
+    const userId = requireUser(c);
+    const input = await body(c, Guest);
+    if (!input.email && !input.phone) throw unprocessable('guest_contact_required', 'Add your guest’s e-mail or phone.');
+    const booking = await addGuest(deps.sql, deps.config, { userId, bookingId: idParam(c, 'id'),
+      guest: { firstName: input.first_name, lastName: input.last_name, email: input.email, phone: input.phone } });
+    return c.json({ booking }, 201);
   });
 
   app.post('/bookings/:id/cancel', async c => {

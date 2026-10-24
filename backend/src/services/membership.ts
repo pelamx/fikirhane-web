@@ -13,6 +13,8 @@ export interface MembershipRights {
   maxActiveBookings: number;
   seatSelectionEnabled: boolean;
   priorityBookingEnabled: boolean;
+  /** Guest passes a month (membership_types.monthly_guest_passes); 0 for Visitor and Basic. */
+  monthlyGuestPasses: number;
   endDate: string | null;
 }
 
@@ -21,10 +23,10 @@ export async function membershipRights(db: Db, userId: string, config: Config): 
   const [m] = await db<{
     id_user_membership: string; id_membership_type: string; membership_type_code: string; membership_type_name: string;
     discount_rate: string; reservation_window_days: number; max_active_bookings: number;
-    seat_selection_enabled: boolean; priority_booking_enabled: boolean; end_date: string | null;
+    seat_selection_enabled: boolean; priority_booking_enabled: boolean; monthly_guest_passes: number; end_date: string | null;
   }[]>`
     select um.id_user_membership, mt.id_membership_type, mt.membership_type_code, mt.membership_type_name, mt.discount_rate,
-           mt.reservation_window_days, mt.max_active_bookings, mt.seat_selection_enabled, mt.priority_booking_enabled,
+           mt.reservation_window_days, mt.max_active_bookings, mt.seat_selection_enabled, mt.priority_booking_enabled, mt.monthly_guest_passes,
            to_char(um.end_date, 'YYYY-MM-DD') as end_date
     from user_memberships um join membership_types mt using (id_membership_type)
     where um.id_user = ${userId} and um.status = 'active'
@@ -33,14 +35,14 @@ export async function membershipRights(db: Db, userId: string, config: Config): 
     return {
       idUserMembership: null, idMembershipType: null, code: null, name: 'Visitor', discountRate: null,
       reservationWindowDays: config.visitorReservationWindowDays, maxActiveBookings: config.visitorMaxActiveBookings,
-      seatSelectionEnabled: config.visitorSeatSelection, priorityBookingEnabled: false, endDate: null,
+      seatSelectionEnabled: config.visitorSeatSelection, priorityBookingEnabled: false, monthlyGuestPasses: 0, endDate: null,
     };
   }
   return {
     idUserMembership: m.id_user_membership, idMembershipType: m.id_membership_type, code: m.membership_type_code,
     name: m.membership_type_name, discountRate: m.discount_rate, reservationWindowDays: m.reservation_window_days,
     maxActiveBookings: m.max_active_bookings, seatSelectionEnabled: m.seat_selection_enabled,
-    priorityBookingEnabled: m.priority_booking_enabled, endDate: m.end_date,
+    priorityBookingEnabled: m.priority_booking_enabled, monthlyGuestPasses: m.monthly_guest_passes, endDate: m.end_date,
   };
 }
 

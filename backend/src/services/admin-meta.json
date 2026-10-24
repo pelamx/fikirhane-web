@@ -1829,7 +1829,8 @@
    "cancelled_at": "İptal anı; status=cancelled için zorunlu.",
    "cancelled_by_user_id": "İptal eden kullanıcı; iptal işleminde oturumdan atanır.",
    "cancellation_reason": "İptal gerekçesi; iptalde girilmesi beklenir.",
-   "notes": "İç not."
+   "notes": "İç not.",
+   "granted_to_user_id": "Aylık misafir hakkıysa hakkın sahibi üye (Plus). Sistem her ay ilk bakışta oluşturur; kodu üye veya arkadaşı kullanır, kullanan kişi rezervasyonda görünür."
   },
   "enums": {
    "freepass_type": {
@@ -1882,7 +1883,8 @@
    "issued_by_user_id",
    "claimed_at",
    "cancelled_at",
-   "cancelled_by_user_id"
+   "cancelled_by_user_id",
+   "granted_to_user_id"
   ],
   "immutable_fields": [
    "freepass_code",
@@ -2949,19 +2951,20 @@
   ]
  },
  "membership_types": {
-  "purpose_tr": "Bir satır, Fikirhane'nin bir ticari üyelik paketidir (Member, Premium) ve varsayılan haklarını tanımlar. Kimin hangi pakete sahip olduğu, etkinlik fiyatları ve Visitor burada tutulmaz.",
+  "purpose_tr": "Bir satır, Fikirhane'nin bir ticari üyelik paketidir (Basic = MEMBER, Plus = PREMIUM) ve varsayılan haklarını tanımlar. Kimin hangi pakete sahip olduğu, etkinlik fiyatları ve Visitor burada tutulmaz.",
   "fields": {
    "membership_type_code": "Sabit teknik kod, büyük harf ve alt çizgi (MEMBER, PREMIUM). Benzersiz; VISITOR olamaz. Oluşturulduktan sonra değiştirilmez.",
-   "membership_type_name": "Kullanıcıya görünen paket adı (ör. Premium Member). Marka diline göre değişebilir.",
+   "membership_type_name": "Kullanıcıya görünen plan adı (ör. Basic, Plus). Marka diline göre değişebilir.",
    "description": "Paketin ne sunduğunu anlatan kısa açıklama.",
    "discount_rate": "Varsayılan indirim yüzdesi, 0–100 (15.00 = %15). Etkinlik/mekân istisnaları Pricing Rules ile yönetilir.",
    "reservation_window_days": "Kaç gün ileriye rezervasyon yapılabileceği (ör. Member 7).",
    "max_active_bookings": "Aynı anda sahip olunabilecek en fazla aktif rezervasyon sayısı (ör. Member 2).",
    "booking_priority": "Sayısal rezervasyon önceliği; yüksek değer daha öncelikli. Yalnızca bekleme listesi/öncelikli dağıtımda anlamlı.",
-   "seat_selection_enabled": "Bu paket koltuk seçebilir mi? (Member hayır, Premium evet)",
+   "seat_selection_enabled": "Bu plan koltuk seçebilir mi?",
    "priority_booking_enabled": "Öncelikli/erken rezervasyon erişimi var mı?",
    "status": "active: yeni üyelikte kullanılabilir; inactive: yeni üyelik verilmez; archived: artık kullanılmıyor.",
-   "sort_order": "Arayüzde sıralama numarası (ör. 10, 20)."
+   "sort_order": "Arayüzde sıralama numarası (ör. 10, 20).",
+   "monthly_guest_passes": "Her ay kaç kez bir arkadaşla ücretsiz gelinebileceği (Plus 1, Basic 0). Üye arkadaşını kendi rezervasyonuna ekler ya da aylık misafir kodunu arkadaşına verir; ikisi aynı haktan düşer."
   },
   "enums": {
    "status": {

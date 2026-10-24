@@ -652,4 +652,76 @@ describe('jobs', () => {
   });
 });
 
+describe('plans: Basic and Plus', () => {
+  test('MEMBER is shown as Basic and PREMIUM as Plus; only Plus has a monthly guest pass', async () => {
+    const types = (await new Client(env).get('/api/membership-types')).json.items;
+    assert.deepEqual(types.map((t: { name: string; monthly_guest_passes: number }) => [t.name, t.monthly_guest_passes]), [['Basic', 0], ['Plus', 1]]);
+    const basic = await registered(env);
+    await giveMembership(env.sql, basic.userId, 'MEMBER');
+    assert.equal((await basic.client.get('/api/me')).json.membership.monthly_guest_passes, 0);
+    assert.equal((await basic.client.get('/api/me/guest-pass')).json.pass, null);
+    const { eventId } = await makeEvent(env.sql, { hoursFromNow: 60 });
+    const own = (await basic.client.post('/api/bookings', { event_id: eventId })).json.booking;
+    const res = await basic.client.post(`/api/me/bookings/${own.id_booking}/guest`, { first_name: 'Can', phone: '+90 532 000 00 00' });
+    assert.equal(res.status, 403);
+    assert.equal(res.json.error.code, 'guest_pass_unavailable');
+  });
+
+  test('Plus brings a friend once a month: to their own booking or with the code, the same single right', async () => {
+    const plus = await registered(env);
+    await giveMembership(env.sql, plus.userId, 'PREMIUM');
+    assert.equal((await plus.client.get('/api/me')).json.membership.monthly_guest_passes, 1);
+    const pass = (await plus.client.get('/api/me/guest-pass')).json.pass;
+    assert.equal(pass.remaining, 1);
+    assert.equal((await plus.client.get('/api/me/guest-pass')).json.pass.code, pass.code, 'one pass per month');
+
+    const first = await makeEvent(env.sql, { hoursFromNow: 70 });
+    const second = await makeEvent(env.sql, { hoursFromNow: 100 });
+    const own = (await plus.client.post('/api/bookings', { event_id: first.eventId })).json.booking;
+    assert.equal((await plus.client.post(`/api/me/bookings/${own.id_booking}/guest`, { first_name: 'Can' })).json.error.code, 'guest_contact_required');
+    const added = await plus.client.post(`/api/me/bookings/${own.id_booking}/guest`, { first_name: 'Can', last_name: 'Ak', email: 'Can@Example.com' });
+    assert.equal(added.status, 201);
+    const guest = added.json.booking;
+    assert.equal(guest.final_price, '0.00');
+    assert.equal(guest.is_guest, true);
+    const [tables] = await env.sql`select (select s.id_table from seats s join bookings b on b.id_seat = s.id_seat where b.id_booking = ${own.id_booking})
+      = (select s.id_table from seats s join bookings b on b.id_seat = s.id_seat where b.id_booking = ${guest.id_booking}) as same`;
+    assert.equal(tables.same, true, 'the friend sits at the member’s table');
+    assert.equal((await plus.client.get(`/api/me/bookings/${guest.id_booking}/pass`)).json.pass.holder, 'Can Ak');
+    assert.equal((await plus.client.get('/api/me/guest-pass')).json.pass.remaining, 0);
+    const listed = (await plus.client.get('/api/me/bookings')).json.items.find((b: { id_booking: string }) => b.id_booking === guest.id_booking);
+    assert.equal(listed.guest_first_name, 'Can');
+    const event = (await plus.client.get(`/api/events/${first.eventId}`)).json.event;
+    assert.equal(event.my_guest.id_booking, guest.id_booking);
+
+    // The right is spent: no second guest, and the code does not work for a friend either.
+    assert.equal((await plus.client.post(`/api/me/bookings/${own.id_booking}/guest`, { first_name: 'Ece', phone: '05320000000' })).json.error.code, 'guest_already_added');
+    const friend = await registered(env);
+    assert.equal((await friend.client.post('/api/bookings', { event_id: second.eventId, freepass_code: pass.code })).json.error.code, 'freepass_used');
+    // Someone else cannot see the friend's pass.
+    assert.equal((await friend.client.get(`/api/me/bookings/${guest.id_booking}/pass`)).status, 404);
+
+    // Cancelling the friend in time returns the right; now the friend books with the code, and the member cannot use it themselves.
+    assert.equal((await plus.client.post(`/api/me/bookings/${guest.id_booking}/cancel`)).status, 200);
+    assert.equal((await plus.client.get('/api/me/guest-pass')).json.pass.remaining, 1);
+    assert.equal((await plus.client.post('/api/bookings', { event_id: second.eventId, freepass_code: pass.code })).json.error.code, 'guest_pass_own');
+    const booked = await friend.client.post('/api/bookings', { event_id: second.eventId, freepass_code: pass.code });
+    assert.equal(booked.status, 201);
+    assert.equal(booked.json.booking.final_price, '0.00');
+    const [fp] = await env.sql`select id_user from freepasses where freepass_code = ${pass.code}`;
+    assert.equal(fp.id_user, null, 'a guest pass stays with the member');
+    assert.equal((await plus.client.get('/api/me/guest-pass')).json.pass.remaining, 0);
+  });
+
+  test('a guest code stops working when the member no longer holds Plus', async () => {
+    const plus = await registered(env);
+    await giveMembership(env.sql, plus.userId, 'PREMIUM');
+    const { code } = (await plus.client.get('/api/me/guest-pass')).json.pass;
+    await env.sql`update user_memberships set status = 'cancelled', cancelled_at = now() where id_user = ${plus.userId}`;
+    const { eventId } = await makeEvent(env.sql, { hoursFromNow: 75 });
+    const friend = await registered(env);
+    assert.equal((await friend.client.post('/api/bookings', { event_id: eventId, freepass_code: code })).json.error.code, 'freepass_expired');
+  });
+});
+
 void ORIGIN;

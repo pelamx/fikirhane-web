@@ -41,7 +41,7 @@ The server migrates on start unless `MIGRATE_ON_START=false`, and runs the expir
 
 ```sh
 npm run typecheck
-npm test           # 42 tests against a real, throwaway PostgreSQL (embedded-postgres)
+npm test           # 62 tests against a real, throwaway PostgreSQL (embedded-postgres)
 ```
 
 They cover schema guards (no hard delete, append-only ledgers, document/allocation/stock rules, sponsor exclusivity), pricing,
@@ -113,8 +113,10 @@ Browsers authenticate with the httpOnly `fh_session` cookie; other clients can s
 | GET / PATCH | `/me` | profile, membership rights, roles, permissions, clubs, active bookings |
 | GET / PUT | `/me/interests`, `/me/skills` | replace the active set (max 10 / 12) |
 | GET | `/me/bookings`, `/me/freepasses`, `/me/membership` | |
-| POST | `/me/bookings/:id/cancel` | 24 h lock for owners |
-| GET | `/me/bookings/:id/pass`, `/me/bookings/:id/qr.svg`, `/me/bookings/:id/qr.png` | entry pass of a confirmed booking: date, session, place; QR as SVG, or PNG download named `fikirhane-qr-<date>-<start>-<end>.png` |
+| POST | `/me/bookings/:id/cancel` | 24 h lock for owners; also the friend's booking the member made |
+| GET | `/me/guest-pass` | Plus: this month's guest code and what is left (`null` without guest passes) |
+| POST | `/me/bookings/:id/guest` | Plus: `first_name, last_name?, email? / phone?` → the friend joins the member's confirmed booking free, with the monthly guest pass |
+| GET | `/me/bookings/:id/pass`, `/me/bookings/:id/qr.svg`, `/me/bookings/:id/qr.png` | entry pass of a confirmed booking (also of a friend the member brought): date, session, place; QR as SVG, or PNG download named `fikirhane-qr-<date>-<start>-<end>.png` |
 | POST | `/me/membership-applications`, `/me/membership-applications/:id/withdraw` | |
 | GET | `/clubs`, `/clubs/:code`, `/events`, `/events/:id`, `/interests`, `/skills`, `/membership-types` | public; prices are personalized when signed in |
 | PUT / DELETE | `/clubs/:code/membership` | join / leave as MEMBER |
