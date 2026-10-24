@@ -100,6 +100,11 @@ html[data-theme=dark] .hero-sketch .glint{display:none}
 .hero-sketch .moonline{stroke:var(--ink);stroke-width:1.6}
 .hero-sketch .moonline.m1{animation-duration:1.2s,3.2s}.hero-sketch .moonline.m2{animation-duration:1.2s,2s}
 @keyframes sketch-moonglow{to{opacity:.12}}@keyframes sketch-lampglow{to{opacity:.3}}
+.hero-sketch .lights{display:none}html[data-theme=dark] .hero-sketch .lights{display:inline}
+.hero-sketch .cone,.hero-sketch .pool{stroke:none;mix-blend-mode:screen;fill-opacity:0}
+.hero-sketch .cone{fill:url(#lamp-cone);filter:blur(6px);animation:sketch-fill 1.1s ease forwards calc(var(--d) + var(--i) * .35s),sketch-glow 5s ease-in-out calc(var(--d) + 2.4s + var(--i) * .7s) infinite}
+.hero-sketch .pool{fill:url(#lamp-pool);animation:sketch-fill 1.6s ease forwards calc(var(--d) + .3s + var(--i) * .35s),sketch-glow 6s ease-in-out calc(var(--d) + 2.6s + var(--i) * .7s) infinite}
+@keyframes sketch-glow{0%,100%{opacity:1}50%{opacity:.78}}
 html[data-theme=dark] .hero-sketch .sky-a{stop-color:#1d2433;stop-opacity:.9}html[data-theme=dark] .hero-sketch .sky-b{stop-color:#273047;stop-opacity:.6}html[data-theme=dark] .hero-sketch .sky-c{stop-color:#3a3550;stop-opacity:.5}
 html[data-theme=dark] .hero-sketch .sea{fill:#6d97b0;opacity:.12}html[data-theme=dark] .hero-sketch .sunlight{display:none}html[data-theme=dark] .hero-sketch .lampglow{display:inline}
 .hero-drawing .photo-caption{position:static;padding:10px 4px 2px;color:var(--muted);text-shadow:none;background:none}
