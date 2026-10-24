@@ -1,7 +1,8 @@
 // One top menu beside the logo on every page, over the site's four shells: visitor (the public site), member, host and
-// admin. The current shell's links are inline; the other shells this account may open (from /me's `shells`) and the
-// account are drop-downs; everything sits under ☰ on phones. Pages announce their current place with a 'fikirhane-nav'
-// event, and the host and admin shells publish their own areas with 'fikirhane-menu'.
+// admin. The current shell's links are inline; one Hesabım drop-down holds the other shells this account may open (from
+// /me's `shells`) and the account. When the links do not fit beside the logo — on phones, or a wide staff menu with large
+// text — everything folds under ☰. Pages announce their current place with a 'fikirhane-nav' event, and the host and
+// admin shells publish their own areas with 'fikirhane-menu'.
 import { escapeHTML as esc } from './shared.js';
 import { api, apiAvailable } from './api.js';
 
@@ -19,6 +20,8 @@ const MEMBER = [['member/#anasayfa', 'Ana sayfam'], ['member/#kesfet', 'Kulüple
 const HOST = [['host/#genel', 'Bugün'], ['host/#etkinlikler', 'Program'], ['host/#kontrol', 'Giriş kontrol']].map(([h, t]) => [url(h), t]);
 const ADMIN = [['admin/#genel', 'Genel bakış'], ['admin/#veri', 'Tüm tablolar']].map(([h, t]) => [url(h), t]);
 const ACCOUNT = [[url('member/#profil'), 'Profilim'], [url('member/#bulusmalar'), 'Rezervasyonlarım']];
+const SHELLS = [['site', url(''), 'Keşfet'], ['member', url('member/#anasayfa'), 'Üye alanım'], ['host', url('host/#genel'), 'Host paneli'],
+  ['admin', url('admin/#genel'), 'Yönetim']];
 
 const header = document.querySelector('header');
 const brand = header?.querySelector('.brand');
@@ -34,20 +37,34 @@ header?.append(toggle);
 
 let current = null, me = null, published = null;
 const links = list => list.map(([href, text]) => `<a href="${esc(href)}">${esc(text)}</a>`).join('');
-const dropdown = (label, list, extra = '') => `<details class="topnav-more${extra ? ' topnav-account' : ''}"><summary>${esc(label)}</summary><div>${links(list)}${extra}</div></details>`;
 
 function draw() {
   if (!nav) return;
   const shells = me?.shells ?? [];
   const primary = published ?? { admin: ADMIN, host: HOST, member: MEMBER }[area] ?? SITE;
+  const elsewhere = SHELLS.filter(([s]) => s !== area && (s === 'site' || s === 'member' || shells.includes(s)));
   nav.innerHTML = `<div class="topnav-main">${links(primary)}</div>`
-    + (me && area !== 'member' ? dropdown('Üye alanı', MEMBER) : '')
-    + (shells.includes('host') && area !== 'host' ? dropdown('Host paneli', HOST) : '')
-    + (shells.includes('admin') && area !== 'admin' ? dropdown('Yönetim', ADMIN) : '')
-    + (me ? dropdown('Hesabım', ACCOUNT, '<button type="button" data-topnav-signout>Çıkış yap</button>')
+    + (me ? `<details class="topnav-more topnav-account"><summary>Hesabım</summary><div>`
+        + (elsewhere.length ? `<span class="topnav-group">Geç</span>${links(elsewhere.map(([, h, t]) => [h, t]))}<span class="topnav-group">Hesap</span>` : '')
+        + `${links(ACCOUNT)}<button type="button" data-topnav-signout>Çıkış yap</button></div></details>`
       : area !== 'site' || !document.querySelector('[data-member-entry]') ? `<a class="topnav-login" href="${esc(url('uyelik/?giris'))}">Giriş yap</a>` : '');
   mark();
+  fit();
 }
+
+/** Folds the menu under ☰ whenever its links do not fit beside the logo, at any width. */
+const folded = window.matchMedia('(max-width:1180px)');
+function fit() {
+  if (!header || !nav || nav.classList.contains('open')) return;
+  header.classList.remove('topnav-compact');
+  if (folded.matches) return;
+  const main = nav.querySelector('.topnav-main');
+  const overflow = header.scrollWidth > header.clientWidth + 1 || nav.scrollWidth > nav.clientWidth + 1 || (main && main.scrollWidth > main.clientWidth + 1);
+  header.classList.toggle('topnav-compact', overflow);
+}
+let fitFrame = 0;
+window.addEventListener('resize', () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(fit); });
+document.fonts?.ready.then(fit);
 
 /** Highlights the link of the current place: the page's own hint, else the exact address. */
 function mark() {

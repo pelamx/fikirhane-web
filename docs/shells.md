@@ -18,7 +18,7 @@ How it is decided:
 
 How people move between them:
 
-- One top menu (`scripts/topnav.js`) on every page: the current shell's areas inline, the other shells this account has (Üye alanı, Host paneli, Yönetim) and Hesabım as drop-downs, all under ☰ on phones.
+- One top menu (`scripts/topnav.js`) on every page: the current shell's areas inline, and one Hesabım drop-down with the other shells this account has and the account; it folds under ☰ on phones and whenever the links do not fit beside the logo.
 - Host and admin are the same app (`scripts/admin.js`) with different areas. Daily-work screens opened in admin (`#basvurular`, `#etkinlikler`, `#kontrol`, …) move to host; back-office tables opened in host move to admin when the account has it. Without the other shell the screen says where it lives instead.
 - A booking's QR opens `/host/#kontrol`; older QR codes pointing at `/admin/#kontrol` are forwarded.
 - Opening host or admin while signed out goes to sign-in and returns to the same screen; an account without that shell is told so, with links to the shells it has.
@@ -55,7 +55,7 @@ Relative URLs work under the GitHub Pages project prefix. A guest visiting a mem
 
 - `scripts/catalog.js`: club/event data shared across shells; source snapshot dated 2026-10-21.
 - `scripts/shared.js`: theme, navigation, safe HTML interpolation.
-- `scripts/topnav.js`: the one top menu beside the logo on every page — the current area's links inline (site, member area or admin areas), the other areas as drop-downs (Üye alanı, Yönetim for staff, Hesabım), all under ☰ on narrow screens. There are no side menus.
+- `scripts/topnav.js`: the one top menu beside the logo on every page — the current shell's links inline, one Hesabım drop-down to switch shells (Keşfet, Üye alanım, Host paneli, Yönetim as the account allows) and for the account; it folds under ☰ on narrow screens and whenever the links do not fit. There are no side menus.
 - `scripts/config.js`: API location (same origin when served by the backend; `PAGES_API_URL` for GitHub Pages).
 - `scripts/api.js`: fetch wrapper (cookie session, Turkish error messages by error code).
 - `scripts/session.js`: session adapter; API mode (accounts, clubs, bookings, membership) or the browser-local preview.
