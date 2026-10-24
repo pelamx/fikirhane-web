@@ -10,9 +10,9 @@ on conflict (center_code) do nothing;
 insert into clubs (club_code, club_name, club_description, club_type, id_financial_center, status, sort_order)
 select v.code, v.name, v.descr, v.type, fc.id_financial_center, 'active', v.ord
 from (values
-  ('WORKING', 'Çalışma Kulübü', 'Fikrini iş modeline dönüştürmek isteyenler için haftalık sohbetler ve mentor buluşmaları.', 'workspace', 'WORKING_CLUB', 10),
-  ('ENGLISH', 'İngilizce Konuşma Kulübü', 'Her hafta farklı bir konuda İngilizce sohbet: başlangıç seviyesinden akıcı konuşanlara herkes davetli. Buluşmalar Fikirhane’de; çay ve kahve bizden.', 'language', 'ENGLISH_CLUB', 20),
-  ('WRITING', 'Yaratıcı Yazarlık Kulübü', 'Kısa öykü, deneme ve şiir üzerine birlikte yazıp okuyoruz. Her buluşmada küçük bir yazma alıştırması ve nazik bir geri bildirim turu var; deneyim şartı yok, merak yeter.', 'creative', 'WRITING_CLUB', 30)
+  ('WORKING', 'Çalışma Kulübü', 'Kendi işine, projene ya da öğrenimine odaklanabileceğin rezervasyonlu ortak çalışma seansları. Sabit masa ya da uzun dönem ofis üyeliği gerekmez.', 'workspace', 'WORKING_CLUB', 10),
+  ('ENGLISH', 'İngilizce Konuşma Kulübü', 'İngilizceyi düzenli kullanabileceğin bir ortam: konuşma pratiği, telaffuz, iş İngilizcesi ve farklı temalar etrafında tekrar eden programlar.', 'language', 'ENGLISH_CLUB', 20),
+  ('WRITING', 'Yaratıcı Yazarlık Kulübü', 'Kısa öykü, deneme ve şiir üzerine düzenli yazma oturumları. Her buluşmada küçük bir yazma alıştırması ve bir geri bildirim turu var; deneyim şartı yok.', 'creative', 'WRITING_CLUB', 30)
 ) as v(code, name, descr, type, fc, ord)
 join financial_centers fc on fc.center_code = v.fc
 on conflict (club_code) do nothing;
