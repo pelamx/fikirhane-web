@@ -1,4 +1,4 @@
-// Reservation flow: Seans → Koltuk → Bilgiler → Onay. State lives in the address (?tarih&seans&adim&salon&koltuk) so a
+// Reservation flow: Seans → Koltuk → Bilgiler → Onay. State lives in the address (?tarih&seans&adim&salon&koltuk&alan) so a
 // step can be shared, reloaded or resumed after signing in. The server re-checks every rule when the booking is made.
 import { initTheme, escapeHTML as esc } from './shared.js';
 import { api, apiAvailable } from './api.js';
@@ -33,6 +33,14 @@ const seatNo = code => String(Number(String(code).replace(/\D/g, '')) || code);
 
 let me = null, policy = null, week = { start: null, items: [] }, detail = null, busy = false, toastTimer;
 const cache = new Map();
+// ?alan= narrows the program to one space, e.g. from the meeting room page; without it every session is listed.
+const AREAS = { toplanti: { location: 'MEETING_ROOM', title: 'Toplantı odasını ayırt', lead: 'Hafta içi akşamları iki saatlik dilimler: 18.00, 20.00 ve 22.00. Odanın tamamı senin.' } };
+const areaOf = () => AREAS[new URLSearchParams(location.search).get('alan')] ?? null;
+const listed = () => { const a = areaOf(); return a ? week.items.filter(e => optionsOf(e).some(o => o.location_code === a.location)) : week.items; };
+const PASS_OK = ['confirmed', 'checked_in'];
+/** One option, booked as a whole place by one person: the meeting room. */
+const wholeRoom = e => optionsOf(e).length === 1 && optionsOf(e)[0].booking_unit === 'location' && optionsOf(e)[0].capacity === 1;
+const noSeatStep = e => optionsOf(e).length === 1 && optionsOf(e)[0].booking_unit !== 'seat';
 
 function state() {
   const p = new URLSearchParams(location.search);
@@ -67,9 +75,10 @@ const cheapest = e => optionsOf(e).map(o => o.price).filter(Boolean).sort((a, b)
 const opensAt = e => new Date(new Date(e.start_datetime).getTime() - (policy?.reservation_window_days ?? 7) * 86_400_000);
 const notYetOpen = e => opensAt(e) > new Date();
 function availability(e) {
-  if (e.my_booking) return ['mine', e.my_booking.booking_status === 'waitlisted' ? 'Bekleme listesindesin' : 'Rezervasyonun var'];
+  if (e.my_booking) return ['mine', e.my_booking.booking_status === 'waitlisted' ? 'Bekleme listesindesin' : PASS_OK.includes(e.my_booking.booking_status) ? 'Rezervasyonun var · QR kodunu gör' : 'Rezervasyonun var'];
   if (notYetOpen(e)) return ['soon', `${fmt({ day: 'numeric', month: 'long' }).format(opensAt(e))} tarihinde açılır`];
   const n = free(e);
+  if (wholeRoom(e)) return n === 0 ? ['full', 'Dolu · bekleme listesi'] : ['ok', 'Boş'];
   return n === 0 ? ['full', 'Dolu · bekleme listesi'] : n <= 5 ? ['few', `Son ${n} yer`] : ['ok', 'Yer var'];
 }
 
@@ -84,11 +93,13 @@ function stepper(current) {
 function sessionsStep(s) {
   const start = mondayOf(s.date), today = dayKey(new Date());
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  const byDay = key => week.items.filter(e => dayKey(new Date(e.start_datetime)) === key);
+  const byDay = key => listed().filter(e => dayKey(new Date(e.start_datetime)) === key);
   const list = byDay(s.date);
   const end = addDays(start, 6);
   const label = `${dayNum.format(at(start))}${monthShort.format(at(start)) !== monthShort.format(at(end)) ? ' ' + monthShort.format(at(start)) : ''} – ${dayNum.format(at(end))} ${monthShort.format(at(end))}`;
-  return `<h1 class="booking-title">Seansını seç</h1><p class="booking-lead">Günü ve seansı belirle; uygun seansları anında gör.</p>
+  const area = areaOf();
+  return (area ? `<h1 class="booking-title">${esc(area.title)}</h1><p class="booking-lead">${esc(area.lead)} <button class="text-link" data-all-sessions>Bütün seansları gör</button></p>`
+    : `<h1 class="booking-title">Seansını seç</h1><p class="booking-lead">Günü ve seansı belirle; uygun seansları anında gör.</p>`) + `
     <div class="booking-week"><button class="booking-arrow" data-week="-7" ${start <= mondayOf(today) ? 'disabled' : ''} aria-label="Önceki hafta">‹</button><strong>${esc(label)}</strong><button class="booking-arrow" data-week="7" aria-label="Sonraki hafta">›</button></div>
     <div class="booking-days" role="group" aria-label="Gün">${days.map(k => {
       const past = k < today, has = byDay(k).length > 0, d = at(k);
@@ -100,7 +111,7 @@ function sessionsStep(s) {
       const disabled = kind === 'mine' || kind === 'soon';
       return `<button class="booking-session${selected ? ' selected' : ''}" role="radio" aria-checked="${selected}" data-session="${e.id_event}" ${disabled ? 'aria-disabled="true"' : ''}>
         <span class="booking-clock" aria-hidden="true">◷</span>
-        <span class="booking-session-main"><strong>${esc(range(e))}</strong><span>${esc(e.event_title)} · ${esc(TYPE[e.event_type] ?? e.event_type)}</span><em class="avail-${kind}">${esc(text)}</em></span>
+        <span class="booking-session-main"><strong>${esc(range(e))}</strong><span>${esc(e.event_title)} · ${esc(wholeRoom(e) ? 'Odanın tamamı' : TYPE[e.event_type] ?? e.event_type)}</span><em class="avail-${kind}">${esc(text)}</em></span>
         <span class="booking-price">${price ? esc(money(price.finalPrice, price.currency)) : ''}${price && Number(price.discountAmount) > 0 ? `<s>${esc(money(price.listAmount, price.currency))}</s>` : ''}</span>
         <span class="booking-radio" aria-hidden="true">${selected ? '✓' : ''}</span></button>`;
     }).join('')}</div>` : '<div class="booking-empty"><p>Bu gün için seans yok.</p><p>Noktalı günlerde seans var; başka bir gün seç.</p></div>'}`;
@@ -168,20 +179,28 @@ function confirmStep(e, s) {
     <p class="form-error" id="booking-error" role="alert" hidden></p>`;
 }
 
+/** After booking, and again when the done address is reloaded (then only the booking's id and status are known). */
 function doneStep(booking, e) {
-  const wait = booking.booking_status === 'waitlisted';
+  const wait = booking.booking_status === 'waitlisted', pass = PASS_OK.includes(booking.booking_status);
   const place = [booking.location_name, booking.seat_code ? `Koltuk ${seatNo(booking.seat_code)}` : booking.table_name].filter(Boolean).join(' · ');
+  const pay = booking.final_price != null ? `Ödenecek tutar: <strong>${esc(money(booking.final_price, booking.currency_code))}</strong>. ` : '';
   return `<div class="booking-done"><span class="booking-done-mark" aria-hidden="true">${wait ? '…' : '✓'}</span><h1 class="booking-title">${wait ? 'Bekleme listesindesin.' : 'Yerin ayrıldı.'}</h1>
     <p class="booking-lead">${esc(e.event_title)} · ${esc(dayTitle(dayKey(new Date(e.start_datetime))))} · ${esc(range(e))}${place ? `<br><strong>${esc(place)}</strong>` : ''}</p>
-    <p>${wait ? 'Yer açıldığında rezervasyonun onaylanır.' : `Ödenecek tutar: <strong>${esc(money(booking.final_price, booking.currency_code))}</strong>. Girişte aşağıdaki QR kodu göster; görüşmek üzere!`}</p>
-    <div id="pass-slot"></div>
+    <p>${wait ? 'Yer açıldığında rezervasyonun onaylanır; QR kodun o zaman Rezervasyonlarım’da görünür.' : pass ? `${pay}Girişte aşağıdaki QR kodu göster ya da indirip telefonunda sakla; görüşmek üzere!` : `${pay}Ödeme tamamlanınca giriş QR kodun burada ve Rezervasyonlarım’da görünür.`}</p>
+    ${pass ? '<div id="pass-slot"><p class="entry-loading">Giriş QR kodun hazırlanıyor…</p></div>' : ''}
     <div class="booking-login"><a class="shell-primary" href="${siteUrl('member/#bulusmalar')}">Rezervasyonlarım <span>↗</span></a><a class="shell-secondary" href="?">Yeni rezervasyon</a></div></div>`;
+}
+
+function showPass(bookingId) {
+  const slot = () => document.querySelector('#pass-slot');
+  passCard(bookingId).then(html => { if (slot()) slot().innerHTML = html; })
+    .catch(() => { if (slot()) slot().innerHTML = `<p class="booking-note">QR kodu şu an gösterilemedi. <button class="text-link" data-pass-retry="${esc(bookingId)}">Tekrar dene</button> ya da <a class="text-link" href="${siteUrl('member/#bulusmalar')}">Rezervasyonlarım</a>’dan aç.</p>`; });
 }
 
 // ---------- summary and bottom bar ----------
 
 function summary(s, e) {
-  const list = week.items.filter(x => dayKey(new Date(x.start_datetime)) === s.date);
+  const list = listed().filter(x => dayKey(new Date(x.start_datetime)) === s.date);
   const day = `<section class="booking-card"><div class="booking-card-head"><h2>${esc(dayTitle(s.date))}</h2><span>${list.length} seans</span></div>${list.length ? `<ul>${list.map(x => `<li><i class="avail-${availability(x)[0]}"></i><strong>${esc(range(x))}</strong> ${esc(x.event_title)}<span>${esc(availability(x)[1].toLocaleLowerCase('tr'))}</span></li>`).join('')}</ul>` : '<p class="booking-muted">Seans yok.</p>'}</section>`;
   if (!e || s.step === 'seans') return day;
   const option = optionsOf(e).find(o => o.id_event_option === s.optionId) ?? (optionsOf(e).length === 1 ? optionsOf(e)[0] : null);
@@ -199,7 +218,7 @@ function bottomBar(s, e) {
   const option = e && (optionsOf(e).find(o => o.id_event_option === s.optionId) ?? (optionsOf(e).length === 1 ? optionsOf(e)[0] : null));
   const seat = e?.seats.find(x => x.id_seat === s.seatId);
   const price = option?.price ?? (e && cheapest(e));
-  const labels = { seans: 'Koltuk seçimine devam et', koltuk: 'Bilgilere devam et', bilgiler: 'Onaya devam et', onay: option?.available === 0 ? 'Bekleme listesine katıl' : 'Rezervasyonu tamamla' };
+  const labels = { seans: noSeatStep(e) ? 'Devam et' : 'Koltuk seçimine devam et', koltuk: 'Bilgilere devam et', bilgiler: 'Onaya devam et', onay: option?.available === 0 ? 'Bekleme listesine katıl' : 'Rezervasyonu tamamla' };
   const ready = s.step === 'seans' ? !!e && !['mine', 'soon'].includes(availability(e)[0])
     : s.step === 'koltuk' ? !!option : s.step === 'bilgiler' ? !!policy?.signed_in : true;
   const what = s.step === 'seans' ? ['Seçilen seans', e ? `${dayTitle(dayKey(new Date(e.start_datetime)))} · ${range(e)}` : 'Henüz seans seçmedin']
@@ -218,9 +237,26 @@ async function render() {
   const s = state();
   try {
     await loadWeek(mondayOf(s.date));
+    // Opened without a date: start on the first day that has something to book, looking one week ahead if needed.
+    if (s.step === 'seans' && !new URLSearchParams(location.search).get('tarih')) {
+      const today = dayKey(new Date());
+      const firstDay = () => listed().map(x => dayKey(new Date(x.start_datetime))).filter(k => k >= today).sort()[0];
+      let first = firstDay();
+      if (!first) { await loadWeek(addDays(mondayOf(s.date), 7)); first = firstDay(); }
+      if (first) { go({ tarih: first }, true); return; }
+      await loadWeek(mondayOf(s.date));
+    }
     let e = s.eventId ? await loadEvent(s.eventId).catch(() => null) : null;
     if (s.eventId && !e) { go({ seans: null, adim: null, salon: null, koltuk: null }, true); return; }
-    if (s.step === 'tamam') { go({ adim: null }, true); return; }
+    if (s.step === 'tamam') {
+      // A reloaded done page shows the booking and its QR again; without a booking it falls back to the program.
+      if (!e?.my_booking) { go({ adim: null }, true); return; }
+      stepper('onay'); bar.hidden = true; aside.innerHTML = '';
+      content.innerHTML = doneStep(e.my_booking, e);
+      if (PASS_OK.includes(e.my_booking.booking_status)) showPass(e.my_booking.id_booking);
+      document.title = 'Rezervasyonun · Fikirhane';
+      return;
+    }
     // Steps after the session need one; skip the seat step for single, non-seat options.
     if (s.step !== 'seans' && !e) { go({ adim: null }, true); return; }
     if (s.step === 'koltuk' && e && optionsOf(e).length === 1 && optionsOf(e)[0].booking_unit !== 'seat') { go({ adim: 'bilgiler', salon: optionsOf(e)[0].id_event_option }, true); return; }
@@ -257,7 +293,7 @@ async function submit() {
     stepper('onay'); bar.hidden = true;
     content.innerHTML = doneStep(booking, e);
     aside.innerHTML = '';
-    if (booking.booking_status === 'confirmed') passCard(booking.id_booking).then(html => { const slot = document.querySelector('#pass-slot'); if (slot) slot.innerHTML = html; }).catch(() => {});
+    if (PASS_OK.includes(booking.booking_status)) showPass(booking.id_booking);
   } catch (err) {
     if (err?.status === 401) { location.assign(siteUrl(`uyelik/?giris&next=${encodeURIComponent('rezervasyon/' + location.search)}`)); return; }
     if (err?.code === 'seat_taken') { cache.delete(e.id_event); flash('Bu koltuk az önce doldu; başka bir koltuk seç.'); go({ adim: 'koltuk', koltuk: null }); return; }
@@ -270,7 +306,14 @@ document.addEventListener('click', ev => {
   const t = ev.target.closest('button'); if (!t || t.disabled) return;
   if (t.dataset.week) { const d = addDays(mondayOf(state().date), Number(t.dataset.week)); const today = dayKey(new Date()); go({ tarih: d < today ? today : d, seans: null, adim: null, salon: null, koltuk: null }); }
   else if (t.dataset.day) go({ tarih: t.dataset.day, seans: null, adim: null, salon: null, koltuk: null });
-  else if (t.dataset.session) { if (t.getAttribute('aria-disabled') === 'true') { flash(availability(week.items.find(x => x.id_event === t.dataset.session))[1] + '.'); return; } go({ seans: t.dataset.session, salon: null, koltuk: null }, true); }
+  else if (t.dataset.session) {
+    const e = week.items.find(x => x.id_event === t.dataset.session);
+    if (PASS_OK.includes(e?.my_booking?.booking_status)) { go({ seans: e.id_event, adim: 'tamam', salon: null, koltuk: null }); return; }
+    if (t.getAttribute('aria-disabled') === 'true') { flash(availability(e)[1] + '.'); return; }
+    go({ seans: t.dataset.session, salon: null, koltuk: null }, true);
+  }
+  else if (t.dataset.passRetry) { document.querySelector('#pass-slot').innerHTML = '<p class="entry-loading">Giriş QR kodun hazırlanıyor…</p>'; showPass(t.dataset.passRetry); }
+  else if (t.hasAttribute('data-all-sessions')) go({ alan: null, seans: null, adim: null, salon: null, koltuk: null });
   else if (t.dataset.room) go({ salon: t.dataset.room, koltuk: null }, true);
   else if (t.dataset.seat) { const s = state(); go({ salon: t.dataset.option, koltuk: s.seatId === t.dataset.seat ? null : t.dataset.seat }, true); }
   else if (t.hasAttribute('data-submit')) submit();

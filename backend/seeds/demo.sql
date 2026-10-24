@@ -82,6 +82,29 @@ select c.id_club, e.id_event, 'organizer', true from events e join clubs c on c.
 where e.event_code like 'WORKING-%'
   and not exists (select 1 from event_clubs ec where ec.id_event = e.id_event and ec.status = 'active');
 
+-- Meeting room: weekday evenings in two-hour slots (18-20, 20-22, 22-24). One booking takes the whole room.
+with days as (
+  select d::date as day from generate_series(current_date, current_date + 9, interval '1 day') d
+  where extract(isodow from d) <= 5 limit 7
+), slots as (
+  select day, start_h from days cross join (values (18), (20), (22)) as s(start_h)
+), ins as (
+  insert into events (event_code, event_type, event_title, event_description, start_datetime, end_datetime, status, base_price, currency_code)
+  select 'MEETING-' || to_char(day, 'YYYY-MM-DD') || '-' || start_h, 'workspace', 'Toplantı odası',
+         'Toplantı odasının tamamı, iki saat: 4–6 kişilik masa, ekran ve beyaz tahta.',
+         (day + make_interval(hours => start_h)) at time zone 'Europe/Istanbul',
+         (day + make_interval(hours => start_h + 2)) at time zone 'Europe/Istanbul',
+         'published', 1000.00, 'TRY'
+  from slots
+  where (day + make_interval(hours => start_h)) at time zone 'Europe/Istanbul' > now()
+  on conflict (event_code) do nothing
+  returning id_event
+)
+insert into event_options (id_event, id_location, id_space_setup, option_code, option_name, capacity, booking_unit, price_adjustment, status, sort_order)
+select ins.id_event, s.id_location, s.id_space_setup, 'ODA', 'Toplantı odası (4–6 kişi)', 1, 'location', l.default_price_adjustment, 'active', 10
+from ins cross join space_setups s join locations l using (id_location)
+where s.setup_code = 'MEETING_ROOM_V1';
+
 -- English conversation meetup from the public program (24 Oct 2026, 14:00-16:00), free; skipped once it is in the past.
 with ins as (
   insert into events (event_code, event_type, event_title, event_description, start_datetime, end_datetime, status, base_price, currency_code,

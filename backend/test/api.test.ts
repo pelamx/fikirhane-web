@@ -319,6 +319,33 @@ describe('admin events', () => {
   });
 });
 
+describe('meeting room', () => {
+  test('weekday evening two-hour slots from 18:00; one booking takes the whole room', async () => {
+    const slots = await env.sql<{ h: number; dow: number; hours: number; capacity: number; unit: string; price: string }[]>`
+      select extract(hour from e.start_datetime at time zone 'Europe/Istanbul')::int as h,
+             extract(isodow from e.start_datetime at time zone 'Europe/Istanbul')::int as dow,
+             (extract(epoch from e.end_datetime - e.start_datetime) / 3600)::int as hours, o.capacity, o.booking_unit as unit, e.base_price as price
+      from events e join event_options o using (id_event) join locations l using (id_location)
+      where l.location_code = 'MEETING_ROOM' and e.status = 'published'`;
+    assert.ok(slots.length > 0);
+    for (const s of slots) {
+      assert.ok([18, 20, 22].includes(s.h), `starts at ${s.h}`);
+      assert.ok(s.dow <= 5, 'weekdays only');
+      assert.deepEqual([s.hours, s.capacity, s.unit, s.price], [2, 1, 'location', '1000.00']);
+    }
+    const [slot] = await env.sql<{ id_event: string }[]>`
+      select e.id_event from events e join event_options o using (id_event) join locations l using (id_location)
+      where l.location_code = 'MEETING_ROOM' and e.status = 'published' order by e.start_datetime limit 1`;
+    const first = await registered(env);
+    const booked = await first.client.post('/api/bookings', { event_id: slot.id_event });
+    assert.equal(booked.status, 201);
+    assert.equal(booked.json.booking.booking_status, 'confirmed');
+    const second = await registered(env);
+    const refused = await second.client.post('/api/bookings', { event_id: slot.id_event });
+    assert.notEqual(refused.status, 201);
+  });
+});
+
 describe('shells', () => {
   test('a new account is a member; staff roles open host and admin as granted', async () => {
     const user = await registered(env);
