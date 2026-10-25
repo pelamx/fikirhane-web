@@ -302,3 +302,4 @@ html[data-theme=dark] .hero-sketch .sea{fill:#6d97b0;opacity:.12}html[data-theme
   .tour-blank input{width:7em}.tour-blank input[type=email],.tour-blank input[type=tel]{width:100%}
   .tour-days{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.tour-days span{min-width:0;padding:9px 10px}}
 .space-tour{grid-column:2;justify-self:start;margin-top:18px}@media(max-width:760px){.space-tour{grid-column:1}}
+.hero+.clubs{padding-top:70px}@media(max-width:760px){.hero+.clubs{padding-top:40px}}
