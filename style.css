@@ -64,7 +64,7 @@ header.topnav-compact .member-header-actions,header.topnav-compact .header-actio
 .hero-sketch .cu{stroke:var(--copper)}
 .hero-sketch .hatch{stroke:var(--muted);stroke-width:.9;opacity:.8;animation-duration:1.8s;animation-delay:calc(var(--d,0s) + .5s)}
 .hero-sketch .hatch.dark{stroke:var(--ink);stroke-width:1}.hero-sketch .hatch.cu-hatch{stroke:var(--copper);opacity:.8}
-.hero-sketch .far-hatch{opacity:.4}.hero-sketch .water{opacity:.55}
+.hero-sketch .far-hatch{opacity:.4}.hero-sketch .far.fine{stroke-width:1}.hero-sketch .water{opacity:.55}
 .hero-sketch .nostroke{stroke:none}
 .hero-sketch .paper{fill:var(--surface)}.hero-sketch .cu-fill{fill:color-mix(in srgb,var(--copper) 35%,var(--surface))}
 .hero-sketch .wash{fill:var(--copper);opacity:.16}.hero-sketch .logo,.hero-sketch .beacon{fill:var(--copper)}
@@ -99,7 +99,8 @@ html[data-theme=dark] .hero-sketch .glint{display:none}
 .hero-sketch .moonglow{fill:var(--ink);stroke:none;opacity:0;filter:blur(14px);animation:sketch-moonglow 1.2s ease forwards calc(var(--d) + .6s)}
 .hero-sketch .moonline{stroke:var(--ink);stroke-width:1.6}
 .hero-sketch .moonline.m1{animation-duration:1.2s,3.2s}.hero-sketch .moonline.m2{animation-duration:1.2s,2s}
-@keyframes sketch-moonglow{to{opacity:.12}}@keyframes sketch-lampglow{to{opacity:.3}}
+@keyframes sketch-moonglow{to{opacity:.12}}@keyframes sketch-citylights{to{opacity:.75}}@keyframes sketch-lampglow{to{opacity:.3}}
+.hero-sketch .citylights{display:none;fill:#f4b26a;opacity:0;animation:sketch-citylights 1.2s ease forwards calc(var(--d) + 1.4s)}html[data-theme=dark] .hero-sketch .citylights{display:inline}
 .hero-sketch .lights{display:none}html[data-theme=dark] .hero-sketch .lights{display:inline}
 .hero-sketch .cone,.hero-sketch .pool{stroke:none;mix-blend-mode:screen;fill-opacity:0}
 .hero-sketch .cone{fill:url(#lamp-cone);filter:blur(6px);animation:sketch-fill 1.1s ease forwards calc(var(--d) + var(--i) * .35s),sketch-glow 5s ease-in-out calc(var(--d) + 2.4s + var(--i) * .7s) infinite}
@@ -109,7 +110,7 @@ html[data-theme=dark] .hero-sketch .sky-a{stop-color:#1d2433;stop-opacity:.9}htm
 html[data-theme=dark] .hero-sketch .sea{fill:#6d97b0;opacity:.12}html[data-theme=dark] .hero-sketch .sunlight{display:none}html[data-theme=dark] .hero-sketch .lampglow{display:inline}
 .hero-drawing .photo-caption{position:static;padding:10px 4px 2px;color:var(--muted);text-shadow:none;background:none}
 @media(max-width:760px){.hero-sketch{height:200px;aspect-ratio:auto}}
-@media(prefers-reduced-motion:reduce){.hero-sketch *{animation:none!important;stroke-dashoffset:0!important;fill-opacity:1!important}.hero-sketch .ferry{transform:translateX(-700px)}.hero-sketch .moonglow{opacity:.12}.hero-sketch .lampglow{opacity:.3}}
+@media(prefers-reduced-motion:reduce){.hero-sketch *{animation:none!important;stroke-dashoffset:0!important;fill-opacity:1!important}.hero-sketch .ferry{transform:translateX(-540px)}.hero-sketch .moonglow{opacity:.12}.hero-sketch .lampglow{opacity:.3}.hero-sketch .citylights{opacity:.75}}
 
 /* Space pages (coworking/, toplanti-odasi/, etkinlik-alani/, language-meetup/): each page is built around what its space
    is for — a day of sessions, a room plan, seating layouts, a conversation — with plain facts beside it. */
