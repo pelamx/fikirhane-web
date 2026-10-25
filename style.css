@@ -344,3 +344,9 @@ html[data-theme=dark] .hero-sketch .sea{fill:#6d97b0;opacity:.12}html[data-theme
 .booking-areas button:hover{border-color:var(--copper);color:var(--copper)}
 .booking-areas button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
 @media(max-width:650px){.booking-days{gap:4px}.booking-day{padding:10px 2px;min-height:60px}.booking-day strong{font-size:19px}.booking-session{grid-template-columns:1fr auto;gap:8px 12px}.booking-clock,.booking-radio{display:none}}
+.invitation .how-title{font-size:56px;letter-spacing:-1.4px;margin-top:0}
+.how-steps{list-style:none;margin:42px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:40px}
+.how-steps li{border-top:1px solid rgba(255,255,255,.35);padding-top:22px}.how-steps span{font:42px/1 var(--serif);color:#f1dcc0}
+.how-steps h3{font:400 28px/1.15 var(--serif);margin:16px 0 10px}.how-steps p{font-size:15px;line-height:1.8}
+.how-actions{display:flex;align-items:center;gap:30px;margin-top:44px}
+@media(max-width:760px){.invitation .how-title{font-size:38px;letter-spacing:-.8px}.how-steps{grid-template-columns:1fr;gap:26px;margin-top:30px}.how-steps h3{font-size:25px}.how-steps p{font-size:14px}.how-actions{margin-top:32px;gap:25px}}
