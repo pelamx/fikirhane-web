@@ -279,7 +279,10 @@ describe('admin events', () => {
   test('create, publish with conflict detection, cancel cascades to bookings', async () => {
     const admin = await registered(env);
     await grantRole(env.sql, admin.userId, 'FIKIRHANE_ADMIN');
+    // 23.00 Istanbul, more than a day ahead: clear of the seeded daytime coworking sessions whatever the time of the run
     const start = new Date(Date.now() + 30 * 3_600_000);
+    start.setUTCHours(20, 0, 0, 0);
+    if (start.getTime() < Date.now() + 26 * 3_600_000) start.setUTCDate(start.getUTCDate() + 1);
     const end = new Date(start.getTime() + 2 * 3_600_000);
     const payload = {
       event_type: 'workshop', event_title: 'AI Prompting', start_datetime: start.toISOString(), end_datetime: end.toISOString(),
