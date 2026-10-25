@@ -4,50 +4,22 @@ import { initTheme, escapeHTML as esc } from './shared.js';
 import { api, apiAvailable } from './api.js';
 import { siteUrl } from './session.js';
 import { passCard } from './pass.js';
+import { dayKey, addDays, mondayOf, range, dayTitle, money, optionsOf, cheapest, AREAS, inArea, availability as availabilityOf, firstDay as firstDayOf, weekPicker } from './program.js';
 import './topnav.js';
 initTheme();
 
-const TZ = 'Europe/Istanbul';
 const content = document.querySelector('#booking-content');
 const aside = document.querySelector('#booking-aside');
 const bar = document.querySelector('#booking-bar');
 const STEPS = [['seans', 'Seans'], ['koltuk', 'Koltuk'], ['bilgiler', 'Bilgiler'], ['onay', 'Onay']];
-const TYPE = { workspace: 'Coworking', meetup: 'Buluşma', workshop: 'Atölye', talk: 'Konuşma', class: 'Ders', social: 'Sosyal' };
-
-const dayKey = d => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
-const fmt = opts => new Intl.DateTimeFormat('tr-TR', { timeZone: TZ, ...opts });
-const timeFmt = fmt({ hour: '2-digit', minute: '2-digit' });
-const longDay = fmt({ day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' });
-const shortWd = fmt({ weekday: 'short' });
-const dayNum = fmt({ day: 'numeric' });
-const monthShort = fmt({ month: 'short' });
-const at = key => new Date(`${key}T12:00:00+03:00`);
-const addDays = (key, n) => dayKey(new Date(at(key).getTime() + n * 86_400_000));
-const mondayOf = key => { const wd = (at(key).getUTCDay() + 6) % 7; return addDays(key, -wd); };
-const time = d => timeFmt.format(new Date(d));
-const range = e => `${time(e.start_datetime)} – ${time(e.end_datetime)}`;
-const dayTitle = key => longDay.format(at(key)).replace(/^(\S+),? (\d+ \S+ \d+)$/, '$2, $1').replace(/^(\d+ \S+ \d+) (\S+)$/, '$1, $2');
-const money = (amount, currency = 'TRY') => amount == null ? '—' : Number(amount) === 0 ? 'Ücretsiz'
-  : new Intl.NumberFormat('tr-TR', { style: 'currency', currency, maximumFractionDigits: Number(amount) % 1 ? 2 : 0 }).format(Number(amount));
 const seatNo = code => String(Number(String(code).replace(/\D/g, '')) || code);
 
 let me = null, policy = null, week = { start: null, items: [] }, detail = null, busy = false, toastTimer;
 const cache = new Map();
-// ?alan= narrows the program to one kind of booking; the choice sits above the week so every entry point reaches each one.
-const inMeetingRoom = e => optionsOf(e).some(o => o.location_code === 'MEETING_ROOM');
-const AREAS = {
-  coworking: { label: 'Coworking', title: 'Coworking seansını seç', lead: 'Hafta içi sabah 10.00–14.00 ve öğleden sonra 14.00–18.00. Salonunu ve koltuğunu sonra seçersin.',
-    match: e => e.event_type === 'workspace' && !inMeetingRoom(e) },
-  toplanti: { label: 'Toplantı odası', title: 'Toplantı odasını ayırt', lead: 'Hafta içi akşamları iki saatlik dilimler: 18.00, 20.00 ve 22.00. Odanın tamamı senin.',
-    match: inMeetingRoom },
-  bulusma: { label: 'Buluşmalar', title: 'Buluşmanı seç', lead: 'Kulüplerin buluşmaları ve etkinlikleri.', match: e => e.event_type !== 'workspace' },
-};
 const areaKey = () => { const k = new URLSearchParams(location.search).get('alan'); return k in AREAS ? k : ''; };
 const areaOf = () => AREAS[areaKey()] ?? null;
-const listed = () => { const a = areaOf(); return a ? week.items.filter(a.match) : week.items; };
+const listed = () => inArea(week.items, areaKey());
 const PASS_OK = ['confirmed', 'checked_in'];
-/** One option, booked as a whole place by one person: the meeting room. */
-const wholeRoom = e => optionsOf(e).length === 1 && optionsOf(e)[0].booking_unit === 'location' && optionsOf(e)[0].capacity === 1;
 const noSeatStep = e => optionsOf(e).length === 1 && optionsOf(e)[0].booking_unit !== 'seat';
 
 function state() {
@@ -77,18 +49,7 @@ async function loadEvent(id) {
   if (!cache.has(id)) cache.set(id, api(`/events/${id}`).then(r => { policy = r.policy; return r.event; }).catch(err => { cache.delete(id); throw err; }));
   return cache.get(id);
 }
-const optionsOf = e => (e?.options ?? []);
-const free = e => optionsOf(e).reduce((n, o) => n + o.available, 0);
-const cheapest = e => optionsOf(e).map(o => o.price).filter(Boolean).sort((a, b) => Number(a.finalPrice) - Number(b.finalPrice))[0] ?? null;
-const opensAt = e => new Date(new Date(e.start_datetime).getTime() - (policy?.reservation_window_days ?? 7) * 86_400_000);
-const notYetOpen = e => opensAt(e) > new Date();
-function availability(e) {
-  if (e.my_booking) return ['mine', e.my_booking.booking_status === 'waitlisted' ? 'Bekleme listesindesin' : PASS_OK.includes(e.my_booking.booking_status) ? 'Rezervasyonun var · QR kodunu gör' : 'Rezervasyonun var'];
-  if (notYetOpen(e)) return ['soon', `${fmt({ day: 'numeric', month: 'long' }).format(opensAt(e))} tarihinde açılır`];
-  const n = free(e);
-  if (wholeRoom(e)) return n === 0 ? ['full', 'Dolu · bekleme listesi'] : ['ok', 'Boş'];
-  return n === 0 ? ['full', 'Dolu · bekleme listesi'] : n <= 5 ? ['few', `Son ${n} yer`] : ['ok', 'Yer var'];
-}
+const availability = e => availabilityOf(e, policy);
 
 // ---------- steps ----------
 
@@ -99,32 +60,10 @@ function stepper(current) {
 }
 
 function sessionsStep(s) {
-  const start = mondayOf(s.date), today = dayKey(new Date());
-  const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  const byDay = key => listed().filter(e => dayKey(new Date(e.start_datetime)) === key);
-  const list = byDay(s.date);
-  const end = addDays(start, 6);
-  const label = `${dayNum.format(at(start))}${monthShort.format(at(start)) !== monthShort.format(at(end)) ? ' ' + monthShort.format(at(start)) : ''} – ${dayNum.format(at(end))} ${monthShort.format(at(end))}`;
   const area = areaOf();
-  const tabs = `<div class="booking-areas" role="group" aria-label="Ne ayırtmak istiyorsun?">${[['', 'Hepsi'], ...Object.entries(AREAS).map(([k, a]) => [k, a.label])]
-    .map(([k, label]) => `<button data-area="${k}" aria-pressed="${k === areaKey()}">${esc(label)}</button>`).join('')}</div>`;
   return (area ? `<h1 class="booking-title">${esc(area.title)}</h1><p class="booking-lead">${esc(area.lead)}</p>`
-    : `<h1 class="booking-title">Seansını seç</h1><p class="booking-lead">Günü ve seansı belirle; uygun seansları anında gör.</p>`) + tabs + `
-    <div class="booking-week"><button class="booking-arrow" data-week="-7" ${start <= mondayOf(today) ? 'disabled' : ''} aria-label="Önceki hafta">‹</button><strong>${esc(label)}</strong><button class="booking-arrow" data-week="7" aria-label="Sonraki hafta">›</button></div>
-    <div class="booking-days" role="group" aria-label="Gün">${days.map(k => {
-      const past = k < today, has = byDay(k).length > 0, d = at(k);
-      return `<button class="booking-day${k === s.date ? ' selected' : ''}" data-day="${k}" ${past ? 'disabled' : ''} aria-pressed="${k === s.date}" aria-label="${esc(dayTitle(k))}${has ? ', seans var' : ''}"><small>${esc(shortWd.format(d))}</small><strong>${dayNum.format(d)}</strong>${has ? '<i aria-label="seans var"></i>' : ''}</button>`;
-    }).join('')}</div>
-    <h2 class="booking-day-title" id="seanslar">${esc(dayTitle(s.date))}</h2>
-    ${list.length ? `<div class="booking-sessions" role="radiogroup" aria-label="Seanslar">${list.map(e => {
-      const [kind, text] = availability(e), price = cheapest(e), selected = e.id_event === s.eventId;
-      const disabled = kind === 'mine' || kind === 'soon';
-      return `<button class="booking-session${selected ? ' selected' : ''}" role="radio" aria-checked="${selected}" data-session="${e.id_event}" ${disabled ? 'aria-disabled="true"' : ''}>
-        <span class="booking-clock" aria-hidden="true">◷</span>
-        <span class="booking-session-main"><strong>${esc(range(e))}</strong><span>${esc(e.event_title)} · ${esc(wholeRoom(e) ? 'Odanın tamamı' : TYPE[e.event_type] ?? e.event_type)}</span><em class="avail-${kind}">${esc(text)}</em></span>
-        <span class="booking-price">${price ? esc(money(price.finalPrice, price.currency)) : ''}${price && Number(price.discountAmount) > 0 ? `<s>${esc(money(price.listAmount, price.currency))}</s>` : ''}</span>
-        <span class="booking-radio" aria-hidden="true">${selected ? '✓' : ''}</span></button>`;
-    }).join('')}</div>` : '<div class="booking-empty"><p>Bu gün için seans yok.</p><p>Noktalı günlerde seans var; başka bir gün seç.</p></div>'}`;
+    : `<h1 class="booking-title">Seansını seç</h1><p class="booking-lead">Günü ve seansı belirle; uygun seansları anında gör.</p>`)
+    + weekPicker({ items: week.items, policy, date: s.date, area: areaKey(), selectedId: s.eventId });
 }
 
 function planView(e, option, s, canPick) {
@@ -250,7 +189,7 @@ async function render() {
     // Opened without a date: start on the first day that has something to book, looking one week ahead if needed.
     if (s.step === 'seans' && !new URLSearchParams(location.search).get('tarih')) {
       const today = dayKey(new Date());
-      const firstDay = () => listed().map(x => dayKey(new Date(x.start_datetime))).filter(k => k >= today).sort()[0];
+      const firstDay = () => firstDayOf(week.items, areaKey(), today);
       let first = firstDay();
       if (!first) { await loadWeek(addDays(mondayOf(s.date), 7)); first = firstDay(); }
       if (first) { go({ tarih: first }, true); return; }
