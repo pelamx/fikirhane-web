@@ -302,4 +302,9 @@ html[data-theme=dark] .hero-sketch .sea{fill:#6d97b0;opacity:.12}html[data-theme
   .tour-blank input{width:7em}.tour-blank input[type=email],.tour-blank input[type=tel]{width:100%}
   .tour-days{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.tour-days span{min-width:0;padding:9px 10px}}
 .space-tour{grid-column:2;justify-self:start;margin-top:18px}@media(max-width:760px){.space-tour{grid-column:1}}
-.hero+.clubs{padding-top:70px}@media(max-width:760px){.hero+.clubs{padding-top:40px}}
+.hero+.clubs{padding-top:36px}.hero+.clubs>.section-line{border-top:0;padding-top:0}@media(max-width:760px){.hero+.clubs{padding-top:28px}}
+.week-day{padding:16px 0;border-bottom:1px solid var(--line)}.week-day:first-child{border-top:1px solid var(--line)}.week-day h4{font:400 21px var(--serif);margin:0 0 6px}.week-day h4 span{font:13px 'DM Sans',sans-serif;color:var(--muted);margin-left:6px}.week-day.today h4{color:var(--copper)}
+.week-session{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:7px 0 7px 22px;font-size:15px}.week-session small{font-size:13px;color:var(--muted);margin-left:12px}.week-session>span:last-child{font-size:13px;color:var(--copper);white-space:nowrap}a.week-session:hover>span:first-child{color:var(--copper)}.week-session.past{opacity:.5}.week-session.past>span:last-child{color:var(--muted)}.week-closed{padding:7px 0 7px 22px;font-size:14px;color:var(--muted)}
+@media(max-width:760px){.week-day h4{font-size:19px}.week-session,.week-closed{padding-left:14px;font-size:14px}.week-session small{display:block;margin:3px 0 0}}
+@media(max-width:359px){.header .brand{width:110px}.header,.header-actions{gap:8px}.join-link span{display:none}header.header .topnav-toggle{width:36px;height:36px;margin-left:4px}}
+.calendar-layout{grid-template-columns:minmax(0,820px)}
