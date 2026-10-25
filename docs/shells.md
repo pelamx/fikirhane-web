@@ -34,7 +34,7 @@ How people move between them:
 - `/rezervasyon/?tarih&seans&adim&salon&koltuk`: reservation flow — Seans (week strip, day's sessions with personal price and availability) → Koltuk (rooms and seat plans drawn over `assets/plans/*.png`; seat picking for members whose membership allows it, otherwise the first free seat is assigned) → Bilgiler (need/offer, freepass; sign-in returns to the same step) → Onay. The member area's "Yer ayırt" opens it.
 - `/member/#anasayfa`: personal home.
 - `/member/#kesfet`: all clubs, search/category filter.
-- `/member/#kulup/work` (also language, writing): club details.
+- `/member/#kulup/work` (also language, spanish): club details.
 - `/member/#kuluplerim`: followed clubs, including empty state.
 - `/member/#bulusmalar`: sourced program, personal plan, cancel/save.
 - `/member/#profil`: name/bio editing, session exit, delete preview.

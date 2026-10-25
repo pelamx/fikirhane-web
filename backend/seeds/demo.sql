@@ -4,7 +4,7 @@
 insert into financial_centers (center_code, center_name, center_type, description, sort_order) values
   ('WORKING_CLUB', 'Working Club / Community Workspace', 'club', 'Community workspace sessions and Working Club activities.', 10),
   ('ENGLISH_CLUB', 'English Club', 'club', 'Financial performance center for English Club activities.', 20),
-  ('WRITING_CLUB', 'Creative Writing Club', 'club', 'Financial performance center for Creative Writing Club activities.', 30)
+  ('WRITING_CLUB', 'Spanish Club', 'club', 'Financial performance center for Spanish Club activities.', 30)
 on conflict (center_code) do nothing;
 
 insert into clubs (club_code, club_name, club_description, club_type, id_financial_center, status, sort_order)
@@ -12,7 +12,7 @@ select v.code, v.name, v.descr, v.type, fc.id_financial_center, 'active', v.ord
 from (values
   ('WORKING', 'Çalışma Kulübü', 'Kendi işine, projene ya da öğrenimine odaklanabileceğin rezervasyonlu ortak çalışma seansları. Sabit masa ya da uzun dönem ofis üyeliği gerekmez.', 'workspace', 'WORKING_CLUB', 10),
   ('ENGLISH', 'İngilizce Konuşma Kulübü', 'İngilizceyi düzenli kullanabileceğin bir ortam: konuşma pratiği, telaffuz, iş İngilizcesi ve farklı temalar etrafında tekrar eden programlar.', 'language', 'ENGLISH_CLUB', 20),
-  ('WRITING', 'Yaratıcı Yazarlık Kulübü', 'Kısa öykü, deneme ve şiir üzerine düzenli yazma oturumları. Her buluşmada küçük bir yazma alıştırması ve bir geri bildirim turu var; deneyim şartı yok.', 'creative', 'WRITING_CLUB', 30)
+  ('WRITING', 'İspanyolca Konuşma Kulübü', 'Konuşma pratiği, günlük hayat, seyahat ve kültür temaları etrafında tekrar eden programlar. Amaç bir ders ortamından çok, İspanyolcayı gerçek iletişim içinde düzenli kullanmak.', 'language', 'WRITING_CLUB', 30)
 ) as v(code, name, descr, type, fc, ord)
 join financial_centers fc on fc.center_code = v.fc
 on conflict (club_code) do nothing;
