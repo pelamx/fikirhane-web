@@ -39,8 +39,8 @@ export function createApp(deps: Deps) {
     c.header('cache-control', 'no-store');
     const viaCookie = !c.req.header('authorization');
     // CSRF: cookie-authenticated writes must come from this origin or an allowed one.
-    // The payment provider's return (a form post from its own site) carries no session and is checked with the provider.
-    if (UNSAFE.has(c.req.method) && viaCookie && c.req.path !== '/api/kitchen/callback') {
+    // The payment provider's notification and return come from its own servers and site: no session, signed or read-only.
+    if (UNSAFE.has(c.req.method) && viaCookie && c.req.path !== '/api/kitchen/notify' && c.req.path !== '/api/kitchen/return') {
       const origin = c.req.header('origin');
       const self = selfOrigin(c, deps.config.trustProxy);
       if (origin && origin !== self && !allowed.has(origin)) throw new ApiError(403, 'bad_origin', 'Request origin is not allowed.');

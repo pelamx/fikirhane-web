@@ -3623,6 +3623,7 @@
   "fields": {
    "item_code": "Sabit teknik kod (örn. WATER_500ML). Sadece A-Z, 0-9, _; benzersiz. Oluşturulduktan sonra değiştirilemez; barkod değildir.",
    "item_name": "Ekranda görünen ad. Değiştirilebilir; geçmiş belgeler eski adı kendi açıklamasında saklar.",
+   "barcode": "Ürünün üzerindeki barkod numarası (8–14 rakam, örn. 8690000000005). Mutfakta müşteri bu barkodu okutarak ürünü hesabına ekler. Mutfakta hazırlanan ürünlerde boş bırakılır; onlar mutfak sayfasında listeden seçilir. Her barkod tek ürüne ait olur.",
    "item_type": "Sistemin kalemi nasıl işlediği: stoklu ürün, stoksuz ürün veya hizmet. Hizmet stok takibine giremez.",
    "item_category": "Ürün/hizmet grubu (kontrollü liste). V1'de ayrı kategori tablosu yok.",
    "unit": "Temel ölçü birimi (adet, kg, litre, seans...). Stok hareketleri bu birimle girilir.",

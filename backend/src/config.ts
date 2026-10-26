@@ -13,8 +13,8 @@ function list(name: string): string[] {
 }
 
 export type PaymentMode = 'pay_at_venue' | 'online';
-/** How a kitchen tab is paid: not at all (off), a fake card page for development and the demo (test), or iyzico. */
-export type KitchenPayment = 'off' | 'test' | 'iyzico';
+/** How a kitchen tab is paid: not at all (off), a fake card page for development and the demo (test), or PayTR. */
+export type KitchenPayment = 'off' | 'test' | 'paytr';
 
 export interface Config {
   databaseUrl: string;
@@ -48,7 +48,7 @@ export interface Config {
   /** Visit requests (Tur planla) accepted per network per hour. */
   tourRequestsPerHour: number;
   kitchenPayment: KitchenPayment;
-  iyzico: { apiKey: string; secretKey: string; baseUrl: string } | null;
+  paytr: { merchantId: string; merchantKey: string; merchantSalt: string; testMode: boolean } | null;
   /** How long an online payment may stay open before the tab unlocks again. */
   kitchenCheckoutMinutes: number;
 }
@@ -59,12 +59,13 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
   const paymentMode = process.env.PAYMENT_MODE ?? 'pay_at_venue';
   if (paymentMode !== 'pay_at_venue' && paymentMode !== 'online') throw new Error('PAYMENT_MODE must be pay_at_venue or online');
   const kitchenPayment = process.env.KITCHEN_PAYMENT || 'off';
-  if (!['off', 'test', 'iyzico'].includes(kitchenPayment)) throw new Error('KITCHEN_PAYMENT must be off, test or iyzico');
-  const iyzico = process.env.IYZICO_API_KEY && process.env.IYZICO_SECRET_KEY
-    ? { apiKey: process.env.IYZICO_API_KEY, secretKey: process.env.IYZICO_SECRET_KEY,
-        baseUrl: (process.env.IYZICO_BASE_URL || 'https://sandbox-api.iyzipay.com').replace(/\/+$/, '') }
+  if (!['off', 'test', 'paytr'].includes(kitchenPayment)) throw new Error('KITCHEN_PAYMENT must be off, test or paytr');
+  const paytr = process.env.PAYTR_MERCHANT_ID && process.env.PAYTR_MERCHANT_KEY && process.env.PAYTR_MERCHANT_SALT
+    ? { merchantId: process.env.PAYTR_MERCHANT_ID, merchantKey: process.env.PAYTR_MERCHANT_KEY, merchantSalt: process.env.PAYTR_MERCHANT_SALT,
+        // PayTR's own test mode (no real charge) until PAYTR_TEST_MODE=false is set for live payments.
+        testMode: (process.env.PAYTR_TEST_MODE ?? 'true') !== 'false' }
     : null;
-  if (kitchenPayment === 'iyzico' && !iyzico) throw new Error('KITCHEN_PAYMENT=iyzico requires IYZICO_API_KEY and IYZICO_SECRET_KEY');
+  if (kitchenPayment === 'paytr' && !paytr) throw new Error('KITCHEN_PAYMENT=paytr requires PAYTR_MERCHANT_ID, PAYTR_MERCHANT_KEY and PAYTR_MERCHANT_SALT');
   const siteDir = process.env.SITE_DIR ?? '..';
   const config: Config = {
     databaseUrl: process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/fikirhane',
@@ -94,7 +95,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     passwordResetRequestsPerHour: int('PASSWORD_RESET_REQUESTS_PER_HOUR', 5),
     tourRequestsPerHour: int('TOUR_REQUESTS_PER_HOUR', 5),
     kitchenPayment: kitchenPayment as KitchenPayment,
-    iyzico,
+    paytr,
     kitchenCheckoutMinutes: int('KITCHEN_CHECKOUT_MINUTES', 15),
     ...overrides,
   };

@@ -215,14 +215,14 @@ export function meRoutes(deps: Deps) {
     return c.json({ items: rows });
   });
 
-  // Kitchen (mutfak): the person's tab, a scanned product, adding and changing lines, and paying online.
+  // Kitchen (mutfak): the person's tab, a scanned barcode's product, adding and changing lines, and paying online.
   const ItemCode = z.object({ item_code: code });
   app.get('/kitchen', async c => c.json(await kitchenState(deps.sql, deps.config, requireUser(c))));
-  app.get('/kitchen/items/:code', async c => {
+  app.get('/kitchen/barcode/:barcode', async c => {
     requireUser(c);
-    const parsed = code.safeParse(c.req.param('code'));
-    if (!parsed.success) return c.json({ error: { code: 'not_found', message: 'Ürün bulunamadı.' } }, 404);
-    return c.json(await kitchenItem(deps.sql, parsed.data));
+    const barcode = c.req.param('barcode');
+    if (!/^[0-9]{8,14}$/.test(barcode)) return c.json({ error: { code: 'not_found', message: 'Ürün bulunamadı.' } }, 404);
+    return c.json(await kitchenItem(deps.sql, barcode));
   });
   app.post('/kitchen/lines', async c => {
     const userId = requireUser(c);

@@ -4,11 +4,12 @@ import { ApiError, badRequest, notFound } from '../errors.ts';
 import { documentTotals } from './admin-write.ts';
 import { audit } from './audit.ts';
 import { lineValues, insertLine, menuItems, paymentAccount, postSale, type Account, type MenuItem } from './cafeteria.ts';
-import { kitchenProvider, type CheckoutResult } from './payments/provider.ts';
+import { kitchenProvider, type PaymentNotice } from './payments/provider.ts';
 
 /**
  * Kitchen self-service (mutfak): DOCUMENTS rule 16's open tab. A person with a booking today scans product labels into
- * one draft sale receipt (their tab) and pays it once, online, when they leave; staff can also close it at the desk.
+ * one draft sale receipt (their tab) by scanning product barcodes (or picking what the kitchen makes from a list) and
+ * pays it once, online, when they leave; staff can also close it at the desk.
  * Paying posts the receipt, takes the stock out and allocates the payment (cafeteria.ts postSale).
  */
 
@@ -41,21 +42,27 @@ const linesOf = (sql: Sql | Tx, idDocument: string) => sql`
   select l.id_document_item::text, i.item_code, l.description, l.quantity::int as quantity, l.unit_price::text, l.line_total::text
   from document_items l left join items i using (id_item) where l.id_document = ${idDocument} order by l.line_no`;
 
-/** The kitchen page: whether this person may add to a tab, their tab, and whether online payment is on. */
+const card = (item: MenuItem) => ({ item_code: item.item_code, item_name: item.item_name, price: lineValues(item, 1).line_total, currency_code: item.currency_code });
+
+/**
+ * The kitchen page: whether this person may add to a tab, their tab, whether online payment is on, and what the
+ * kitchen makes itself (no barcode to scan, so it is picked from a list).
+ */
 export async function kitchenState(sql: Sql, config: Config, userId: string) {
-  const [ok, tab] = await Promise.all([eligible(sql, userId), tabRow(sql, userId)]);
+  const [ok, tab, items] = await Promise.all([eligible(sql, userId), tabRow(sql, userId), menuItems(sql)]);
   return {
     eligible: ok,
     online_payment: config.kitchenPayment !== 'off',
     tab: tab && { ...tab, lines: await linesOf(sql, tab.id_document) },
+    menu: items.filter(i => !i.barcode).map(card),
   };
 }
 
-/** The card a scanned label opens: name and price with tax. */
-export async function kitchenItem(sql: Sql, code: string) {
-  const [item] = await menuItems(sql, { codes: [code] });
+/** The card a scanned barcode opens: name and price with tax. */
+export async function kitchenItem(sql: Sql, barcode: string) {
+  const [item] = await menuItems(sql, { barcodes: [barcode] });
   if (!item) throw notFound('Ürün');
-  return { item_code: item.item_code, item_name: item.item_name, price: lineValues(item, 1).line_total, currency_code: item.currency_code };
+  return card(item);
 }
 
 /** The tab may change: the person has a booking today, the tab is from today and no payment is under way. */
@@ -145,7 +152,8 @@ async function closeOpenCheckouts(tx: Tx, idDocument: string) {
 
 /**
  * Starts paying the tab online: a pending payment for the tab's total and an attempt that locks the tab, then the
- * provider's card page. Returns the address to send the person to.
+ * provider's card page. Returns the address to send the person to. The attempt's reference (its id without dashes)
+ * names it in the provider's notification.
  */
 export async function startCheckout(sql: Sql, config: Config, userId: string, ctx: { ip: string; origin: string }) {
   const provider = kitchenProvider(config);
@@ -153,8 +161,8 @@ export async function startCheckout(sql: Sql, config: Config, userId: string, ct
     const tab = await tabRow(tx, userId, true);
     if (!tab) throw notFound('Hesap');
     await documentTotals(tx, tab.id_document);
-    const lines = await tx<{ id_document_item: string; description: string; line_total: string }[]>`
-      select id_document_item::text, description, line_total::text from document_items where id_document = ${tab.id_document} and line_total > 0 order by line_no`;
+    const lines = await tx<{ description: string; quantity: number; line_total: string }[]>`
+      select description, quantity::int as quantity, line_total::text from document_items where id_document = ${tab.id_document} and line_total > 0 order by line_no`;
     const [{ total }] = await tx<{ total: string }[]>`select grand_total::text as total from documents where id_document = ${tab.id_document}`;
     if (!lines.length || Number(total) <= 0) throw badRequest('validation_failed', 'Hesabında ödenecek ürün yok.');
     await closeOpenCheckouts(tx, tab.id_document);
@@ -163,28 +171,30 @@ export async function startCheckout(sql: Sql, config: Config, userId: string, ct
       insert into transactions (transaction_type, to_account_id, amount, currency_code, payment_method, status, provider_name, description, created_by_user_id, updated_by_user_id)
       values ('collection', ${account.id_account}, ${total}, ${tab.currency_code}, 'online_payment', 'pending', ${provider.name}, ${`${TAB} (ödeme bekliyor)`}, ${userId}, ${userId})
       returning id_transaction::text`;
-    const [checkout] = await tx<{ id: string }[]>`
-      insert into kitchen_checkouts (id_document, id_transaction, amount, currency_code, provider, expires_at)
-      values (${tab.id_document}, ${payment.id_transaction}, ${total}, ${tab.currency_code}, ${provider.name}, now() + make_interval(mins => ${config.kitchenCheckoutMinutes}))
-      returning id_kitchen_checkout::text as id`;
+    const [checkout] = await tx<{ id: string; reference: string }[]>`
+      insert into kitchen_checkouts (id_document, id_transaction, amount, currency_code, provider, provider_token, expires_at)
+      select ${tab.id_document}, ${payment.id_transaction}, ${total}, ${tab.currency_code}, ${provider.name}, replace(id::text, '-', ''),
+             now() + make_interval(mins => ${config.kitchenCheckoutMinutes})
+      from (select gen_random_uuid() as id) g
+      returning id_kitchen_checkout::text as id, provider_token as reference`;
     const [buyer] = await tx<{ first_name: string; last_name: string | null; email: string | null }[]>`
       select u.first_name, u.last_name, e.email from users u left join user_emails e on e.id_user = u.id_user and e.is_primary and e.status = 'active'
       where u.id_user = ${userId}`;
-    return { checkoutId: checkout.id, id_transaction: payment.id_transaction, total, currency: tab.currency_code, lines, buyer };
+    return { ...checkout, id_transaction: payment.id_transaction, total, currency: tab.currency_code, lines, buyer };
   });
 
   try {
+    const back = `${ctx.origin}/api/kitchen/return?ref=${started.reference}`;
     const page = await provider.start({
-      checkoutId: started.checkoutId, amount: started.total, currency: started.currency,
-      buyer: { id: userId, firstName: started.buyer.first_name, lastName: started.buyer.last_name ?? '', email: started.buyer.email ?? 'uye@fikirhane.co', ip: ctx.ip },
-      lines: started.lines.map(l => ({ id: l.id_document_item, name: l.description, amount: l.line_total })),
-      callbackUrl: `${ctx.origin}/api/kitchen/callback`, origin: ctx.origin,
+      reference: started.reference, amount: started.total, currency: started.currency, timeoutMinutes: config.kitchenCheckoutMinutes,
+      buyer: { firstName: started.buyer.first_name, lastName: started.buyer.last_name ?? '', email: started.buyer.email ?? 'uye@fikirhane.co', ip: ctx.ip },
+      lines: started.lines.map(l => ({ name: l.description, unitPrice: (Number(l.line_total) / l.quantity).toFixed(2), quantity: l.quantity })),
+      okUrl: back, failUrl: `${back}&sonuc=hata`, origin: ctx.origin,
     });
-    await sql`update kitchen_checkouts set provider_token = ${page.token} where id_kitchen_checkout = ${started.checkoutId}`;
     return { page_url: page.pageUrl };
   } catch (err) {
     await sql.begin(async tx => {
-      await tx`update kitchen_checkouts set status = 'failed' where id_kitchen_checkout = ${started.checkoutId} and status = 'open'`;
+      await tx`update kitchen_checkouts set status = 'failed' where id_kitchen_checkout = ${started.id} and status = 'open'`;
       await tx`update transactions set status = 'failed' where id_transaction = ${started.id_transaction} and status = 'pending'`;
     });
     throw err;
@@ -199,54 +209,68 @@ export async function cancelCheckout(sql: Sql, userId: string) {
   });
 }
 
-/**
- * The provider's callback: asks the provider for the result (the browser's word is never taken), then posts the tab.
- * Idempotent: a repeated callback for a paid attempt answers with the same receipt. A payment that arrives after its
- * attempt was closed is still posted while the tab is unchanged; otherwise it is recorded for a refund.
- */
-export async function finishCheckout(sql: Sql, config: Config, token: string): Promise<{ ok: boolean; document_number?: string; message?: string }> {
-  const [found] = await sql<{ id: string }[]>`select id_kitchen_checkout::text as id from kitchen_checkouts where provider_token = ${token}`;
-  if (!found) return { ok: false, message: 'Ödeme bulunamadı.' };
-  const provider = kitchenProvider(config);
-  let result: CheckoutResult;
-  try { result = await provider.result(token); } catch { return { ok: false, message: 'Ödeme sağlayıcısına ulaşılamadı; hesabın açık duruyor.' }; }
+type Outcome = { ok: boolean; document_number?: string; message?: string };
 
+/**
+ * Settles an attempt on the provider's verified notification (never on the person's browser): posts the tab when the
+ * amount paid is the amount asked. Idempotent: a repeated notification for a paid attempt changes nothing. A payment
+ * that arrives after its attempt was closed is still posted while the tab is unchanged; otherwise it is recorded for a
+ * refund.
+ */
+export async function settleCheckout(sql: Sql, providerName: string, notice: PaymentNotice): Promise<Outcome> {
   return sql.begin(async tx => {
     const [k] = await tx<{ id: string; id_document: string; id_transaction: string; amount: string; status: string }[]>`
       select id_kitchen_checkout::text as id, id_document::text, id_transaction::text, amount::text, status
-      from kitchen_checkouts where id_kitchen_checkout = ${found.id} for update`;
+      from kitchen_checkouts where provider_token = ${notice.reference} and provider = ${providerName} for update`;
+    if (!k) return { ok: false, message: 'Ödeme bulunamadı.' };
     if (k.status === 'paid') {
       const [doc] = await tx<{ document_number: string }[]>`select document_number from documents where id_document = ${k.id_document}`;
       return { ok: true, document_number: doc.document_number };
     }
-    if (!result.ok) {
+    if (!notice.ok) {
       if (k.status === 'open') {
         await tx`update kitchen_checkouts set status = 'failed' where id_kitchen_checkout = ${k.id}`;
         await tx`update transactions set status = 'failed' where id_transaction = ${k.id_transaction} and status = 'pending'`;
       }
-      return { ok: false, message: result.message || 'Ödeme tamamlanmadı; hesabın açık duruyor.' };
+      return { ok: false, message: notice.message || 'Ödeme tamamlanmadı; hesabın açık duruyor.' };
     }
 
     const [doc] = await tx<{ id_user: string; status: string; currency_code: string }[]>`
       select id_user::text, status, currency_code from documents where id_document = ${k.id_document} for update`;
     if (doc.status === 'draft') await documentTotals(tx, k.id_document);
     const [{ total }] = await tx<{ total: string }[]>`select grand_total::text as total from documents where id_document = ${k.id_document}`;
-    const matches = result.basketId === k.id && result.paidPrice === k.amount && doc.status === 'draft' && total === k.amount;
-    if (!matches) {
+    if (notice.paidAmount !== k.amount || doc.status !== 'draft' || total !== k.amount) {
       await tx`update kitchen_checkouts set status = 'failed' where id_kitchen_checkout = ${k.id}`;
       await tx`update transactions set status = 'failed' where id_transaction = ${k.id_transaction} and status = 'pending'`;
       await audit(tx, { actorUserId: null, actorType: 'integration', action: 'kitchen.payment_unmatched', entityType: 'documents', entityId: k.id_document,
-        source: 'integration', metadata: { provider: provider.name, payment_id: result.paymentId, paid: result.paidPrice, expected: k.amount, tab_total: total, tab_status: doc.status } });
+        source: 'integration', metadata: { provider: providerName, payment_id: notice.paymentId, paid: notice.paidAmount, expected: k.amount, tab_total: total, tab_status: doc.status } });
       return { ok: false, message: 'Ödemen alındı ama hesabınla eşleşmedi. Görevliye haber ver; iade ya da düzeltme yapılacak.' };
     }
     const pending = (await tx`select 1 from transactions where id_transaction = ${k.id_transaction} and status = 'pending'`).length > 0;
     const sale = await postSale(tx, k.id_document, await onlineAccount(tx, doc.currency_code), 'online_payment', doc.id_user, {
       action: 'kitchen.paid', source: 'integration', pending: pending ? k.id_transaction : undefined,
-      provider: { name: provider.name, id: result.paymentId ?? `${provider.name}-${token}` },
+      provider: { name: providerName, id: notice.paymentId ?? `${providerName}-${notice.reference}` },
     });
     await tx`update kitchen_checkouts set status = 'paid' where id_kitchen_checkout = ${k.id}`;
     return { ok: true, document_number: sale.document_number };
   });
+}
+
+/**
+ * Where an attempt stands when the person comes back from the card page. The provider's notification usually lands
+ * first; this waits up to `waitMs` for it, and otherwise says the payment is still being confirmed.
+ */
+export async function checkoutOutcome(sql: Sql, reference: string, waitMs = 8000): Promise<Outcome & { pending?: boolean }> {
+  const until = Date.now() + waitMs;
+  for (;;) {
+    const [k] = await sql<{ status: string; document_number: string | null }[]>`
+      select k.status, d.document_number from kitchen_checkouts k join documents d using (id_document) where k.provider_token = ${reference}`;
+    if (!k) return { ok: false, message: 'Ödeme bulunamadı.' };
+    if (k.status === 'paid') return { ok: true, document_number: k.document_number ?? undefined };
+    if (k.status !== 'open') return { ok: false, message: 'Ödeme tamamlanmadı; hesabın açık duruyor.' };
+    if (Date.now() >= until) return { ok: false, pending: true };
+    await new Promise(r => setTimeout(r, 500));
+  }
 }
 
 /** Open tabs for the host shell: who, what and since when. */
@@ -275,9 +299,4 @@ export async function closeTabAtDesk(sql: Sql, actor: string, idDocument: string
       ? 'Aktif bir kasa hesabı yok; muhasebe bir kasa hesabı açmalı.' : 'Kart ödemesi için aktif bir POS ya da banka hesabı yok.');
     return postSale(tx, idDocument, account, method === 'cash' ? 'cash' : 'credit_card', actor, { action: 'kitchen.paid_at_desk', source: 'admin_web' });
   });
-}
-
-/** What the label sheet prints: every product the kitchen sells, with the address its QR carries. */
-export async function labelItems(sql: Sql): Promise<(Pick<MenuItem, 'item_code' | 'item_name' | 'currency_code'> & { price: string })[]> {
-  return (await menuItems(sql)).map(i => ({ item_code: i.item_code, item_name: i.item_name, currency_code: i.currency_code, price: lineValues(i, 1).line_total }));
 }

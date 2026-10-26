@@ -14,20 +14,21 @@ export type Account = { id_account: string; account_name: string };
 export type PaymentMethod = 'cash' | 'card';
 
 export interface MenuItem {
-  id_item: string; item_code: string; item_name: string; unit: string | null; price: string; tax_rate: string; currency_code: string;
+  id_item: string; item_code: string; item_name: string; barcode: string | null; unit: string | null; price: string; tax_rate: string; currency_code: string;
   current_stock: string | null; is_stock_tracked: boolean; id_financial_center: string; id_financial_category: string;
 }
 
 /** What the counter sells: active sellable items with a price whose default center is a cafeteria center. */
-export async function menuItems(sql: Sql, by: { ids?: string[]; codes?: string[] } = {}): Promise<MenuItem[]> {
+export async function menuItems(sql: Sql, by: { ids?: string[]; codes?: string[]; barcodes?: string[] } = {}): Promise<MenuItem[]> {
   return sql<MenuItem[]>`
-    select i.id_item::text, i.item_code, i.item_name, i.unit, i.default_selling_price::text as price, coalesce(i.default_tax_rate, 0)::text as tax_rate,
+    select i.id_item::text, i.item_code, i.item_name, i.barcode, i.unit, i.default_selling_price::text as price, coalesce(i.default_tax_rate, 0)::text as tax_rate,
            coalesce(i.currency_code, 'TRY') as currency_code, i.current_stock::text, i.is_stock_tracked,
            i.default_financial_center_id::text as id_financial_center, i.default_revenue_category_id::text as id_financial_category
     from items i join financial_centers fc on fc.id_financial_center = i.default_financial_center_id and fc.center_type = 'cafeteria'
     where i.status = 'active' and i.is_sellable and i.default_selling_price is not null and i.default_revenue_category_id is not null
       ${by.ids ? sql`and i.id_item::text = any(${by.ids})` : sql``}
       ${by.codes ? sql`and i.item_code = any(${by.codes})` : sql``}
+      ${by.barcodes ? sql`and i.barcode = any(${by.barcodes})` : sql``}
     order by i.sort_order nulls last, i.item_name`;
 }
 
@@ -95,7 +96,8 @@ export async function postSale(tx: Tx, idDocument: string, account: Account, met
   await documentStock(tx, idDocument, 'post', actor);
   const [payment] = opts.pending
     ? await tx<{ id_transaction: string }[]>`
-        update transactions set status = 'posted', posted_at = now(), provider_transaction_id = ${opts.provider?.id ?? null},
+        update transactions set status = 'posted', posted_at = now(), provider_name = coalesce(${opts.provider?.name ?? null}, provider_name),
+          provider_transaction_id = ${opts.provider?.id ?? null},
           description = ${`${posted.description} ${number}`}, updated_by_user_id = ${actor}
         where id_transaction = ${opts.pending} and status = 'pending' and amount = ${posted.grand_total} returning id_transaction::text`
     : await tx<{ id_transaction: string }[]>`

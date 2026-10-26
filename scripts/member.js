@@ -1,12 +1,13 @@
 import { initTheme, escapeHTML as esc } from './shared.js';
 import { passCard } from './pass.js';
 import { api } from './api.js';
+import { mountKitchen } from './kitchen.js';
 import './topnav.js';
 import { ready, mode, getCatalog, getSession, saveProfile, toggleClub, toggleEvent, bookEvent, cancelBooking, addGuest, signOut, clearPreview, siteUrl } from './session.js';
 initTheme();
 const content = document.querySelector('#member-content');
 let query = '', category = 'all', eventFilter = 'all', toastTimer, busy = false;
-const navNames = { anasayfa: 'Ana sayfam', kesfet: 'Kulüpleri keşfet', kuluplerim: 'Kulüplerim', bulusmalar: 'Buluşmalar', profil: 'Profilim', kulup: 'Kulüp' };
+const navNames = { anasayfa: 'Ana sayfam', kesfet: 'Kulüpleri keşfet', kuluplerim: 'Kulüplerim', bulusmalar: 'Buluşmalar', mutfak: 'Mutfak', profil: 'Profilim', kulup: 'Kulüp' };
 const live = () => mode() === 'api';
 const clubs = () => getCatalog().clubs;
 const events = () => getCatalog().events;
@@ -177,17 +178,23 @@ function render() {
   document.querySelector('#header-initial').textContent = session.profile.name[0].toLocaleUpperCase('tr');
   window.dispatchEvent(new CustomEvent('fikirhane-nav', { detail: { href: `member/#${view === 'kulup' ? 'kesfet' : view}` } }));
   if (view==='bulusmalar' && id==='tumu') eventFilter='all';
-  content.innerHTML = view==='anasayfa' ? home(session) : view==='kesfet' ? discover() : view==='kuluplerim' ? myClubs(session) : view==='kulup' ? clubDetail(id,session) : view==='bulusmalar' ? gatherings(session) : profile(session);
+  content.innerHTML = view==='anasayfa' ? home(session) : view==='kesfet' ? discover() : view==='kuluplerim' ? myClubs(session) : view==='kulup' ? clubDetail(id,session) : view==='bulusmalar' ? gatherings(session) : view==='mutfak' ? kitchen() : profile(session);
   if (view==='kesfet') renderResults(session);
   if (view==='profil' && live()) { loadTags(); loadGuestPass(); }
   if (view==='anasayfa' && live()) loadKitchen();
+  if (view==='mutfak' && live()) mountKitchen(content.querySelector('#kitchen-root'), { flash, signedOut: requireSession });
+}
+function kitchen() {
+  return heading('MUTFAK', 'Al, okut, <em>çıkarken öde.</em>', 'Bugün rezervasyonun varsa mutfaktan aldığın ürünün barkodunu okut; hepsi hesabında toplanır, çıkarken tek seferde ödersin.')
+    + (live() ? '<div class="kitchen-root" id="kitchen-root"><p class="entry-loading">Mutfak hesabın yükleniyor…</p></div>'
+      : '<div class="booking-empty"><p>Mutfak hesabı yalnızca sunucuya bağlıyken çalışır; bu önizlemede yok.</p></div>');
 }
 /** On a day with a booking (or an unpaid tab), the home page points to the kitchen tab. */
 async function loadKitchen() {
   const k = await api('/me/kitchen').catch(() => null);
   if (!k || (!k.eligible && !k.tab) || route().view !== 'anasayfa' || content.querySelector('.member-kitchen')) return;
   const total = k.tab?.lines.length ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: k.tab.currency_code, maximumFractionDigits: 2 }).format(Number(k.tab.grand_total)) : null;
-  content.querySelector('.member-heading')?.insertAdjacentHTML('afterend', `<a class="member-kitchen" href="${siteUrl('mutfak/')}"><span class="copper-dot"></span><span><strong>${total ? `Mutfak hesabın: ${esc(total)}` : 'Bugün buradasın.'}</strong>${total ? 'Çıkarken tek seferde öde.' : 'Mutfaktan aldıklarının QR kodunu okut, çıkarken tek seferde öde.'}</span><span aria-hidden="true">↗</span></a>`);
+  content.querySelector('.member-heading')?.insertAdjacentHTML('afterend', `<a class="member-kitchen" href="#mutfak"><span class="copper-dot"></span><span><strong>${total ? `Mutfak hesabın: ${esc(total)}` : 'Bugün buradasın.'}</strong>${total ? 'Çıkarken tek seferde öde.' : 'Mutfaktan aldıklarının barkodunu okut, çıkarken tek seferde öde.'}</span><span aria-hidden="true">↗</span></a>`);
 }
 async function exit() { try { await signOut(); location.assign(siteUrl('')); } catch { flash('Çıkış kaydedilemedi. Tarayıcı depolama iznini kontrol et.'); } }
 async function run(task, success) {

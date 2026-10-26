@@ -36,17 +36,20 @@ services:
         value: pay_at_venue
       - key: SEED_DEMO
         value: "true"
-      # Kitchen tabs (mutfak/): "test" shows a stand-in card page (no money moves) so the flow can be tried; switch to
-      # "iyzico" with the keys below once the merchant contract is signed (IYZICO_BASE_URL: https://api.iyzipay.com live,
-      # https://sandbox-api.iyzipay.com sandbox). "off": tabs are paid at the desk (host shell → Kafeterya → Açık hesaplar).
+      # Kitchen tabs (member/#mutfak): "test" shows a stand-in card page (no money moves) so the flow can be tried. For PayTR
+      # set "paytr" and the three keys from the PayTR merchant panel, and in that panel set Bildirim URL to
+      # https://fikirhane.onrender.com/api/kitchen/notify. PAYTR_TEST_MODE stays "true" (no real charge) until "false".
+      # "off": tabs are paid at the desk (host shell → Kafeterya ve stok → Açık hesaplar).
       - key: KITCHEN_PAYMENT
         value: test
-      - key: IYZICO_API_KEY
+      - key: PAYTR_MERCHANT_ID
         sync: false
-      - key: IYZICO_SECRET_KEY
+      - key: PAYTR_MERCHANT_KEY
         sync: false
-      - key: IYZICO_BASE_URL
+      - key: PAYTR_MERCHANT_SALT
         sync: false
+      - key: PAYTR_TEST_MODE
+        value: "true"
       # First admin, created on start if the account does not exist (the free plan has no shell for create-admin).
       - key: BOOTSTRAP_ADMIN_EMAIL
         sync: false

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { runJobs } from '../src/services/jobs.ts';
 import { Client, grantRole, makeEvent, ORIGIN, registered, setup, type TestEnv } from './helpers.ts';
@@ -27,8 +28,12 @@ async function pay(client: Client, outcome: 'ok' | 'fail') {
   assert.equal((await env.app.request(ORIGIN + path)).status, 200);
   const res = await env.app.request(ORIGIN + path, { method: 'POST', headers: { origin: ORIGIN, 'content-type': 'application/x-www-form-urlencoded' }, body: `outcome=${outcome}` });
   assert.equal(res.status, 303);
-  return { location: res.headers.get('location')!, token: path.split('/').pop()! };
+  // The card page sends the person to the return address, which says how it went.
+  const returned = await env.app.request(ORIGIN + res.headers.get('location')!);
+  assert.equal(returned.status, 303);
+  return { location: returned.headers.get('location')!, token: path.split('/').pop()! };
 }
+const form = (fields: Record<string, string>) => ({ method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields).toString() });
 
 describe('kitchen tab', () => {
   test('only people with a booking today can open a tab', async () => {
@@ -40,8 +45,13 @@ describe('kitchen tab', () => {
     const guest = await guestToday();
     const state = (await guest.client.get('/api/me/kitchen')).json;
     assert.deepEqual([state.eligible, state.online_payment, state.tab], [true, true, null]);
-    assert.equal((await guest.client.get('/api/me/kitchen/items/TEA')).json.price, '27.50', '25 + 10% tax');
-    assert.equal((await guest.client.get('/api/me/kitchen/items/COFFEE_BEANS')).status, 404, 'ingredients are not sold');
+    const water = (await guest.client.get('/api/me/kitchen/barcode/8690000000005')).json;
+    assert.deepEqual([water.item_code, water.price], ['WATER_500ML', '22.00'], 'a barcode finds its product, price with 10% tax');
+    assert.equal((await guest.client.get('/api/me/kitchen/barcode/8690000000012')).status, 404, 'an unknown barcode');
+    assert.equal((await guest.client.get('/api/me/kitchen/barcode/TEA')).status, 404, 'barcodes are digits');
+    const menu = state.menu.map((i: { item_code: string }) => i.item_code);
+    assert.ok(menu.includes('TEA') && !menu.includes('WATER_500ML'), 'what the kitchen makes (no barcode) is picked from a list');
+    assert.ok(!menu.includes('COFFEE_BEANS'), 'ingredients are not sold');
   });
 
   test('scans add lines, quantities change and lines come off', async () => {
@@ -77,7 +87,7 @@ describe('kitchen tab', () => {
 
     const stock = Number((await one(env.sql`select current_stock::text as s from items where item_code = 'WATER_500ML'`)).s);
     const { location } = await pay(guest.client, 'ok');
-    assert.match(location, /^\/mutfak\/\?odeme=ok&fis=SA-\d{4}-\d{5}$/);
+    assert.match(location, /^\/member\/\?odeme=ok&fis=SA-\d{4}-\d{5}#mutfak$/);
     const doc = await one(env.sql`select status, grand_total::text, id_user::text from documents where id_document = ${id_document}`);
     assert.deepEqual({ ...doc }, { status: 'posted', grand_total: '143.00', id_user: guest.userId });
     assert.equal(Number((await one(env.sql`select current_stock::text as s from items where item_code = 'WATER_500ML'`)).s), stock - 1);
@@ -89,20 +99,43 @@ describe('kitchen tab', () => {
     const cancelled = await one(env.sql`select t.status from kitchen_checkouts k join transactions t using (id_transaction) where k.provider_token = ${token}`);
     assert.equal(cancelled.status, 'cancelled', 'the abandoned attempt keeps no pending money');
 
-    // A repeated callback answers with the same receipt and posts nothing twice.
-    const [{ provider_token }] = await env.sql`select provider_token from kitchen_checkouts where id_document = ${id_document} and status = 'paid'`;
-    const again = await env.app.request(ORIGIN + '/api/kitchen/callback', { method: 'POST', headers: { origin: 'https://sandbox-api.iyzipay.com', 'content-type': 'application/x-www-form-urlencoded' }, body: `token=${provider_token}` });
-    assert.equal(again.status, 303, 'the provider may post from its own origin');
-    assert.equal(again.headers.get('location'), location);
-    assert.equal((await env.sql`select 1 from transaction_allocations where id_document = ${id_document}`).length, 1);
     assert.equal((await guest.client.get('/api/me/kitchen')).json.tab, null, 'a new tab starts with the next scan');
+  });
+
+  test('PayTR: only a correctly signed notification settles the tab, once', async () => {
+    const guest = await guestToday();
+    const { id_document } = (await guest.client.post('/api/me/kitchen/lines', { item_code: 'CHEESE_TOAST' })).json.tab;
+    await guest.client.post('/api/me/kitchen/checkout');
+    // The attempt as PayTR would have it: the test page started it, PayTR answers it.
+    const [{ ref }] = await env.sql`update kitchen_checkouts set provider = 'paytr' where id_document = ${id_document} and status = 'open' returning provider_token as ref`;
+    const keys = { merchantId: '123456', merchantKey: 'test-key', merchantSalt: 'test-salt', testMode: true };
+    const hash = (oid: string, status: string, total: string) => createHmac('sha256', keys.merchantKey).update(oid + keys.merchantSalt + status + total).digest('base64');
+    Object.assign(env.config, { kitchenPayment: 'paytr', paytr: keys });
+    try {
+      const notify = (fields: Record<string, string>) => env.app.request(ORIGIN + '/api/kitchen/notify', form(fields));
+      const forged = await notify({ merchant_oid: ref, status: 'success', total_amount: '12100', hash: hash(ref, 'success', '99') });
+      assert.equal(forged.status, 400, 'a wrong signature is refused');
+      assert.equal((await one(env.sql`select status from documents where id_document = ${id_document}`)).status, 'draft');
+
+      const waiting = await env.app.request(`${ORIGIN}/api/kitchen/return?ref=${ref}`);
+      assert.equal(waiting.headers.get('location'), '/member/?odeme=bekliyor#mutfak', 'back before the notification: still being confirmed');
+
+      const signed = { merchant_oid: ref, status: 'success', total_amount: '12100', payment_amount: '12100', hash: hash(ref, 'success', '12100') };
+      const res = await notify(signed);
+      assert.deepEqual([res.status, await res.text()], [200, 'OK']);
+      assert.equal((await notify(signed)).status, 200, 'PayTR may repeat it');
+      const paid = await env.sql`select t.provider_name, t.provider_transaction_id, x.allocated_amount::text from transaction_allocations x join transactions t using (id_transaction) where x.id_document = ${id_document}`;
+      assert.deepEqual(paid.map(p => [p.provider_name, p.provider_transaction_id, p.allocated_amount]), [['paytr', `paytr-${ref}`, '121.00']], 'posted once');
+      const back = await env.app.request(`${ORIGIN}/api/kitchen/return?ref=${ref}`);
+      assert.match(back.headers.get('location')!, /^\/member\/\?odeme=ok&fis=SA-/);
+    } finally { Object.assign(env.config, { kitchenPayment: 'test', paytr: null }); }
   });
 
   test('a failed or abandoned payment leaves the tab open', async () => {
     const guest = await guestToday();
     await guest.client.post('/api/me/kitchen/lines', { item_code: 'TEA' });
     const { location } = await pay(guest.client, 'fail');
-    assert.match(location, /^\/mutfak\/\?odeme=hata/);
+    assert.match(location, /^\/member\/\?odeme=hata.*#mutfak$/);
     const tab = (await guest.client.get('/api/me/kitchen')).json.tab;
     assert.deepEqual([tab.locked, tab.lines.length], [false, 1]);
 
@@ -127,10 +160,6 @@ describe('kitchen tab', () => {
     assert.equal(closed.json.account, 'Fikirhane Cash');
     assert.equal((await staff.client.post(`/api/host/kitchen/tabs/${id_document}/close`, { payment_method: 'cash' })).status, 404, 'only open tabs');
 
-    const labels = (await staff.client.get('/api/host/kitchen/labels')).json.items;
-    const tea = labels.find((l: { item_code: string }) => l.item_code === 'TEA');
-    assert.equal(tea.url, `${ORIGIN}/mutfak/?urun=TEA`);
-    assert.match(tea.qr_svg, /^<svg/);
   });
 
   test('with online payment off the tab is paid at the desk', async () => {

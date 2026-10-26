@@ -64,6 +64,9 @@ from (values
 ) as v(code, name, category, price, sort)
 on conflict (item_code) do nothing;
 
+-- The bottled water carries a barcode, so the kitchen's barcode scan can be tried (an example EAN-13).
+update items set barcode = '8690000000005' where item_code = 'WATER_500ML' and barcode is null;
+
 -- Coworking sessions for the next 7 weekdays (morning 10-14, afternoon 14-18), two options each.
 with days as (
   select d::date as day from generate_series(current_date, current_date + 9, interval '1 day') d

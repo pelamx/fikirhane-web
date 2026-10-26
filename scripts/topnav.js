@@ -16,7 +16,7 @@ const SITE = onHome
   ? [[url('kulupler/'), 'Kulüpler'], ['#takvim', 'Buluşma takvimi'], ['#mekan', 'Mekân & topluluk'], [url('rezervasyon/'), 'Rezervasyon']]
   : [[url(''), 'Keşfet'], [url('kulupler/'), 'Kulüpler'], [url('rezervasyon/'), 'Rezervasyon']];
 const MEMBER = [['member/#anasayfa', 'Ana sayfam'], ['member/#kesfet', 'Kulüpleri keşfet'], ['member/#kuluplerim', 'Kulüplerim'],
-  ['member/#bulusmalar', 'Buluşmalar'], ['rezervasyon/', 'Rezervasyon yap']].map(([h, t]) => [url(h), t]);
+  ['member/#bulusmalar', 'Buluşmalar'], ['member/#mutfak', 'Mutfak'], ['rezervasyon/', 'Rezervasyon yap']].map(([h, t]) => [url(h), t]);
 const HOST = [['host/#genel', 'Bugün'], ['host/#etkinlikler', 'Program'], ['host/#kontrol', 'Giriş kontrol']].map(([h, t]) => [url(h), t]);
 const ADMIN = [['admin/#genel', 'Genel bakış'], ['admin/#veri', 'Tüm tablolar']].map(([h, t]) => [url(h), t]);
 const ACCOUNT = [[url('member/#profil'), 'Profilim'], [url('member/#bulusmalar'), 'Rezervasyonlarım']];
