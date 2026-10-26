@@ -31,6 +31,8 @@ const HOST_MODULES = [
     tables: ['users', 'user_memberships', 'membership_applications'] },
   { key: 'kafeterya', icon: '▤', title: 'Kafeterya ve stok', copy: 'Satış, ürünler, stok hareketleri ve sayımlar.',
     views: [{ tab: 'satis', label: 'Satış', href: '#satis', show: () => can('cafeteria_sale.create') },
+      { tab: 'hesaplar', label: 'Açık hesaplar', href: '#hesaplar', show: () => SHELL === 'host' && can('cafeteria_sale.create') },
+      { tab: 'etiketler', label: 'QR etiketleri', href: '#etiketler', show: () => SHELL === 'host' && can('cafeteria_sale.create') },
       { tab: 'eksikler', label: 'Eksikler', href: '#eksikler', show: () => can('stock.view') }],
     tables: ['items', 'stock_movements', 'stock_counts', 'stock_count_items'] },
   { key: 'finans', icon: '₺', title: 'Finans', copy: 'Belgeler, para hareketleri, ödeme eşleştirmeleri, hesaplar ve raporlar.',
@@ -76,7 +78,7 @@ const visibleModules = () => MODULES.filter(m => moduleTabs(m).length);
 function placeOf(view, a) {
   if (view === 'basvurular' || view === 'turlar') return ['uyeler', view];
   if (view === 'kontrol') return ['program', 'kontrol'];
-  if (view === 'satis') return ['kafeterya', 'satis'];
+  if (view === 'satis' || view === 'hesaplar' || view === 'etiketler') return ['kafeterya', view];
   if (view === 'eksikler') return [SHELL === 'host' ? 'kafeterya' : 'stok', 'eksikler'];
   if (view === 'raporlar') return ['finans', 'raporlar'];
   if (['etkinlikler', 'etkinlik', 'yeni-etkinlik'].includes(view)) return ['program', 'program'];
@@ -710,6 +712,26 @@ async function cafeteria() {
     + '</section>';
 }
 
+// ---------- kitchen tabs (mutfak/): open tabs closed at the desk, and the QR labels the products carry ----------
+
+const dayTime = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+async function kitchenTabs() {
+  const { items } = await api('/host/kitchen/tabs');
+  const intro = heading('MUTFAK', 'Açık <em>hesaplar.</em>', 'Mutfakta QR okutarak hesabına ürün ekleyen ve henüz ödemeyenler. Online ödeyemeyen ya da ödemeden çıkan birinin hesabını burada nakit veya kartla kapatabilirsin.');
+  if (!items.length) return intro + empty('Açık hesap yok.', 'Mutfak sayfasında (fikirhane/mutfak) hesabına ürün ekleyen biri olduğunda burada görünür.');
+  return intro + `<div class="kitchen-desk">${items.map(t => `<article class="admin-card kitchen-desk-tab"><header><h2 class="admin-h2">${esc([t.first_name, t.last_name].filter(Boolean).join(' '))}</h2><small>${esc(dayTime.format(new Date(t.created_at)))}${t.earlier ? ' · önceki gün' : ''}${t.locked ? ' · online ödeme sürüyor' : ''}</small></header>`
+    + `<ul>${t.lines.map(l => `<li><span>${esc(l.description)} × ${l.quantity}</span><span>${esc(tl(l.line_total, t.currency_code))}</span></li>`).join('')}</ul>`
+    + `<p class="sale-total">Toplam <strong>${esc(tl(t.grand_total, t.currency_code))}</strong></p>`
+    + `<div class="admin-actions"><button class="shell-primary" data-close-tab="${esc(t.id_document)}" data-method="cash" ${t.locked ? 'disabled' : ''}>Nakit al</button><button class="shell-secondary" data-close-tab="${esc(t.id_document)}" data-method="card" ${t.locked ? 'disabled' : ''}>Kartla al</button></div></article>`).join('')}</div>`;
+}
+async function kitchenLabels() {
+  const { items } = await api('/host/kitchen/labels');
+  const intro = heading('MUTFAK', 'QR <em>etiketleri.</em>', 'Her ürünün etiketi: yazdır, kes ve ürünün ya da rafının üzerine yapıştır. Okutulan etiket ürünü kişinin hesabına ekler. QR yalnızca ürünü tanıtır: fiyat değişirse hesaba yine güncel fiyat yazılır, yalnızca etiketteki fiyat eskir.')
+    + `<div class="admin-actions kitchen-print"><button class="shell-primary" data-print>Etiketleri yazdır</button></div>`;
+  if (!items.length) return intro + empty('Satışta ürün yok.', 'Kafeterya merkezine bağlı, satılabilir ve fiyatı girilmiş ürünler burada görünür.');
+  return intro + `<div class="kitchen-labels">${items.map(i => `<figure class="kitchen-label">${i.qr_svg}<figcaption><strong>${esc(i.item_name)}</strong><span>${esc(tl(i.price, i.currency_code))}</span><small>Okut, hesabına ekle · fikirhane mutfak</small></figcaption></figure>`).join('')}</div>`;
+}
+
 /** Keeps the basket and total in step with the quantities typed on the counter. */
 function saleBasket(form) {
   const picked = [...form.querySelectorAll('input[name=qty]')].map(i => [counter.items.find(x => x.id_item === i.dataset.item), Math.max(0, Math.floor(Number(i.value) || 0))]).filter(([item, q]) => item && q > 0);
@@ -794,6 +816,8 @@ async function render() {
       : view === 'kontrol' ? await doorCheck(params)
       : view === 'turlar' && SHELL === 'host' ? await tours(params)
       : view === 'satis' && SHELL === 'host' ? await cafeteria()
+      : view === 'hesaplar' && SHELL === 'host' ? await kitchenTabs()
+      : view === 'etiketler' && SHELL === 'host' ? await kitchenLabels()
       : view === 'raporlar' ? await reports(params)
       : view === 'eksikler' ? await shortages()
       : view === 'kuluplerim' && SHELL === 'host' ? await myClubs()
@@ -867,6 +891,15 @@ document.addEventListener('click', async event => {
     if (await ask({ title: 'Kaydı sil', copy: 'Bu kayıt kalıcı olarak silinecek. Silme işlemi denetim kaydına yazılır.', ok: 'Sil' }) === null) return;
     const table = t.dataset.table;
     run(async () => { await api(`/admin/data/${table}/${t.dataset.id}`, { method: 'DELETE' }); location.hash = `veri/${table}`; }, 'Kayıt silindi.');
+  }
+  if (t.hasAttribute('data-print')) { window.print(); return; }
+  if (t.dataset.closeTab) {
+    const method = t.dataset.method;
+    run(async () => {
+      const r = await api(`/host/kitchen/tabs/${t.dataset.closeTab}/close`, { method: 'POST', body: { payment_method: method } });
+      flash(`Hesap kapatıldı: ${r.document_number} · ${tl(r.grand_total, r.currency_code)} (${r.account}).`);
+    });
+    return;
   }
   if (t.dataset.tourStatus) {
     const label = TOUR_NEXT.find(([s]) => s === t.dataset.tourStatus)?.[1] ?? '';

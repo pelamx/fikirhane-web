@@ -1,10 +1,12 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { ApiError, forbidden, notFound } from '../errors.ts';
-import { body, idParam, permissionsOf, query, requireUser, type Deps, type Env } from '../http.ts';
+import { body, idParam, linkBase, permissionsOf, query, requireUser, selfOrigin, type Deps, type Env } from '../http.ts';
 import { audit } from '../services/audit.ts';
 import { hasClubPermission, requirePermission } from '../services/authz.ts';
 import { cafeteriaCounter, cafeteriaSale } from '../services/cafeteria.ts';
+import { closeTabAtDesk, labelItems, openTabs } from '../services/kitchen.ts';
+import { qrSvg } from '../services/pass.ts';
 import { hostScope, shellsOf } from '../services/shells.ts';
 
 /**
@@ -81,6 +83,27 @@ export function hostRoutes(deps: Deps) {
     const userId = requireUser(c);
     requirePermission(await permissionsOf(c, deps), 'cafeteria_sale.create');
     return c.json(await cafeteriaSale(sql, userId, await body(c, Sale)), 201);
+  });
+
+  // Kitchen tabs (mutfak): the open ones, closing one at the desk, and the QR labels the products carry.
+  app.get('/kitchen/tabs', async c => {
+    requirePermission(await permissionsOf(c, deps), 'cafeteria_sale.create');
+    return c.json({ items: await openTabs(sql) });
+  });
+  app.post('/kitchen/tabs/:id/close', async c => {
+    const userId = requireUser(c);
+    requirePermission(await permissionsOf(c, deps), 'cafeteria_sale.create');
+    const { payment_method } = await body(c, z.object({ payment_method: z.enum(['cash', 'card']) }));
+    return c.json(await closeTabAtDesk(sql, userId, idParam(c, 'id'), payment_method));
+  });
+  app.get('/kitchen/labels', async c => {
+    requirePermission(await permissionsOf(c, deps), 'cafeteria_sale.create');
+    const base = linkBase(c, deps) ?? selfOrigin(c, deps.config.trustProxy);
+    const items = await labelItems(sql);
+    return c.json({ items: await Promise.all(items.map(async i => {
+      const url = `${base}/mutfak/?urun=${encodeURIComponent(i.item_code)}`;
+      return { ...i, url, qr_svg: await qrSvg(url) };
+    })) });
   });
 
   return app;

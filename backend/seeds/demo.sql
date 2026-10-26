@@ -50,6 +50,20 @@ insert into stock_movements (id_item, movement_type, quantity, reason_code, note
 select a.id_item, 'opening_balance', o.qty, null, 'Demo açılış stoku'
 from added a join (values ('WATER_500ML', 48), ('COFFEE_BEANS', 4), ('PAPER_CUP', 300)) as o(code, qty) on o.code = a.item_code;
 
+-- Made in the kitchen, so not stock-tracked: sold at the counter and on kitchen tabs (QR labels).
+insert into items (item_code, item_name, item_type, item_category, unit, is_sellable, is_purchasable, is_stock_tracked,
+  default_selling_price, currency_code, default_tax_rate, default_financial_center_id, default_revenue_category_id, sort_order)
+select v.code, v.name, 'nonstock_item', v.category, 'piece', true, false, false, v.price, 'TRY', 10,
+  (select id_financial_center from financial_centers where center_code = 'CAFETERIA'),
+  (select id_financial_category from financial_categories where category_code = 'CAFETERIA_SALES'), v.sort
+from (values
+  ('TURKISH_COFFEE', 'Türk kahvesi', 'beverage', 60.00, 11),
+  ('FILTER_COFFEE', 'Filtre kahve', 'beverage', 70.00, 12),
+  ('TEA', 'Çay', 'beverage', 25.00, 13),
+  ('CHEESE_TOAST', 'Kaşarlı tost', 'food', 110.00, 14)
+) as v(code, name, category, price, sort)
+on conflict (item_code) do nothing;
+
 -- Coworking sessions for the next 7 weekdays (morning 10-14, afternoon 14-18), two options each.
 with days as (
   select d::date as day from generate_series(current_date, current_date + 9, interval '1 day') d

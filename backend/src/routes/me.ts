@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { unprocessable } from '../errors.ts';
-import { body, idParam, linkBase, requireUser, selfOrigin, type Deps, type Env } from '../http.ts';
+import { body, clientIp, idParam, linkBase, requireUser, selfOrigin, type Deps, type Env } from '../http.ts';
 import { audit } from '../services/audit.ts';
 import { globalPermissions, globalRoles } from '../services/authz.ts';
 import { cancelBooking } from '../services/bookings.ts';
 import { addGuest, currentGuestPass } from '../services/guest-pass.ts';
+import { addToTab, cancelCheckout, kitchenItem, kitchenState, setTabQuantity, startCheckout } from '../services/kitchen.ts';
 import { ownPass, passInfo, pngName, qrPng, qrSvg, qrText } from '../services/pass.ts';
 import { membershipRights, submitApplication, withdrawApplication } from '../services/membership.ts';
 import { shellsOf } from '../services/shells.ts';
@@ -212,6 +213,37 @@ export function meRoutes(deps: Deps) {
              f.usage_limit - (select count(*)::int from freepass_redemptions r where r.id_freepass = f.id_freepass and r.status = 'active') as remaining
       from freepasses f where f.id_user = ${userId} order by f.valid_until desc`;
     return c.json({ items: rows });
+  });
+
+  // Kitchen (mutfak): the person's tab, a scanned product, adding and changing lines, and paying online.
+  const ItemCode = z.object({ item_code: code });
+  app.get('/kitchen', async c => c.json(await kitchenState(deps.sql, deps.config, requireUser(c))));
+  app.get('/kitchen/items/:code', async c => {
+    requireUser(c);
+    const parsed = code.safeParse(c.req.param('code'));
+    if (!parsed.success) return c.json({ error: { code: 'not_found', message: 'Ürün bulunamadı.' } }, 404);
+    return c.json(await kitchenItem(deps.sql, parsed.data));
+  });
+  app.post('/kitchen/lines', async c => {
+    const userId = requireUser(c);
+    await addToTab(deps.sql, userId, (await body(c, ItemCode)).item_code);
+    return c.json(await kitchenState(deps.sql, deps.config, userId), 201);
+  });
+  app.patch('/kitchen/lines/:id', async c => {
+    const userId = requireUser(c);
+    const { quantity } = await body(c, z.object({ quantity: z.int().min(0).max(20) }));
+    await setTabQuantity(deps.sql, userId, idParam(c, 'id'), quantity);
+    return c.json(await kitchenState(deps.sql, deps.config, userId));
+  });
+  app.post('/kitchen/checkout', async c => {
+    const userId = requireUser(c);
+    const origin = linkBase(c, deps) ?? selfOrigin(c, deps.config.trustProxy);
+    return c.json(await startCheckout(deps.sql, deps.config, userId, { ip: clientIp(c, deps.config.trustProxy), origin }));
+  });
+  app.post('/kitchen/checkout/cancel', async c => {
+    const userId = requireUser(c);
+    await cancelCheckout(deps.sql, userId);
+    return c.json(await kitchenState(deps.sql, deps.config, userId));
   });
 
   return app;

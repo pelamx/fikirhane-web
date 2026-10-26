@@ -36,6 +36,17 @@ services:
         value: pay_at_venue
       - key: SEED_DEMO
         value: "true"
+      # Kitchen tabs (mutfak/): "test" shows a stand-in card page (no money moves) so the flow can be tried; switch to
+      # "iyzico" with the keys below once the merchant contract is signed (IYZICO_BASE_URL: https://api.iyzipay.com live,
+      # https://sandbox-api.iyzipay.com sandbox). "off": tabs are paid at the desk (host shell → Kafeterya → Açık hesaplar).
+      - key: KITCHEN_PAYMENT
+        value: test
+      - key: IYZICO_API_KEY
+        sync: false
+      - key: IYZICO_SECRET_KEY
+        sync: false
+      - key: IYZICO_BASE_URL
+        sync: false
       # First admin, created on start if the account does not exist (the free plan has no shell for create-admin).
       - key: BOOTSTRAP_ADMIN_EMAIL
         sync: false

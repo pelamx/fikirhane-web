@@ -180,6 +180,14 @@ function render() {
   content.innerHTML = view==='anasayfa' ? home(session) : view==='kesfet' ? discover() : view==='kuluplerim' ? myClubs(session) : view==='kulup' ? clubDetail(id,session) : view==='bulusmalar' ? gatherings(session) : profile(session);
   if (view==='kesfet') renderResults(session);
   if (view==='profil' && live()) { loadTags(); loadGuestPass(); }
+  if (view==='anasayfa' && live()) loadKitchen();
+}
+/** On a day with a booking (or an unpaid tab), the home page points to the kitchen tab. */
+async function loadKitchen() {
+  const k = await api('/me/kitchen').catch(() => null);
+  if (!k || (!k.eligible && !k.tab) || route().view !== 'anasayfa' || content.querySelector('.member-kitchen')) return;
+  const total = k.tab?.lines.length ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: k.tab.currency_code, maximumFractionDigits: 2 }).format(Number(k.tab.grand_total)) : null;
+  content.querySelector('.member-heading')?.insertAdjacentHTML('afterend', `<a class="member-kitchen" href="${siteUrl('mutfak/')}"><span class="copper-dot"></span><span><strong>${total ? `Mutfak hesabın: ${esc(total)}` : 'Bugün buradasın.'}</strong>${total ? 'Çıkarken tek seferde öde.' : 'Mutfaktan aldıklarının QR kodunu okut, çıkarken tek seferde öde.'}</span><span aria-hidden="true">↗</span></a>`);
 }
 async function exit() { try { await signOut(); location.assign(siteUrl('')); } catch { flash('Çıkış kaydedilemedi. Tarayıcı depolama iznini kontrol et.'); } }
 async function run(task, success) {

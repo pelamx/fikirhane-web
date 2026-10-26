@@ -17,6 +17,7 @@ COPY uyelik uyelik
 COPY host host
 COPY admin admin
 COPY rezervasyon rezervasyon
+COPY mutfak mutfak
 COPY coworking coworking
 COPY toplanti-odasi toplanti-odasi
 COPY etkinlik-alani etkinlik-alani

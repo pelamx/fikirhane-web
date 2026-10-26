@@ -307,3 +307,39 @@ html[data-theme=dark] .booking-plan{background:#f4f1ea}
 .sale-layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(240px,1fr);gap:28px;align-items:start;margin-bottom:38px}.sale-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}.sale-item{display:flex;justify-content:space-between;align-items:center;gap:14px;border:1px solid var(--line);padding:14px 16px;cursor:pointer}.sale-item>span{display:flex;flex-direction:column;gap:5px;min-width:0}.sale-item small{color:var(--muted);font-size:13px}.sale-item input{width:74px;background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:9px;font:18px 'DM Sans',sans-serif;text-align:center}.sale-item:has(input:not([value="0"]):valid){border-color:var(--copper)}.sale-summary{border:1px solid var(--line);background:var(--surface);padding:22px;position:sticky;top:20px}.sale-line{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);color:var(--ink)}.sale-total{display:flex;justify-content:space-between;align-items:baseline;margin:18px 0;font-size:15px}.sale-total strong{font:32px var(--serif);color:var(--copper)}.sale-summary .admin-actions .shell-primary,.sale-summary .admin-actions .shell-secondary{font-size:15px;padding:13px 16px}
 .report-totals>div{padding:20px 22px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line)}.report-totals>div:nth-child(3n){border-right:0}.report-totals>div>span{font-size:14px}.report-downloads{display:flex;flex-wrap:wrap;gap:22px;margin:-4px 0 24px;font-size:14px}
 @media(max-width:760px){.sale-layout{grid-template-columns:1fr}.sale-summary{position:static}.report-totals strong{font-size:30px}}
+/* Kitchen (mutfak/): scan onto a tab, pay when leaving. Phone first. */
+.kitchen-layout{max-width:620px;margin:0 auto;padding:30px 20px 60px}.kitchen-layout:focus{outline:none}
+.kitchen-kicker{font-size:13px;letter-spacing:1.6px;color:var(--copper);margin:0 0 10px}
+.kitchen-layout .booking-title{margin-bottom:26px}
+.kitchen-notice{border-radius:12px;padding:14px 16px;margin:0 0 18px;border:1px solid var(--line)}.kitchen-notice strong{font-size:16.5px}.kitchen-notice p{margin:4px 0 0;font-size:14.5px;color:var(--muted);line-height:1.6}
+.kitchen-notice-ok{border-color:var(--copper);background:var(--surface)}.kitchen-notice-bad{border-style:dashed}
+.kitchen-product{border:1px solid var(--copper);border-radius:14px;padding:18px;margin:0 0 18px;display:grid;gap:16px;background:var(--bg)}
+.kitchen-product small{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}.kitchen-product strong{display:block;font:30px/1.15 var(--serif)}.kitchen-product div>span{display:block;font-size:15px;margin-top:6px}
+.kitchen-product-actions,.kitchen-actions{display:flex;gap:10px;flex-wrap:wrap}.kitchen-product-actions>*,.kitchen-actions>*{flex:1 1 140px;width:auto;border-radius:999px;justify-content:center;gap:12px;white-space:nowrap}
+.kitchen-product-actions .shell-primary[disabled]{opacity:.45;cursor:not-allowed}
+.kitchen-scan{width:100%;border-radius:999px;justify-content:center;font-size:17px;min-height:58px;margin:0 0 22px}
+.kitchen-tab{border:1px solid var(--line);border-radius:14px;padding:18px}.kitchen-tab h2{font:26px/1.2 var(--serif);margin:0 0 12px}.kitchen-tab h2 small{font:14px var(--sans,inherit);color:var(--muted)}
+.kitchen-tab-empty p{font-size:15px;color:var(--muted);line-height:1.7}
+.kitchen-lines{list-style:none;padding:0;margin:0}.kitchen-lines li{display:grid;grid-template-columns:minmax(0,1fr) auto 76px;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.kitchen-line-name{font-size:15.5px;min-width:0;overflow-wrap:anywhere}.kitchen-line-name small{display:block;font-size:13px;color:var(--muted)}
+.kitchen-qty{display:flex;align-items:center;gap:6px}.kitchen-qty b{min-width:20px;text-align:center;font-weight:600}
+.kitchen-qty button{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:18px;line-height:1;cursor:pointer}
+.kitchen-line-total{text-align:right;font-size:15px;white-space:nowrap}
+.kitchen-total{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--ink);padding:14px 0 18px;margin:0;font-size:16px}.kitchen-total strong{font:28px/1 var(--serif)}
+.kitchen-fine{font-size:13px;color:var(--muted);margin:12px 0 0;line-height:1.6}
+.kitchen-scanner{width:min(480px,calc(100vw - 24px));border:0;border-radius:16px;padding:14px;background:var(--bg);color:var(--ink)}.kitchen-scanner::backdrop{background:rgba(20,18,15,.7)}
+.kitchen-scanner video{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:#000}
+.kitchen-scanner p{font-size:14.5px;line-height:1.6;margin:12px 2px}.kitchen-scanner .shell-secondary{width:100%;justify-content:center;border-radius:999px}
+@media(max-width:400px){.kitchen-layout{padding:22px 16px 50px}.kitchen-lines li{grid-template-columns:minmax(0,1fr) auto;row-gap:4px}.kitchen-line-total{grid-column:1/-1;text-align:left;color:var(--muted);font-size:14px}.kitchen-product strong{font-size:26px}}
+/* Host shell: open kitchen tabs and the QR label sheet. */
+.kitchen-desk{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.kitchen-desk-tab header{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}.kitchen-desk-tab header small{font-size:13px;color:var(--muted)}
+.kitchen-desk-tab ul{list-style:none;padding:0;margin:0 0 6px;display:grid;gap:6px;font-size:14.5px}.kitchen-desk-tab li{display:flex;justify-content:space-between;gap:10px}
+.kitchen-print{margin:0 0 18px}
+.kitchen-labels{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.kitchen-label{margin:0;border:1px dashed var(--line);border-radius:10px;padding:12px;text-align:center;break-inside:avoid;background:#fff;color:#29251e}
+.kitchen-label svg{display:block;width:100%;max-width:160px;height:auto;margin:0 auto}
+.kitchen-label figcaption{display:grid;gap:2px;margin-top:6px}.kitchen-label strong{font-size:16px}.kitchen-label span{font-size:14px}.kitchen-label small{font-size:11px;color:#6b6257}
+@media print{body *{visibility:hidden}.kitchen-labels,.kitchen-labels *{visibility:visible}.kitchen-labels{position:absolute;left:0;top:0;width:100%;grid-template-columns:repeat(3,1fr);gap:6mm}.kitchen-label{border-color:#999}}
+.member-kitchen{display:flex;align-items:center;gap:14px;border:1px solid var(--copper);border-radius:12px;padding:14px 18px;margin:0 0 26px;color:var(--ink);text-decoration:none;font-size:15px;line-height:1.5}.member-kitchen strong{display:block;font-size:16px}.member-kitchen>span:last-child{margin-left:auto;color:var(--copper)}
+.kitchen-layout .booking-login{justify-content:center}

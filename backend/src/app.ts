@@ -7,6 +7,7 @@ import { adminRoutes } from './routes/admin.ts';
 import { authRoutes } from './routes/auth.ts';
 import { catalogRoutes } from './routes/catalog.ts';
 import { hostRoutes } from './routes/host.ts';
+import { kitchenRoutes } from './routes/kitchen.ts';
 import { meRoutes } from './routes/me.ts';
 import { tourRoutes } from './routes/tours.ts';
 import { resolveSession } from './services/auth.ts';
@@ -38,7 +39,8 @@ export function createApp(deps: Deps) {
     c.header('cache-control', 'no-store');
     const viaCookie = !c.req.header('authorization');
     // CSRF: cookie-authenticated writes must come from this origin or an allowed one.
-    if (UNSAFE.has(c.req.method) && viaCookie) {
+    // The payment provider's return (a form post from its own site) carries no session and is checked with the provider.
+    if (UNSAFE.has(c.req.method) && viaCookie && c.req.path !== '/api/kitchen/callback') {
       const origin = c.req.header('origin');
       const self = selfOrigin(c, deps.config.trustProxy);
       if (origin && origin !== self && !allowed.has(origin)) throw new ApiError(403, 'bad_origin', 'Request origin is not allowed.');
@@ -58,6 +60,7 @@ export function createApp(deps: Deps) {
   app.route('/api/admin', adminRoutes(deps));
   app.route('/api/host', hostRoutes(deps));
   app.route('/api/tours', tourRoutes(deps));
+  app.route('/api/kitchen', kitchenRoutes(deps));
   app.route('/api', catalogRoutes(deps));
   app.all('/api/*', c => c.json({ error: { code: 'not_found', message: 'Unknown endpoint.' } }, 404));
 

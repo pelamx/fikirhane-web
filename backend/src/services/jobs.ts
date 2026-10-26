@@ -14,6 +14,14 @@ export async function runJobs(db: Sql): Promise<Record<string, number>> {
       where booking_status = 'pending_payment' and expires_at < now() returning id_booking`;
     result.expiredBookings = expiredBookings.length;
 
+    // Kitchen payments left on the card page unlock their tab (0115); reads treat them as closed already.
+    const expiredCheckouts = await tx<{ id_transaction: string }[]>`
+      update kitchen_checkouts set status = 'expired' where status = 'open' and expires_at < now() returning id_transaction`;
+    if (expiredCheckouts.length) {
+      await tx`update transactions set status = 'cancelled' where status = 'pending' and id_transaction in ${tx(expiredCheckouts.map(k => k.id_transaction))}`;
+    }
+    result.expiredKitchenCheckouts = expiredCheckouts.length;
+
     // UMEM rule 13.
     const expiredMemberships = await tx<{ id_user_membership: string }[]>`
       update user_memberships set status = 'expired' where status = 'active' and end_date < current_date returning id_user_membership`;
