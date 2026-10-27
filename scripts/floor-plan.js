@@ -3,26 +3,30 @@
 // zone is the area's outline (percent points) tinted while it is selected.
 import { escapeHTML as esc } from './shared.js';
 
-const SOON = 'Bu alanla ilgili detaylar yakında burada.';
 const FLOORS = { giris: 'Giriş katı', cati: 'Çatı katı' };
 
 export const AREAS = [
   { id: 'fikirhane', name: 'Fikirhane', plan: 'giris', x: 20, y: 48.9,
     text: 'İnsanların tanıştığı, fikirlerini paylaştığı ve yeni iş birlikleri geliştirdiği buluşma alanı. Diğer üyelerle sohbet etmek ve profesyonel çevreni genişletmek için bir araya gel.',
     zone: [[0.8, 2.3], [30.6, 2.3], [30.6, 95.7], [6.8, 95.7]] },
-  { id: 'atolye', name: 'Atölye', plan: 'giris', x: 79.1, y: 90.5, text: SOON,
+  { id: 'atolye', name: 'Atölye', plan: 'giris', x: 79.1, y: 90.5,
+    text: 'Atölye, daha çok sessiz ve odaklı çalışma alanımız.',
     zone: [[61.1, 48.9], [93.1, 48.2], [96.6, 96.8], [61.1, 96.2]] },
-  { id: 'demhane', name: 'Demhane', plan: 'giris', x: 45.9, y: 25.2, text: SOON,
+  { id: 'demhane', name: 'Demhane', plan: 'giris', x: 45.9, y: 25.2,
+    text: 'Mutfak ve çay, kahve gibi içecek makinelerinin bulunduğu bölge.',
     zone: [[31.3, 5], [60.6, 5], [60.6, 78.2], [54.9, 78.2], [54.9, 48.2], [31.3, 48.2]] },
   { id: 'kapsul', name: 'Kapsül', plan: 'giris', x: 85.3, y: 25.2,
-    text: 'Küçük, sessiz ve 4–6 kişilik toplantı odası. Hafta içi akşamları iki saatlik dilimlerle odanın tamamını ayırtırsın.',
+    text: 'Görüşmelerin yapılacağı toplantı odası.',
     link: { href: '../toplanti-odasi/', label: 'Toplantı odası' },
     zone: [[79.4, 3.2], [90, 2.7], [91.9, 45.5], [81.6, 45.5]] },
-  { id: 'ateshane', name: 'Ateşhane', plan: 'giris', x: 99.4, y: 50, side: 'right', text: SOON,
+  { id: 'ateshane', name: 'Ateşhane', plan: 'giris', x: 99.4, y: 50, side: 'right',
+    text: 'Sigara içme alanı olarak kullanılabilecek balkon.',
     zone: [[92.6, 34.2], [98.6, 32.9], [99.3, 63.1], [94.9, 67.6], [93.8, 50]] },
-  { id: 'studio', name: 'Studio', plan: 'cati', x: 54.6, y: 38.9, text: SOON,
+  { id: 'studio', name: 'Studio', plan: 'cati', x: 54.6, y: 38.9,
+    text: 'Hem toplantıların hem de özel etkinliklerin yapılabileceği alan.',
     zone: [[33.5, 1.7], [50.4, 0.8], [51.1, 30.8], [72.1, 30.8], [72.1, 76.6], [99.4, 77.5], [99.6, 94.9], [39.1, 94.5]] },
-  { id: 'seyirhane', name: 'Seyirhane', plan: 'cati', x: 18.9, y: 49.6, text: SOON,
+  { id: 'seyirhane', name: 'Seyirhane', plan: 'cati', x: 18.9, y: 49.6,
+    text: '180 derece Boğaz manzaralı terasımız.',
     zone: [[0.4, 7], [32.8, 1.1], [39.1, 94.9], [11.9, 98.3]] },
 ];
 
