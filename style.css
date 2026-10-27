@@ -407,3 +407,7 @@ html[data-theme=dark] .floor-map img{filter:invert(1) hue-rotate(180deg)}
 @keyframes area-fade{from{opacity:0}}
 @keyframes area-sheet{from{transform:translateY(100%)}}
 @media(prefers-reduced-motion:reduce){.area-panel,.area-backdrop{animation:none}.area-zone,.area-tag{transition:none}}
+.included{display:flex;align-items:baseline;gap:16px;max-width:860px;margin-top:22px;padding:15px 18px;border:1px solid var(--line);border-left:3px solid var(--copper);border-radius:12px;background:var(--bg);font-size:15px;line-height:1.5}
+.included-label{flex:none;font-size:11px;letter-spacing:1px;color:var(--copper)}
+.included strong{font-weight:500}
+@media(max-width:760px){.included{flex-direction:column;gap:6px;padding:14px 16px;font-size:14px}}
