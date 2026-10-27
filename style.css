@@ -362,5 +362,7 @@ html[data-theme=dark] .floor-map img{filter:invert(1) hue-rotate(180deg)}
 .floor-label.on-line{background:var(--surface);padding:3px 6px;border-radius:4px}
 .floor-label.pin{transform:translate(-50%,-100%);padding-bottom:44px}
 .floor-label.pin::after{content:'';position:absolute;left:50%;bottom:0;height:40px;border-left:1px solid currentColor}
+.floor-map.fit{container-type:inline-size}
+.floor-map.fit .floor-label{font-size:clamp(11px,1.7cqi,19px)}
 .floor-hint{display:none;font-size:13px;color:var(--muted);margin-top:12px}
 @media(max-width:760px){.floors figure{padding:14px 12px 16px}.floor-label{font-size:15px}.floor-hint{display:block}.floor-hint+figure{margin-top:32px}}
