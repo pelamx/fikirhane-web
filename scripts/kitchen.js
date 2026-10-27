@@ -1,8 +1,7 @@
-// Kitchen (mutfak), the member area's #mutfak view: scan a product's barcode onto your tab, pay it once when you leave.
+// Kafeterya, the member area's #mutfak view: pick a product from the menu (or scan its barcode) onto your tab, pay it once when you leave.
 // The tab, prices and payment live on the server (/api/me/kitchen); this view only shows them.
 import { escapeHTML as esc } from './shared.js';
 import { api } from './api.js';
-import { siteUrl } from './session.js';
 
 let content = null, flash = () => {}, signedOut = () => {};
 let state = null, product = null, notice = null, noticeAt = 0, busy = false, confirming = 0;
@@ -22,14 +21,14 @@ function noticeHtml() {
 
 function productHtml() {
   if (!product) return '';
-  const blocked = !state.eligible || state.tab?.earlier || state.tab?.locked;
+  const blocked = state.tab?.earlier || state.tab?.locked;
   return `<section class="kitchen-product" aria-label="Seçtiğin ürün"><div><small>${product.fromList ? 'Seçtiğin ürün' : 'Okuttuğun ürün'}</small><strong>${esc(product.item_name)}</strong><span>${esc(tl(product.price, product.currency_code))} · KDV dahil</span></div>
     <div class="kitchen-product-actions"><button class="shell-secondary" data-dismiss>Vazgeç</button><button class="shell-primary" data-add="${esc(product.item_code)}" ${blocked ? 'disabled' : ''}>Hesabıma ekle <span>+</span></button></div></section>`;
 }
 
 function tabHtml(tab) {
   if (!tab || !tab.lines.length) {
-    return `<section class="kitchen-tab kitchen-tab-empty"><h2>Hesabın</h2><p>Henüz bir şey eklemedin. Aldığın ürünün barkodunu okut; çıkarken hepsini tek seferde ödersin.</p></section>`;
+    return `<section class="kitchen-tab kitchen-tab-empty"><h2>Hesabın</h2><p>Henüz bir şey eklemedin. Aldığın ürünü menüden seç ya da barkodunu okut; çıkarken hepsini tek seferde ödersin.</p></section>`;
   }
   const lines = tab.lines.map(l => `<li><span class="kitchen-line-name">${esc(l.description)}<small>${esc(tl(Number(l.line_total) / l.quantity, tab.currency_code))}</small></span>
       <span class="kitchen-qty">${tab.locked ? '' : `<button data-line="${esc(l.id_document_item)}" data-quantity="${l.quantity - 1}" aria-label="${esc(l.description)}: bir azalt">−</button>`}<b aria-label="adet">${l.quantity}</b>${tab.locked || tab.earlier ? '' : `<button data-line="${esc(l.id_document_item)}" data-quantity="${l.quantity + 1}" aria-label="${esc(l.description)}: bir artır">+</button>`}</span>
@@ -48,22 +47,21 @@ const mounted = () => content?.isConnected;
 function render() {
   if (!state || !mounted()) return;
   const tab = state.tab;
-  const canScan = state.eligible && !tab?.earlier && !tab?.locked;
-  const closed = !state.eligible && !tab
-    ? `<div class="booking-empty"><p>Mutfak, bugün Fikirhane’de rezervasyonu olanlara açık.</p><p><a class="text-link" href="${siteUrl('rezervasyon/')}">Seans ayırt ↗</a></p></div>` : '';
-  const menu = canScan && state.menu?.length
-    ? `<section class="kitchen-menu" aria-label="Barkodu olmayan ürünler"><h2>Mutfakta hazırlananlar</h2><p>Barkodu yok; listeden seç.</p><div>${state.menu.map(i =>
-        `<button data-pick="${esc(i.item_code)}"><span>${esc(i.item_name)}</span><small>${esc(tl(i.price, i.currency_code))}</small></button>`).join('')}</div></section>` : '';
-  const scan = canScan ? `<button class="shell-primary kitchen-scan" data-scan>Barkod okut <span aria-hidden="true">|||</span></button>
+  const canAdd = !tab?.earlier && !tab?.locked;
+  const menu = state.menu?.length
+    ? `<section class="kitchen-menu" aria-label="Kafeterya menüsü"><h2>Menü</h2><p>${canAdd ? 'Aldığın ürünü seç, hesabına ekle. Fiyatlara KDV dahil.' : 'Fiyatlara KDV dahil.'}</p><div>${state.menu.map(i =>
+        `<button data-pick="${esc(i.item_code)}" ${canAdd ? '' : 'disabled'}><span>${esc(i.item_name)}</span><small>${esc(tl(i.price, i.currency_code))}</small></button>`).join('')}</div></section>`
+    : '<div class="booking-empty"><p>Kafeteryada şu an satışta ürün yok.</p></div>';
+  const scan = canAdd ? `<button class="shell-secondary kitchen-scan" data-scan>Barkod okut <span aria-hidden="true">|||</span></button>
     <form class="kitchen-manual" id="kitchen-manual"><label for="kitchen-barcode">Barkod okunmuyorsa altındaki numarayı yaz</label><div><input id="kitchen-barcode" name="barcode" inputmode="numeric" autocomplete="off" pattern="[0-9 ]{8,17}" maxlength="17" placeholder="8690000000005" required><button class="shell-secondary" type="submit">Bul</button></div></form>` : '';
-  content.innerHTML = noticeHtml() + productHtml() + closed + scan + menu + (state.eligible || tab ? tabHtml(tab) : '');
+  content.innerHTML = noticeHtml() + productHtml() + menu + scan + tabHtml(tab);
 }
 
 async function load() {
   try { state = await api('/me/kitchen'); render(); }
   catch (err) {
     if (err?.status === 401) { signedOut(); return; }
-    if (mounted()) content.innerHTML = `<div class="booking-empty"><p>${esc(err?.message ?? 'Mutfak hesabın şu an açılamadı.')}</p></div>`;
+    if (mounted()) content.innerHTML = `<div class="booking-empty"><p>${esc(err?.message ?? 'Kafeterya hesabın şu an açılamadı.')}</p></div>`;
   }
 }
 
@@ -72,7 +70,7 @@ async function showProduct(barcode) {
   catch (err) {
     if (err?.status === 401) { signedOut(); return; }
     product = null; notice = err?.status === 404
-      ? { kind: 'bad', title: `${barcode} mutfakta satılan bir ürün değil.`, text: 'Barkod kayıtlı değil. Görevliye haber ver ya da çıkarken görevliye öde.' }
+      ? { kind: 'bad', title: `${barcode} kafeteryada satılan bir ürün değil.`, text: 'Barkod kayıtlı değil. Ürünü menüden seç ya da görevliye haber ver.' }
       : { kind: 'bad', title: 'Ürün şu an bulunamadı.', text: err?.message ?? '' };
   }
   render();

@@ -716,8 +716,8 @@ async function cafeteria() {
 const dayTime = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 async function kitchenTabs() {
   const { items } = await api('/host/kitchen/tabs');
-  const intro = heading('MUTFAK', 'Açık <em>hesaplar.</em>', 'Mutfakta barkod okutarak hesabına ürün ekleyen ve henüz ödemeyenler. Online ödeyemeyen ya da ödemeden çıkan birinin hesabını burada nakit veya kartla kapatabilirsin.');
-  if (!items.length) return intro + empty('Açık hesap yok.', 'Üye alanının Mutfak bölümünde hesabına ürün ekleyen biri olduğunda burada görünür. Ürünlerin barkodunu Ürün ve hizmetler sekmesinde girebilirsin.');
+  const intro = heading('MUTFAK', 'Açık <em>hesaplar.</em>', 'Üye alanının Kafeterya bölümünden hesabına ürün ekleyen ve henüz ödemeyenler. Online ödeyemeyen ya da ödemeden çıkan birinin hesabını burada nakit veya kartla kapatabilirsin.');
+  if (!items.length) return intro + empty('Açık hesap yok.', 'Üye alanının Kafeterya bölümünde hesabına ürün ekleyen biri olduğunda burada görünür. Ürünlerin barkodunu Ürün ve hizmetler sekmesinde girebilirsin.');
   return intro + `<div class="kitchen-desk">${items.map(t => `<article class="admin-card kitchen-desk-tab"><header><h2 class="admin-h2">${esc([t.first_name, t.last_name].filter(Boolean).join(' '))}</h2><small>${esc(dayTime.format(new Date(t.created_at)))}${t.earlier ? ' · önceki gün' : ''}${t.locked ? ' · online ödeme sürüyor' : ''}</small></header>`
     + `<ul>${t.lines.map(l => `<li><span>${esc(l.description)} × ${l.quantity}</span><span>${esc(tl(l.line_total, t.currency_code))}</span></li>`).join('')}</ul>`
     + `<p class="sale-total">Toplam <strong>${esc(tl(t.grand_total, t.currency_code))}</strong></p>`

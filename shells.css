@@ -308,6 +308,7 @@ html[data-theme=dark] .booking-plan{background:#f4f1ea}
 .report-totals>div{padding:20px 22px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line)}.report-totals>div:nth-child(3n){border-right:0}.report-totals>div>span{font-size:14px}.report-downloads{display:flex;flex-wrap:wrap;gap:22px;margin:-4px 0 24px;font-size:14px}
 @media(max-width:760px){.sale-layout{grid-template-columns:1fr}.sale-summary{position:static}.report-totals strong{font-size:30px}}
 /* Kitchen (member/#mutfak): scan onto a tab, pay when leaving. Phone first. */
+.member-kitchen{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;max-width:620px;margin:0 0 28px;padding:16px 18px;border:1px solid var(--copper);border-radius:14px;background:var(--surface);font-size:14.5px;line-height:1.5;color:var(--muted)}.member-kitchen strong{display:block;font-size:16px;font-weight:500;color:var(--ink)}.member-kitchen>span:last-child{color:var(--copper)}
 .kitchen-root{max-width:620px}
 .kitchen-notice{border-radius:12px;padding:14px 16px;margin:0 0 18px;border:1px solid var(--line)}.kitchen-notice strong{font-size:16.5px}.kitchen-notice p{margin:4px 0 0;font-size:14.5px;color:var(--muted);line-height:1.6}
 .kitchen-notice-ok{border-color:var(--copper);background:var(--surface)}.kitchen-notice-bad{border-style:dashed}

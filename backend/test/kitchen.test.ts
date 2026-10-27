@@ -9,7 +9,7 @@ before(async () => { env = await setup({ kitchenPayment: 'test' }); });
 after(async () => { await env?.stop(); });
 const one = async <T>(q: Promise<T[]>) => (await q)[0];
 
-/** A signed-in person with a booking for a session today (moved to today's noon, Istanbul, after booking it). */
+/** A signed-in person with a booking for a session today (moved to today's noon, Istanbul, after booking it): someone at the venue. */
 async function guestToday() {
   const u = await registered(env);
   const { eventId } = await makeEvent(env.sql, { hoursFromNow: 2 });
@@ -36,22 +36,23 @@ async function pay(client: Client, outcome: 'ok' | 'fail') {
 const form = (fields: Record<string, string>) => ({ method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields).toString() });
 
 describe('kitchen tab', () => {
-  test('only people with a booking today can open a tab', async () => {
-    const stranger = await registered(env);
-    assert.equal((await stranger.client.get('/api/me/kitchen')).json.eligible, false);
-    assert.equal((await stranger.client.post('/api/me/kitchen/lines', { item_code: 'TEA' })).json.error.code, 'kitchen_closed');
+  test('every signed-in member sees the cafeteria menu and can open a tab, no booking needed', async () => {
     assert.equal((await new Client(env).get('/api/me/kitchen')).status, 401);
 
-    const guest = await guestToday();
-    const state = (await guest.client.get('/api/me/kitchen')).json;
-    assert.deepEqual([state.eligible, state.online_payment, state.tab], [true, true, null]);
-    const water = (await guest.client.get('/api/me/kitchen/barcode/8690000000005')).json;
+    const member = await registered(env);
+    const state = (await member.client.get('/api/me/kitchen')).json;
+    assert.deepEqual([state.online_payment, state.tab], [true, null]);
+    const water = (await member.client.get('/api/me/kitchen/barcode/8690000000005')).json;
     assert.deepEqual([water.item_code, water.price], ['WATER_500ML', '22.00'], 'a barcode finds its product, price with 10% tax');
-    assert.equal((await guest.client.get('/api/me/kitchen/barcode/8690000000012')).status, 404, 'an unknown barcode');
-    assert.equal((await guest.client.get('/api/me/kitchen/barcode/TEA')).status, 404, 'barcodes are digits');
+    assert.equal((await member.client.get('/api/me/kitchen/barcode/8690000000012')).status, 404, 'an unknown barcode');
+    assert.equal((await member.client.get('/api/me/kitchen/barcode/TEA')).status, 404, 'barcodes are digits');
     const menu = state.menu.map((i: { item_code: string }) => i.item_code);
-    assert.ok(menu.includes('TEA') && !menu.includes('WATER_500ML'), 'what the kitchen makes (no barcode) is picked from a list');
+    assert.ok(menu.includes('TEA') && menu.includes('WATER_500ML'), 'the menu is everything the counter sells, with or without a barcode');
     assert.ok(!menu.includes('COFFEE_BEANS'), 'ingredients are not sold');
+
+    const added = await member.client.post('/api/me/kitchen/lines', { item_code: 'WATER_500ML' });
+    assert.equal(added.status, 201, JSON.stringify(added.json));
+    assert.deepEqual(added.json.tab.lines.map((l: { item_code: string; quantity: number }) => [l.item_code, l.quantity]), [['WATER_500ML', 1]]);
   });
 
   test('scans add lines, quantities change and lines come off', async () => {
@@ -164,7 +165,7 @@ describe('kitchen tab', () => {
 
   test('with online payment off the tab is paid at the desk', async () => {
     const guest = await guestToday();
-    await guest.client.post('/api/me/kitchen/lines', { item_code: 'TEA' });
+    assert.equal((await guest.client.post('/api/me/kitchen/lines', { item_code: 'TEA' })).status, 201, 'tabs keep opening after the statement is prepared');
     env.config.kitchenPayment = 'off';
     try {
       assert.equal((await guest.client.get('/api/me/kitchen')).json.online_payment, false);

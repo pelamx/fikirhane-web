@@ -7,8 +7,8 @@ import { lineValues, insertLine, menuItems, paymentAccount, postSale, type Accou
 import { kitchenProvider, type PaymentNotice } from './payments/provider.ts';
 
 /**
- * Kitchen self-service (mutfak): DOCUMENTS rule 16's open tab. A person with a booking today scans product labels into
- * one draft sale receipt (their tab) by scanning product barcodes (or picking what the kitchen makes from a list) and
+ * Kitchen self-service (the member area's Kafeterya): DOCUMENTS rule 16's open tab. Any signed-in member collects what
+ * they take into one draft sale receipt (their tab), picking it from the cafeteria menu or scanning its barcode, and
  * pays it once, online, when they leave; staff can also close it at the desk.
  * Paying posts the receipt, takes the stock out and allocates the payment (cafeteria.ts postSale).
  */
@@ -16,15 +16,6 @@ import { kitchenProvider, type PaymentNotice } from './payments/provider.ts';
 export const TAB = 'Mutfak hesabı';
 const MAX_QUANTITY = 20;
 const TODAY = (sql: Sql | Tx) => sql`(now() at time zone 'Europe/Istanbul')::date`;
-
-/** A booking today keeps the kitchen open to its holder, also once the session is over (completed) so they can still pay. */
-export async function eligible(sql: Sql | Tx, userId: string) {
-  const [row] = await sql<{ ok: boolean }[]>`
-    select exists (select 1 from bookings b join events e using (id_event)
-      where b.id_user = ${userId} and b.booking_status in ('confirmed', 'checked_in', 'completed')
-        and (e.start_datetime at time zone 'Europe/Istanbul')::date = ${TODAY(sql)}) as ok`;
-  return row.ok;
-}
 
 interface TabRow { id_document: string; created_at: Date; earlier: boolean; locked: boolean; grand_total: string; currency_code: string }
 
@@ -44,17 +35,13 @@ const linesOf = (sql: Sql | Tx, idDocument: string) => sql`
 
 const card = (item: MenuItem) => ({ item_code: item.item_code, item_name: item.item_name, price: lineValues(item, 1).line_total, currency_code: item.currency_code });
 
-/**
- * The kitchen page: whether this person may add to a tab, their tab, whether online payment is on, and what the
- * kitchen makes itself (no barcode to scan, so it is picked from a list).
- */
+/** The kitchen page: this person's tab, whether online payment is on, and the cafeteria menu (what the counter sells). */
 export async function kitchenState(sql: Sql, config: Config, userId: string) {
-  const [ok, tab, items] = await Promise.all([eligible(sql, userId), tabRow(sql, userId), menuItems(sql)]);
+  const [tab, items] = await Promise.all([tabRow(sql, userId), menuItems(sql)]);
   return {
-    eligible: ok,
     online_payment: config.kitchenPayment !== 'off',
     tab: tab && { ...tab, lines: await linesOf(sql, tab.id_document) },
-    menu: items.filter(i => !i.barcode).map(card),
+    menu: items.map(card),
   };
 }
 
@@ -65,11 +52,10 @@ export async function kitchenItem(sql: Sql, barcode: string) {
   return card(item);
 }
 
-/** The tab may change: the person has a booking today, the tab is from today and no payment is under way. */
-async function editable(tx: Tx, userId: string, tab: TabRow | null) {
+/** The tab may grow: it is from today and no payment is under way. */
+function editable(tab: TabRow | null) {
   if (tab?.locked) throw new ApiError(409, 'tab_locked', 'Ödemen sürüyor. Bitir ya da iptal et, sonra ürün ekleyebilirsin.');
   if (tab?.earlier) throw new ApiError(409, 'earlier_tab', 'Önceki ziyaretinden açık bir hesabın var; önce onu öde.');
-  if (!await eligible(tx, userId)) throw new ApiError(403, 'kitchen_closed', 'Mutfak, bugün rezervasyonu olanlara açık.');
 }
 
 async function setLine(tx: Tx, userId: string, idDocument: string, line: { id_document_item: string; unit_price: string; tax_rate: string; quantity: number; description: string }, quantity: number) {
@@ -89,17 +75,19 @@ async function setLine(tx: Tx, userId: string, idDocument: string, line: { id_do
   }
 }
 
-/** One more of the scanned product on the tab (opening the tab on the first scan); the price is the one of this moment. */
+/** One more of the picked or scanned product on the tab (opening the tab on the first scan); the price is the one of this moment. */
 export async function addToTab(sql: Sql, userId: string, code: string) {
   const [item] = await menuItems(sql, { codes: [code] });
   if (!item) throw notFound('Ürün');
   await sql.begin(async tx => {
     let tab = await tabRow(tx, userId, true);
-    await editable(tx, userId, tab);
+    editable(tab);
     if (!tab) {
+      // The conflict target repeats documents_kitchen_tab_uq's predicate as a literal: with a parameter there, Postgres
+      // cannot match the partial index once the prepared statement switches to its generic plan (after five runs).
       await tx`insert into documents (direction, document_type, id_user, currency_code, description, created_by_user_id, updated_by_user_id)
         values ('sale', 'receipt', ${userId}, ${item.currency_code}, ${TAB}, ${userId}, ${userId})
-        on conflict (id_user) where status = 'draft' and description = ${TAB} do nothing`;
+        on conflict (id_user) where status = 'draft' and description = 'Mutfak hesabı' do nothing`;
       tab = (await tabRow(tx, userId, true))!;
     }
     if (tab.currency_code !== item.currency_code) throw badRequest('validation_failed', 'Farklı para birimindeki ürünler aynı hesapta olamaz.');
@@ -129,8 +117,8 @@ export async function setTabQuantity(sql: Sql, userId: string, idLine: string, q
       select id_document_item::text, unit_price::text, tax_rate::text, quantity::int as quantity, description
       from document_items where id_document = ${tab.id_document} and id_document_item = ${idLine}`;
     if (!line) throw notFound('Satır');
-    // Taking things off is always allowed (an earlier tab or no booking today); adding needs an open kitchen.
-    if (quantity > line.quantity) await editable(tx, userId, tab);
+    // Taking things off is always allowed (also on an earlier tab); adding needs a tab from today.
+    if (quantity > line.quantity) editable(tab);
     await setLine(tx, userId, tab.id_document, line, Math.min(quantity, MAX_QUANTITY));
     await documentTotals(tx, tab.id_document);
   });

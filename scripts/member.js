@@ -7,7 +7,7 @@ import { ready, mode, getCatalog, getSession, saveProfile, toggleClub, toggleEve
 initTheme();
 const content = document.querySelector('#member-content');
 let query = '', category = 'all', eventFilter = 'all', toastTimer, busy = false;
-const navNames = { anasayfa: 'Ana sayfam', kesfet: 'Kulüpleri keşfet', kuluplerim: 'Kulüplerim', bulusmalar: 'Buluşmalar', mutfak: 'Mutfak', profil: 'Profilim', kulup: 'Kulüp' };
+const navNames = { anasayfa: 'Ana sayfam', kesfet: 'Kulüpleri keşfet', kuluplerim: 'Kulüplerim', bulusmalar: 'Buluşmalar', mutfak: 'Kafeterya', profil: 'Profilim', kulup: 'Kulüp' };
 const live = () => mode() === 'api';
 const clubs = () => getCatalog().clubs;
 const events = () => getCatalog().events;
@@ -185,16 +185,16 @@ function render() {
   if (view==='mutfak' && live()) mountKitchen(content.querySelector('#kitchen-root'), { flash, signedOut: requireSession });
 }
 function kitchen() {
-  return heading('MUTFAK', 'Al, okut, <em>çıkarken öde.</em>', 'Bugün rezervasyonun varsa mutfaktan aldığın ürünün barkodunu okut; hepsi hesabında toplanır, çıkarken tek seferde ödersin.')
-    + (live() ? '<div class="kitchen-root" id="kitchen-root"><p class="entry-loading">Mutfak hesabın yükleniyor…</p></div>'
-      : '<div class="booking-empty"><p>Mutfak hesabı yalnızca sunucuya bağlıyken çalışır; bu önizlemede yok.</p></div>');
+  return heading('KAFETERYA', 'Seç, ekle, <em>çıkarken öde.</em>', 'Kafeteryadan aldığın ürünü menüden seç ya da barkodunu okut; hepsi hesabında toplanır, çıkarken tek seferde ödersin.')
+    + (live() ? '<div class="kitchen-root" id="kitchen-root"><p class="entry-loading">Menü yükleniyor…</p></div>'
+      : '<div class="booking-empty"><p>Kafeterya yalnızca sunucuya bağlıyken çalışır; bu önizlemede yok.</p></div>');
 }
-/** On a day with a booking (or an unpaid tab), the home page points to the kitchen tab. */
+/** With an unpaid tab, the home page points to it. */
 async function loadKitchen() {
   const k = await api('/me/kitchen').catch(() => null);
-  if (!k || (!k.eligible && !k.tab) || route().view !== 'anasayfa' || content.querySelector('.member-kitchen')) return;
-  const total = k.tab?.lines.length ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: k.tab.currency_code, maximumFractionDigits: 2 }).format(Number(k.tab.grand_total)) : null;
-  content.querySelector('.member-heading')?.insertAdjacentHTML('afterend', `<a class="member-kitchen" href="#mutfak"><span class="copper-dot"></span><span><strong>${total ? `Mutfak hesabın: ${esc(total)}` : 'Bugün buradasın.'}</strong>${total ? 'Çıkarken tek seferde öde.' : 'Mutfaktan aldıklarının barkodunu okut, çıkarken tek seferde öde.'}</span><span aria-hidden="true">↗</span></a>`);
+  if (!k?.tab?.lines.length || route().view !== 'anasayfa' || content.querySelector('.member-kitchen')) return;
+  const total = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: k.tab.currency_code, maximumFractionDigits: 2 }).format(Number(k.tab.grand_total));
+  content.querySelector('.member-heading')?.insertAdjacentHTML('afterend', `<a class="member-kitchen" href="#mutfak"><span class="copper-dot"></span><span><strong>Kafeterya hesabın: ${esc(total)}</strong>Çıkarken tek seferde öde.</span><span aria-hidden="true">↗</span></a>`);
 }
 async function exit() { try { await signOut(); location.assign(siteUrl('')); } catch { flash('Çıkış kaydedilemedi. Tarayıcı depolama iznini kontrol et.'); } }
 async function run(task, success) {
