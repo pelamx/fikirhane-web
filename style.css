@@ -364,9 +364,7 @@ html[data-theme=dark] .floor-map img{filter:invert(1) hue-rotate(180deg)}
 .area-zone.is-active{opacity:1}
 .area-label{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:0 2px;background:none;border-radius:999px;white-space:nowrap}
 .area-label.on-right{transform:translate(0,-50%);padding-left:6px}
-.area-label.is-static{pointer-events:none}
 .area-tag{display:inline-flex;align-items:center;gap:6px;padding:4px 8px 4px 11px;border:1px solid color-mix(in srgb,var(--copper) 45%,transparent);border-radius:999px;background:var(--surface);font:400 16px/1.1 var(--serif);color:var(--copper);transition:background .15s,color .15s}
-.is-static .area-tag{border-color:transparent;background:none;padding-inline:4px}
 .area-plus{display:inline-grid;place-items:center;width:16px;height:16px;flex-shrink:0;border:1px solid currentColor;border-radius:50%;font:500 12px/1 'DM Sans',sans-serif}
 .area-label:hover .area-tag{background:color-mix(in srgb,var(--copper) 12%,var(--surface))}
 .area-label[aria-expanded=true] .area-tag{background:var(--copper);border-color:var(--copper);color:var(--bg)}
