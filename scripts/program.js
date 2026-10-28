@@ -30,7 +30,7 @@ const inMeetingRoom = e => optionsOf(e).some(o => o.location_code === 'MEETING_R
 
 // ?alan= narrows the program to one kind of booking; the choice sits above the week so every entry point reaches each one.
 export const AREAS = {
-  coworking: { label: 'Coworking', title: 'Coworking seansını seç', lead: 'Hafta içi sabah 10.00–14.00 ve öğleden sonra 14.00–18.00. Salonunu ve koltuğunu sonra seçersin.',
+  coworking: { label: 'Coworking', title: 'Coworking seansını seç', lead: 'Hafta içi sabah 10.00–14.00 ve öğleden sonra 14.30–18.30. Salonunu ve koltuğunu sonra seçersin.',
     match: e => e.event_type === 'workspace' && !inMeetingRoom(e) },
   toplanti: { label: 'Toplantı odası', title: 'Toplantı odasını ayırt', lead: 'Hafta içi akşamları iki saatlik dilimler: 18.00, 20.00 ve 22.00. Odanın tamamı senin.',
     match: inMeetingRoom },

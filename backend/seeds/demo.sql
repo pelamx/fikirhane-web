@@ -67,23 +67,28 @@ on conflict (item_code) do nothing;
 -- The bottled water carries a barcode, so the kitchen's barcode scan can be tried (an example EAN-13).
 update items set barcode = '8690000000005' where item_code = 'WATER_500ML' and barcode is null;
 
--- Coworking sessions for the next 7 weekdays (morning 10-14, afternoon 14-18), two options each.
+-- Afternoon sessions moved from 14.00-18.00 to 14.30-18.30: shift the ones already seeded that have not started yet.
+update events set start_datetime = start_datetime + interval '30 minutes', end_datetime = end_datetime + interval '30 minutes'
+where event_code like 'WORKING-%-PM' and start_datetime > now()
+  and to_char(start_datetime at time zone 'Europe/Istanbul', 'HH24:MI') = '14:00';
+
+-- Coworking sessions for the next 7 weekdays (morning 10.00-14.00, afternoon 14.30-18.30), two options each.
 with days as (
   select d::date as day from generate_series(current_date, current_date + 9, interval '1 day') d
   where extract(isodow from d) <= 5 limit 7
 ), slots as (
-  select day, s.code, s.label, s.start_h, s.end_h from days
-  cross join (values ('AM', 'Sabah', 10, 14), ('PM', 'Öğleden sonra', 14, 18)) as s(code, label, start_h, end_h)
+  select day, s.code, s.label, s.start_m, s.end_m from days
+  cross join (values ('AM', 'Sabah', 600, 840), ('PM', 'Öğleden sonra', 870, 1110)) as s(code, label, start_m, end_m)
 ), ins as (
   insert into events (event_code, event_type, event_title, event_description, start_datetime, end_datetime, status, base_price, currency_code,
                       networking_enabled, enable_need, enable_offer)
   select 'WORKING-' || to_char(day, 'YYYY-MM-DD') || '-' || code, 'workspace', 'Coworking · ' || label,
          'Fikirhane topluluk çalışma alanında ' || lower(label) || ' oturumu.',
-         (day + make_interval(hours => start_h)) at time zone 'Europe/Istanbul',
-         (day + make_interval(hours => end_h)) at time zone 'Europe/Istanbul',
+         (day + make_interval(mins => start_m)) at time zone 'Europe/Istanbul',
+         (day + make_interval(mins => end_m)) at time zone 'Europe/Istanbul',
          'published', 500.00, 'TRY', true, true, true
   from slots
-  where (day + make_interval(hours => start_h)) at time zone 'Europe/Istanbul' > now()
+  where (day + make_interval(mins => start_m)) at time zone 'Europe/Istanbul' > now()
   on conflict (event_code) do nothing
   returning id_event
 )

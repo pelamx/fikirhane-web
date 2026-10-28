@@ -318,7 +318,7 @@ async function eventDetail(id) {
 // ---------- visit requests from "Tur planla" (host shell) ----------
 
 const TOUR_INTERESTS = { coworking: 'Çalışma alanı', meeting_room: 'Toplantı odası', event_space: 'Etkinlik alanı', clubs: 'Kulüpler' };
-const TOUR_SLOTS = { morning: 'sabah (10.00–14.00)', afternoon: 'öğleden sonra (14.00–18.00)' };
+const TOUR_SLOTS = { morning: 'sabah (10.00–14.00)', afternoon: 'öğleden sonra (14.30–18.30)' };
 const TOUR_NEXT = [['contacted', 'İletişime geçildi'], ['scheduled', 'Saati belli'], ['visited', 'Geldi'], ['cancelled', 'İptal']];
 const longDate = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' });
 
