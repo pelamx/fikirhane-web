@@ -66,6 +66,7 @@ header.topnav-compact .member-header-actions,header.topnav-compact .header-actio
 .hero-sketch .hatch.dark{stroke:var(--ink);stroke-width:1}.hero-sketch .hatch.cu-hatch{stroke:var(--copper);opacity:.8}
 .hero-sketch .far-hatch{opacity:.4}.hero-sketch .far.fine{stroke-width:1}.hero-sketch .water{opacity:.55}
 .hero-sketch .nostroke{stroke:none}
+.hero-sketch .ln{stroke-width:.7}.hero-sketch .ln.gh{stroke-width:.55}.hero-sketch .hatch.skin{stroke-width:.4;opacity:.75}.hero-sketch .hatch.skin.dark{stroke:var(--ink);opacity:.6}
 .hero-sketch .paper{fill:var(--surface)}.hero-sketch .cu-fill{fill:color-mix(in srgb,var(--copper) 35%,var(--surface))}
 .hero-sketch .wash{fill:var(--copper);opacity:.16}.hero-sketch .logo,.hero-sketch .beacon{fill:var(--copper)}
 .hero-sketch .ink{fill:var(--ink)}.hero-sketch .sky{fill:url(#fh-sky)}.hero-sketch .sea{fill:#2c78a6;opacity:.2}.hero-sketch .sunlight{fill:#e6a15e;opacity:.16}
