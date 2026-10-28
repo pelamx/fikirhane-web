@@ -95,6 +95,9 @@ header.topnav-compact .member-header-actions,header.topnav-compact .header-actio
 /* Light theme shows the sun, dark theme the full moon (both in the .sun group). */
 .hero-sketch .moon-real,html[data-theme=dark] .hero-sketch .sun-real{display:none}html[data-theme=dark] .hero-sketch .moon-real{display:inline}
 html[data-theme=dark] .hero-sketch .glint{stroke:var(--ink)}
+/* Cumulus clouds: white with blue-grey undersides by day, dark and faintly moonlit by night. */
+.hero-sketch .cl-sh{fill:#b7c5d6}.hero-sketch .cl-hi{fill:#fff;opacity:.85}.hero-sketch .cl-base{fill:#a9b8cb;opacity:.3}.hero-sketch .clb-a{stop-color:#fff}.hero-sketch .clb-b{stop-color:#f6f8fb}.hero-sketch .clb-c{stop-color:#d3dce8}
+html[data-theme=dark] .hero-sketch .cl-sh{fill:#262d3d}html[data-theme=dark] .hero-sketch .cl-hi{fill:#9aa4b8;opacity:.35}html[data-theme=dark] .hero-sketch .cl-base{fill:#161b26;opacity:.6}html[data-theme=dark] .hero-sketch .clb-a{stop-color:#5a647b}html[data-theme=dark] .hero-sketch .clb-b{stop-color:#424b60}html[data-theme=dark] .hero-sketch .clb-c{stop-color:#323a4d}
 .hero-sketch .moonpath{display:none}
 html[data-theme=dark] .hero-sketch .moonpath{display:inline}
 html[data-theme=dark] .hero-sketch .glint{display:none}
