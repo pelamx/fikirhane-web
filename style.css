@@ -92,10 +92,9 @@ header.topnav-compact .member-header-actions,header.topnav-compact .header-actio
 @keyframes sketch-ferry{to{transform:translateX(-1460px)}}
 @keyframes sketch-glide{to{transform:translate(50px,-8px)}}
 @keyframes sketch-flap{to{transform:scaleY(.4)}}
-html[data-theme=dark] .hero-sketch .sun .cu,html[data-theme=dark] .hero-sketch .glint{stroke:var(--ink)}
-html[data-theme=dark] .hero-sketch .sun .wash{fill:var(--ink);opacity:.45}
-html[data-theme=dark] .hero-sketch .sun{filter:drop-shadow(0 0 12px color-mix(in srgb,var(--ink) 35%,transparent))}
-html[data-theme=dark] .hero-sketch .sun .stripe{display:none}
+/* Light theme shows the sun, dark theme the full moon (both in the .sun group). */
+.hero-sketch .moon-real,html[data-theme=dark] .hero-sketch .sun-real{display:none}html[data-theme=dark] .hero-sketch .moon-real{display:inline}
+html[data-theme=dark] .hero-sketch .glint{stroke:var(--ink)}
 .hero-sketch .moonpath{display:none}
 html[data-theme=dark] .hero-sketch .moonpath{display:inline}
 html[data-theme=dark] .hero-sketch .glint{display:none}
