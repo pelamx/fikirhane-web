@@ -66,6 +66,8 @@ header.topnav-compact .member-header-actions,header.topnav-compact .header-actio
 .hero-sketch .hatch.dark{stroke:var(--ink);stroke-width:1}.hero-sketch .hatch.cu-hatch{stroke:var(--copper);opacity:.8}
 .hero-sketch .far-hatch{opacity:.4}.hero-sketch .far.fine{stroke-width:1}.hero-sketch .water{opacity:.55}
 .hero-sketch .nostroke{stroke:none}
+/* People are full-colour vector characters on top of the line drawing; they fade in instead of drawing on. */
+.hero-sketch .toon{stroke:none;animation:sketch-toon .9s ease both calc(var(--d,0s) + .2s)}@keyframes sketch-toon{from{opacity:0}}
 .hero-sketch .ln{stroke-width:.7}.hero-sketch .ln.gh{stroke-width:.55}.hero-sketch .hatch.skin{stroke-width:.4;opacity:.75}.hero-sketch .hatch.skin.dark{stroke:var(--ink);opacity:.6}
 .hero-sketch .paper{fill:var(--surface)}.hero-sketch .cu-fill{fill:color-mix(in srgb,var(--copper) 35%,var(--surface))}
 .hero-sketch .wash{fill:var(--copper);opacity:.16}.hero-sketch .logo,.hero-sketch .beacon{fill:var(--copper)}
