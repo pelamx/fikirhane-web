@@ -10,6 +10,7 @@ import { hostRoutes } from './routes/host.ts';
 import { kitchenRoutes } from './routes/kitchen.ts';
 import { meRoutes } from './routes/me.ts';
 import { tourRoutes } from './routes/tours.ts';
+import { contactRoutes } from './routes/contact.ts';
 import { resolveSession } from './services/auth.ts';
 import { staticSite } from './static.ts';
 
@@ -60,6 +61,7 @@ export function createApp(deps: Deps) {
   app.route('/api/admin', adminRoutes(deps));
   app.route('/api/host', hostRoutes(deps));
   app.route('/api/tours', tourRoutes(deps));
+  app.route('/api/contact', contactRoutes(deps));
   app.route('/api/kitchen', kitchenRoutes(deps));
   app.route('/api', catalogRoutes(deps));
   app.all('/api/*', c => c.json({ error: { code: 'not_found', message: 'Unknown endpoint.' } }, 404));

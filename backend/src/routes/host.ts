@@ -69,6 +69,37 @@ export function hostRoutes(deps: Deps) {
     return c.json(row);
   });
 
+  // Messages from "İletişim", newest first among the open ones.
+  const ContactUpdate = z.object({
+    status: z.enum(['new', 'answered', 'closed']),
+    staff_note: z.string().trim().max(1000).nullable().optional(),
+  });
+  app.get('/contact', async c => {
+    requirePermission(await permissionsOf(c, deps), 'contact.view');
+    const { durum } = query(c, z.object({ durum: z.enum(['acik', 'kapali']).default('acik') }));
+    const open = durum === 'acik';
+    const rows = await sql`
+      select m.id_contact_message, m.full_name, m.contact_email, m.contact_phone, m.topic, m.message, m.status, m.staff_note,
+             m.created_at, m.updated_at, h.first_name as handled_by
+      from contact_messages m left join users h on h.id_user = m.handled_by_user_id
+      where ${open ? sql`m.status = 'new'` : sql`m.status in ('answered', 'closed')`}
+      order by ${open ? sql`m.created_at desc` : sql`m.updated_at desc`} limit 300`;
+    return c.json({ items: rows });
+  });
+  app.patch('/contact/:id', async c => {
+    const userId = requireUser(c);
+    requirePermission(await permissionsOf(c, deps), 'contact.manage');
+    const input = await body(c, ContactUpdate);
+    const id = idParam(c, 'id');
+    const [row] = await sql<{ status: string }[]>`
+      update contact_messages set status = ${input.status}, handled_by_user_id = ${userId},
+        staff_note = ${input.staff_note === undefined ? sql`staff_note` : input.staff_note || null}
+      where id_contact_message = ${id} returning status`;
+    if (!row) throw notFound('Contact message');
+    await audit(sql, { actorUserId: userId, action: 'contact.update', entityType: 'contact_message', entityId: id, source: 'admin_web', metadata: { status: input.status } });
+    return c.json(row);
+  });
+
   // Cafeteria counter: the menu with today's sales, and one sale (receipt, stock, payment and allocation together).
   const Sale = z.object({
     lines: z.array(z.object({ id_item: z.uuid(), quantity: z.number().positive().max(1000).multipleOf(0.001) })).min(1).max(30),

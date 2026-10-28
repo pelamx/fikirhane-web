@@ -47,6 +47,7 @@ export interface Config {
   passwordResetRequestsPerHour: number;
   /** Visit requests (Tur planla) accepted per network per hour. */
   tourRequestsPerHour: number;
+  contactMessagesPerHour: number;
   kitchenPayment: KitchenPayment;
   paytr: { merchantId: string; merchantKey: string; merchantSalt: string; testMode: boolean } | null;
   /** How long an online payment may stay open before the tab unlocks again. */
@@ -94,6 +95,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     checkinEarlyMinutes: int('CHECKIN_EARLY_MINUTES', 15),
     passwordResetRequestsPerHour: int('PASSWORD_RESET_REQUESTS_PER_HOUR', 5),
     tourRequestsPerHour: int('TOUR_REQUESTS_PER_HOUR', 5),
+    contactMessagesPerHour: int('CONTACT_MESSAGES_PER_HOUR', 5),
     kitchenPayment: kitchenPayment as KitchenPayment,
     paytr,
     kitchenCheckoutMinutes: int('KITCHEN_CHECKOUT_MINUTES', 15),
