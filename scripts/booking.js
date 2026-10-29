@@ -124,7 +124,7 @@ function confirmStep(e, s) {
       ${extra.freepass ? `<div><dt>Freepass</dt><dd>${esc(extra.freepass)} <small>(geçerliyse ücret alınmaz)</small></dd></div>` : ''}
       <div><dt>Ücret</dt><dd>${p ? `${Number(p.discountAmount) > 0 ? `<s>${esc(money(p.listAmount, p.currency))}</s> ` : ''}<strong>${esc(money(p.finalPrice, p.currency))}</strong>${p.reason === 'membership' ? ' <small>üyelik indirimiyle</small>' : ''}` : '—'}</dd></div>
     </dl>
-    <p class="booking-note">${policy?.payment_mode === 'online' ? 'Ödemeyi bir sonraki adımda yapacaksın; yerin 10 dakika tutulur.' : 'Ödeme buluşmada alınır.'} Buluşmaya ${policy?.cancellation_lock_hours ?? 24} saatten fazla varken rezervasyonunu üye alanından iptal edebilirsin.${waitlist ? ' <strong>Bu salon dolu; bekleme listesine eklenirsin, yer açılınca haber veririz.</strong>' : ''}</p>
+    <p class="booking-note">${policy?.payment_mode === 'online' ? 'Ödemeyi bir sonraki adımda yapacaksın; yerin 10 dakika tutulur.' : 'Ödeme buluşmada alınır.'} Buluşmaya ${policy?.cancellation_lock_hours ?? 24} saatten fazla varken rezervasyonunu hesabından iptal edebilirsin.${waitlist ? ' <strong>Bu salon dolu; bekleme listesine eklenirsin, yer açılınca haber veririz.</strong>' : ''}</p>
     <p class="form-error" id="booking-error" role="alert" hidden></p>`;
 }
 

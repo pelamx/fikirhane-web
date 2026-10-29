@@ -12,15 +12,15 @@ const path = location.pathname.replace(new URL('.', base).pathname, '/');
 const area = path.startsWith('/admin') ? 'admin' : path.startsWith('/host') ? 'host' : path.startsWith('/member') ? 'member' : 'site';
 const onHome = path === '/' || path === '/index.html';
 
-const SITE = onHome
-  ? [[url('kulupler/'), 'Kulüpler'], ['#takvim', 'Buluşma takvimi'], ['#mekan', 'Mekân & topluluk'], ['#sss', 'SSS'], [url('rezervasyon/'), 'Rezervasyon']]
-  : [[url(''), 'Keşfet'], [url('kulupler/'), 'Kulüpler'], [url('rezervasyon/'), 'Rezervasyon']];
+// The same visitor menu on every public page; the home page's sections are reached from anywhere.
+const home = onHome ? '' : url('');
+const SITE = [[url('kulupler/'), 'Kulüpler'], [home + '#takvim', 'Buluşma takvimi'], [home + '#mekan', 'Mekânlar'], [home + '#sss', 'SSS'], [url('rezervasyon/'), 'Rezervasyon']];
 const MEMBER = [['member/#anasayfa', 'Ana sayfam'], ['member/#kesfet', 'Kulüpleri keşfet'], ['member/#kuluplerim', 'Kulüplerim'],
   ['member/#bulusmalar', 'Buluşmalar'], ['member/#mutfak', 'Kafeterya'], ['rezervasyon/', 'Rezervasyon yap']].map(([h, t]) => [url(h), t]);
 const HOST = [['host/#genel', 'Bugün'], ['host/#etkinlikler', 'Program'], ['host/#kontrol', 'Giriş kontrol']].map(([h, t]) => [url(h), t]);
 const ADMIN = [['admin/#genel', 'Genel bakış'], ['admin/#veri', 'Tüm tablolar']].map(([h, t]) => [url(h), t]);
 const ACCOUNT = [[url('member/#profil'), 'Profilim'], [url('member/#bulusmalar'), 'Rezervasyonlarım']];
-const SHELLS = [['site', url(''), 'Keşfet'], ['member', url('member/#anasayfa'), 'Üye alanım'], ['host', url('host/#genel'), 'Host paneli'],
+const SHELLS = [['site', url(''), 'Keşfet'], ['member', url('member/#anasayfa'), 'Hesabım'], ['host', url('host/#genel'), 'Host paneli'],
   ['admin', url('admin/#genel'), 'Yönetim']];
 
 const header = document.querySelector('header');
@@ -57,6 +57,7 @@ const folded = window.matchMedia('(max-width:1180px)');
 function fit() {
   if (!header || !nav || nav.classList.contains('open')) return;
   header.classList.remove('topnav-compact');
+  document.documentElement.style.setProperty('--header-h', header.offsetHeight + 'px');
   if (folded.matches) return;
   const main = nav.querySelector('.topnav-main');
   const overflow = header.scrollWidth > header.clientWidth + 1 || nav.scrollWidth > nav.clientWidth + 1 || (main && main.scrollWidth > main.clientWidth + 1);

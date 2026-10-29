@@ -14,7 +14,7 @@ function updateEntryLinks() {
   const session = getSession();
   document.querySelectorAll('[data-member-entry]').forEach(link => {
     link.href = siteUrl(session ? 'member/#anasayfa' : 'uyelik/');
-    if (link.classList.contains('join-link')) link.innerHTML = session ? 'Üye alanım <span>↗</span>' : 'Aramıza katıl <span>↗</span>';
+    if (link.classList.contains('join-link')) link.innerHTML = session ? 'Hesabım <span>↗</span>' : 'Hesap aç <span>↗</span>';
   });
 }
 window.addEventListener('fikirhane-session', updateEntryLinks);
