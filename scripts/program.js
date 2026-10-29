@@ -32,7 +32,7 @@ const inMeetingRoom = e => optionsOf(e).some(o => o.location_code === 'MEETING_R
 export const AREAS = {
   coworking: { label: 'Coworking', title: 'Coworking seansını seç', lead: 'Hafta içi sabah 10.00–14.00 ve öğleden sonra 14.30–18.30. Salonunu ve koltuğunu sonra seçersin.',
     match: e => e.event_type === 'workspace' && !inMeetingRoom(e) },
-  toplanti: { label: 'Toplantı odası', title: 'Toplantı odasını ayırt', lead: 'Hafta içi akşamları iki saatlik dilimler: 18.00, 20.00 ve 22.00. Odanın tamamı senin.',
+  toplanti: { label: 'Studio', title: 'Studio’yu ayırt', lead: 'Hafta içi akşamları iki saatlik dilimler: 18.00, 20.00 ve 22.00. Odanın tamamı senin.',
     match: inMeetingRoom },
   bulusma: { label: 'Buluşmalar', title: 'Buluşmanı seç', lead: 'Kulüplerin buluşmaları ve etkinlikleri.', match: e => e.event_type !== 'workspace' },
 };

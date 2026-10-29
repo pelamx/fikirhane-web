@@ -436,3 +436,4 @@ html[data-theme=dark] .floor-map img{filter:invert(1) hue-rotate(180deg)}
 @media(prefers-reduced-motion:reduce){.faq-icon{transition:none}}
 .contact-message{margin-bottom:26px}
 .contact-facts{margin-bottom:40px}
+.room-h{font:400 44px/1.1 var(--serif);letter-spacing:-1px;margin:80px 0 -10px}.room-h em{font-size:.42em;letter-spacing:0;color:var(--copper);margin-left:14px;white-space:nowrap}@media(max-width:760px){.room-h{font-size:34px;margin:50px 0 -10px}.room-h em{display:block;margin:8px 0 0}}
